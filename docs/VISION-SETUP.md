@@ -142,6 +142,14 @@ closes the stream and produces `RESPONSE_TOO_LARGE`, with no retry or release of
 the reservation. This caps response buffering, not total process memory; decoding
 chunks, bounded copies and JSON objects have additional overhead.
 
+VisionResult schema version 3 removes presentation-length caps from all 12
+free-form narrative fields. The response-size and output-token limits still bound
+provider output. Required values, substantive evidence rules, literal hallmark
+limits and reference checks remain enforced. Narratives over 800 characters are
+collapsible in the interface, with their complete escaped text preserved. This
+display threshold is not a validation limit. See the
+[field audit and offline regressions](VISION-NARRATIVE-LIMITS.md).
+
 For successful responses, the hook extracts only bounded numeric token counters, an allowlisted
 stop reason, HTTP status and sanitized request ID. The SDK then parses that same
 response normally: there is no second request and no validation bypass. No response
@@ -163,8 +171,8 @@ HTTPX/eBay behavior is unchanged.
 - The reviewed Haiku QUICK profile allows 32,768 output tokens and reserves
   $0.581920 at the conservative full-context rates. This changes only the output
   allowance: implicit thinking behavior and effort are preserved, with no thinking
-  parameter added. The production VisionResult schema, validators, 2 MiB response
-  limit and timeouts are unchanged. After merge, append the revised profile through
+  parameter added. The 2 MiB response limit and timeouts are unchanged; the current
+  response contract is described above. Append the revised profile through
   the existing settings workflow; prior profiles/runs stay immutable. See
   [Haiku output allowance](HAIKU-OUTPUT-ALLOWANCE.md).
 - Paid requests are off by default. Ten paid starts per UTC day and $5 per UTC

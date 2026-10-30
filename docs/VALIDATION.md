@@ -503,3 +503,22 @@ six owner workflow pages responded with expected content.
 - No Anthropic request, retry, new authorization, billing reconciliation, automatic
   merge, thinking optimization or Task 006 work occurred. See
   [output allowance and activation steps](HAIKU-OUTPUT-ALLOWANCE.md).
+
+## Complete evidence-safe narratives — October 30, 2026
+
+- Based on merged PR #8 main `4c2515bb643e1dad78f22f31287f5bd70022d3a3`.
+  Audited all 12 free-form narrative fields and removed presentation-length caps.
+  Required values and substantive evidence/reference restrictions remain enforced.
+  Schema version is 3; prompt `jewelry-3` and generation settings are unchanged.
+- **489 tests pass**, including 40 new narrative regressions and all previous 449
+  cases. Ruff lint, formatting and whitespace checks pass. The existing
+  Starlette/AnyIO deprecation warning remains. Mocked SDK responses exercise the
+  complete parse, validation, storage and rendering path without external calls.
+- Long accepted narratives remain verbatim, escaped and collapsible. Desktop and
+  Android-sized Chromium checks confirm complete text after expansion, keyboard
+  access, no overflow, no injected resources and disabled paid analysis.
+- All 26 actual database tables and hashes of 28 pre-existing private files match
+  the preservation snapshot. All four failed real-photo attempts, authorizations,
+  photographs and reservations remain unchanged. No Anthropic request, new pilot,
+  billing edit, automatic merge or unrelated development occurred. See the
+  [field audit and remaining limits](VISION-NARRATIVE-LIMITS.md).

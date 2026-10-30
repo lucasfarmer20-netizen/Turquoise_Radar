@@ -9,7 +9,7 @@ from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS
 from radar.jewelry.validation import reference_error, rule_error
 
 PROMPT_VERSION = "jewelry-3"
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 OWNER = "local-owner"
 Role = Literal["FRONT", "BACK_HALLMARK", "STONE", "SIDE_DETAIL"]
 Stage = Literal["QUICK", "DEEP"]
@@ -101,8 +101,14 @@ def guarded_text(value):
             safe_spans.append((start, end))
         start = next_start
     for code, pattern in forbidden:
+        # Both matches and caution spans are ordered. Scan each span at most once
+        # per rule so long explanations do not cause quadratic containment work.
+        spans = iter(safe_spans)
+        span = next(spans, None)
         for match in re.finditer(pattern, value, re.I):
-            if not any(a <= match.start() and match.end() <= b for a, b in safe_spans):
+            while span is not None and span[1] < match.end():
+                span = next(spans, None)
+            if span is None or span[0] > match.start():
                 raise rule_error(code)
     return value  # Never rewrite accepted findings.
 
@@ -110,13 +116,14 @@ def guarded_text(value):
 class Finding(Strict):
     key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")
     category: Literal["CLASSIFICATION", "METAL", "STONE", "CONSTRUCTION", "CONDITION", "RESEARCH"]
-    description: str = Field(min_length=1, max_length=350)
+    # Prose is bounded by the provider response cap, not presentation lengths.
+    description: str = Field(min_length=1)
     image_id: str = Field(pattern=r"^[a-f0-9]{32}$")
-    visible_evidence: str = Field(min_length=1, max_length=800)
+    visible_evidence: str = Field(min_length=1)
     confidence: Literal["HIGH", "MEDIUM", "LOW", "UNKNOWN"]
     evidence_kind: Literal["DIRECT", "INFERRED"]
-    uncertainty: str = Field(min_length=1, max_length=600)
-    next_action: str | None = Field(default=None, max_length=400)
+    uncertainty: str = Field(min_length=1)
+    next_action: str | None = None
     signal: Signal
     legibility: Literal["LEGIBLE", "PARTIAL", "UNREADABLE", "NOT_APPLICABLE"] = "NOT_APPLICABLE"
     hallmark_transcription: str | None = Field(default=None, min_length=1, max_length=40)
@@ -147,9 +154,9 @@ class Finding(Strict):
 
 
 class MakerCandidate(Strict):
-    research_name: str = Field(min_length=1, max_length=100)
+    research_name: str = Field(min_length=1)
     supporting_finding_key: str
-    uncertainty: str = Field(min_length=1, max_length=500)
+    uncertainty: str = Field(min_length=1)
     status: Literal["UNVERIFIED_RESEARCH_LEAD"] = "UNVERIFIED_RESEARCH_LEAD"
 
     @field_validator("research_name", "uncertainty")
@@ -160,11 +167,11 @@ class MakerCandidate(Strict):
 
 class SubItem(Strict):
     key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")
-    label: str = Field(min_length=1, max_length=150)
+    label: str = Field(min_length=1)
     image_id: str = Field(pattern=r"^[a-f0-9]{32}$")
-    location_hint: str = Field(min_length=1, max_length=250)
+    location_hint: str = Field(min_length=1)
     finding_keys: list[str] = Field(min_length=1, max_length=8)
-    uncertainty: str = Field(min_length=1, max_length=400)
+    uncertainty: str = Field(min_length=1)
 
     @field_validator("label", "location_hint", "uncertainty")
     @classmethod
@@ -174,9 +181,9 @@ class SubItem(Strict):
 
 class VisionResult(Strict):
     classification: Kind
-    summary: str = Field(min_length=1, max_length=800)
-    visible_southwestern_style: str = Field(max_length=500)
-    hallmark_candidate: str = Field(max_length=500)
+    summary: str = Field(min_length=1)
+    visible_southwestern_style: str
+    hallmark_candidate: str
     possible_maker_identity: MakerCandidate | None = None
     documented_cultural_attribution: Literal["UNVERIFIED"] = "UNVERIFIED"
     material_verification: Literal["UNVERIFIED"] = "UNVERIFIED"
