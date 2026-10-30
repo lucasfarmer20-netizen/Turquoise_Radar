@@ -1,4 +1,31 @@
-# Authorized source evaluation — Phase 003 candidate
+# Source register — Task 004
+
+Local owner-provided alert, CSV/JSON and copied-text paths now operate independently
+of eBay approval. See [operational matrix, official references and limitations](ALERT-SETUP.md).
+ShopGoodwill Personal Shopper / HiBid daily digest formats are still provisional;
+the addendum describes other observed transaction/promotion categories, but no real
+messages were supplied to this task. Synthetic fixture validation is not real-format
+verification. Current public help checks returned proxy 403. No public website is
+assumed to grant API/crawling rights.
+
+| Source | Working owner path | Remaining restriction |
+|---|---|---|
+| ShopGoodwill | .eml/paste direct item links/labels, item/order events, receipts, structured/manual | Personal Shopper digest unverified; no website automation authorization |
+| HiBid | .eml/paste lot vs catalog links, explicit auction/price/fee evidence, structured/manual | Daily digest unverified; Shipping Available does not prove 99669 eligibility |
+| EstateSales.org | Generic labelled/link intake, structured/manual | Optional source rules need permitted samples; automatic retrieval not authorized |
+| EstateSales.net | Generic labelled/link intake, structured/manual | Same; source fees and shipping remain per-sale evidence |
+| CTBids | Generic labelled/link intake, structured/manual | Same; no universal premium or Alaska quote assumed |
+| Poshmark | Owner CSV/JSON, direct links/copied text, generic alert evidence | No validated email template or API/crawling access claimed |
+| Mercari | Owner CSV/JSON, direct links/copied text, generic alert evidence | Same |
+| Other authorized estates | Separate configurable source entry/domains, generic/structured/manual | One entry per marketplace; verified samples required for optional custom extraction |
+
+All unknown costs/attribution remain unknown. Owner-configured metadata is not an
+access grant. No direct mailbox integration or additional automated source adapter
+is implemented. Original owner content stays in SQLite, not GitHub.
+
+---
+
+# Previous eBay architecture evaluation
 
 Assessment date: **2026-10-29**. Task 003 implements an official eBay adapter with
 fixture-first operation; **no real sandbox or production API calls were executed**.

@@ -1,0 +1,41 @@
+[
+  {
+    "source": "shopgoodwill",
+    "files": [
+      "synthetic-shop-search.eml",
+      "synthetic-shop-search.eml",
+      "synthetic-shop-bid.eml",
+      "synthetic-shop-outbid.eml",
+      "synthetic-shop-won.eml",
+      "synthetic-shop-paid.eml",
+      "synthetic-shop-shipped.eml",
+      "synthetic-shop-multi-paid.eml"
+    ]
+  },
+  {
+    "source": "hibid",
+    "files": [
+      "synthetic-hibid-promo.eml",
+      "synthetic-hibid-closing.eml",
+      "synthetic-hibid-search.eml"
+    ]
+  },
+  {
+    "source": "ctbids",
+    "files": [
+      "synthetic-ctbids.eml"
+    ]
+  },
+  {
+    "source": "estatesales-org",
+    "files": [
+      "synthetic-estatesales-org.eml"
+    ]
+  },
+  {
+    "source": "estatesales-net",
+    "files": [
+      "synthetic-estatesales-net.eml"
+    ]
+  }
+]

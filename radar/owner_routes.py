@@ -29,6 +29,8 @@ EDITABLE = ACQUISITION + [
     "sale_auction_id",
     "shipping_status",
     "carrier",
+    "combined_shipping_available",
+    "combined_shipping_evidence",
     "condition",
     "stated_weight",
     "weight_unit",
@@ -210,6 +212,9 @@ def owner_routes(app, render, preferences, view):
             for key in ("resale_confirmed", "weight_verified", "invoice_allocation_confirmed"):
                 if key in form:
                     updates[key] = form[key] == "true"
+            if "combined_shipping_available" in form:
+                value = form["combined_shipping_available"]
+                updates["combined_shipping_available"] = None if value == "" else value == "true"
             statuses = dict(before.get("cost_status", {}))
             statuses.update({k: form[k + "_status"] for k in ACQUISITION if k + "_status" in form})
             try:

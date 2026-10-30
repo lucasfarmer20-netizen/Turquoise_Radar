@@ -120,3 +120,50 @@ six owner workflow pages responded with expected content.
   entries. No production API host was added. Saving is not runtime application or
   publication; documentation, credentials and permitted sandbox access remain
   prerequisites for real API validation.
+
+
+## Task 004 validation
+
+- Branch task/004-multi-source-discovery is based on merged Task 003 main
+  f37f63e175190e38a8b87f99a0404d254e09bfbc. eBay adapter/configuration/gates are unchanged.
+- **165 tests pass**, including every retained Task 003 case and new classification,
+  .eml/text/MIME, duplicates, source identities, query provenance, grouping, receipts,
+  real-vs-estimated costs, HTML/URL safety, attachment, size and v4 migration tests.
+- Ruff lint/format and whitespace checks pass; one existing Starlette/AnyIO
+  deprecation warning remains, with no skipped/disabled tests.
+- The source fixture demo yields 15 identities: 5 ShopGoodwill, 5 HiBid, 3 CTBids,
+  1 EstateSales.org and 1 EstateSales.net. Thirteen unique messages retain 23
+  independent observations; a repeated alert creates duplicate accounting, not
+  another message/item. No purchase feedback is seeded.
+- Tests cover bid/outbid/win/paid/shipped correlation; a paid single-item receipt
+  reconciles 18 subtotal + 0 tax + 9 combined shipping/handling = 27 order total.
+  A two-item receipt keeps its 12 shipping/handling at order level. Nonzero order
+  tax, premiums, service fees and separate shipping/handling never become first-lot
+  costs merely because their labels precede the first lot. Conflicts,
+  incomplete amounts, non-USD and mismatches cannot apply paid landed costs.
+- v4 migration/rollback tests use populated v3 tables, including eBay query histories,
+  original observations, financial edits, feedback, comparables and settings.
+  A copy of the actual default v3 DB also retained every old row/column unchanged:
+  25 listings, 27 patterns, one preferences row, three query groups and all prior
+  observation/review tables. New email data is not seeded into owner inventory.
+- Desktop 1440×1000 / mobile 390×844 Chromium passed uploads from five sources,
+  duplicate handling, 15-candidate/source filtering, review handoff, 27 paid-cost
+  confirmation, multi-item non-allocation, purchase preservation after repeat import,
+  irrelevant status, explicit query confirmation, exact clipboard copy and setup
+  flags, and catalog-only reminder evidence. Ten mobile views had no horizontal
+  overflow. Browser errors and external requests were both zero.
+- Original bodies are escaped text only. No actual owner email, address, tracking
+  link or purchase record was used in checked-in fixtures. Original .eml files are
+  ignored except explicitly named synthetic fixtures; private data/backups stay ignored.
+- Official ShopGoodwill/HiBid help requests returned proxy 403; current terms and
+  actual search-digest formats remain unverified. No scraping or account/API access
+  is inferred from website availability or owner-reported features.
+
+- Restarted the private default app on Task 004 and verified ten readiness routes
+  returned 200, including health destination 99669. Startup retained 25 existing
+  listings, zero feedback, zero alert messages/observations/invoices; only eight
+  reference sources and 168 recommended saved searches were initialized.
+- Reusable install/start instructions were saved in the cloud configuration draft
+  for v4/local alert intake. Reference-only ShopGoodwill/HiBid domains were added
+  while preserving prior draft domains. Saving is confirmed; publication/application
+  requires environment-settings review/save and publication and has not occurred.

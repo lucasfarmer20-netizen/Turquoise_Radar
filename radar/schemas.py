@@ -182,6 +182,8 @@ class ListingInput(BaseModel):
     collector_evidence: str | None = None
     combined_shipping_available: bool | None = None
     synthetic: bool = False
+    query_attribution_verified: bool | None = None
+    combined_shipping_evidence: str | None = None
     buying_options: list[str] = Field(default_factory=list)
     item_end_time: datetime | None = None
     shipping_evidence: str | None = None

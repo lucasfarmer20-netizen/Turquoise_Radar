@@ -6,6 +6,8 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from radar.db import (
+    AlertMessage,
+    AlertObservation,
     DiscoveredItem,
     DiscoveryObservation,
     Feedback,
@@ -45,6 +47,24 @@ def pattern_effectiveness(session):
                 execution.mode != "production",
             )
         )
+    for observation, message, item in session.execute(
+        select(AlertObservation, AlertMessage, DiscoveredItem)
+        .join(AlertMessage, AlertMessage.id == AlertObservation.message_id)
+        .join(DiscoveredItem, DiscoveredItem.id == AlertObservation.item_id)
+        .where(DiscoveredItem.listing_id.is_not(None))
+    ):
+        p = next((p for p in patterns.values() if p.phrase == observation.query_text), None)
+        linked[item.listing_id].append(
+            (
+                p.id if p else None,
+                item.source,
+                observation.query_text,
+                "UNKNOWN"
+                if observation.attribution_verified and message.message_type == "SEARCH_MATCH"
+                else "UNVERIFIED ALERT",
+                message.synthetic,
+            )
+        )
     for row in session.scalars(select(Listing)):
         evidence = list(linked[row.id])
         if not evidence:
@@ -72,6 +92,8 @@ def pattern_effectiveness(session):
             kind = (
                 "INFERRED"
                 if not actual
+                else "UNVERIFIED ALERT"
+                if state == "UNVERIFIED ALERT"
                 else "NON-LIVE QUERY"
                 if non_live
                 else "SOURCE CORRECTED"

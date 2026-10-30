@@ -65,7 +65,40 @@ VERSION_3 = [
     "CREATE INDEX ix_discovery_obs_item ON discovery_observations(item_id)",
     "CREATE INDEX ix_search_execution_run ON search_executions(run_id)",
 ]
-CURRENT_VERSION = 3
+VERSION_4 = [
+    "ALTER TABLE discovered_items ADD COLUMN inbox_status VARCHAR NOT NULL DEFAULT 'NEW'",
+    """CREATE TABLE intake_sources (id VARCHAR PRIMARY KEY, data JSON NOT NULL,
+        last_successful_import DATETIME)""",
+    """CREATE TABLE alert_imports (id INTEGER PRIMARY KEY,
+        source_id VARCHAR NOT NULL REFERENCES intake_sources(id), stats JSON NOT NULL,
+        created_at DATETIME NOT NULL)""",
+    """CREATE TABLE alert_messages (id INTEGER PRIMARY KEY,
+        source_id VARCHAR NOT NULL REFERENCES intake_sources(id), digest VARCHAR NOT NULL UNIQUE,
+        raw_b64 TEXT NOT NULL, safe_text TEXT NOT NULL, subject TEXT NOT NULL,
+        message_type VARCHAR NOT NULL, data JSON NOT NULL, received_at DATETIME, sent_at DATETIME,
+        imported_at DATETIME NOT NULL, last_imported_at DATETIME NOT NULL,
+        import_count INTEGER NOT NULL, synthetic BOOLEAN NOT NULL)""",
+    """CREATE TABLE alert_observations (id INTEGER PRIMARY KEY,
+        message_id INTEGER NOT NULL REFERENCES alert_messages(id),
+        item_id INTEGER NOT NULL REFERENCES discovered_items(id), data JSON NOT NULL,
+        query_text TEXT, attribution_verified BOOLEAN NOT NULL, created_at DATETIME NOT NULL,
+        UNIQUE(message_id,item_id))""",
+    """CREATE TABLE alert_invoices (id INTEGER PRIMARY KEY,
+        source_id VARCHAR NOT NULL REFERENCES intake_sources(id), identity VARCHAR NOT NULL UNIQUE,
+        order_id VARCHAR NOT NULL, data JSON NOT NULL,
+        listing_id INTEGER REFERENCES listings(id), confirmed_at DATETIME)""",
+    """CREATE TABLE invoice_evidence (id INTEGER PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES alert_invoices(id),
+        message_id INTEGER NOT NULL REFERENCES alert_messages(id),
+        UNIQUE(invoice_id,message_id))""",
+    """CREATE TABLE saved_source_searches (id INTEGER PRIMARY KEY,
+        source_id VARCHAR NOT NULL REFERENCES intake_sources(id), phrase TEXT NOT NULL,
+        group_name VARCHAR NOT NULL, selected BOOLEAN NOT NULL, configured BOOLEAN NOT NULL,
+        UNIQUE(source_id,phrase))""",
+    "CREATE INDEX ix_alert_obs_item ON alert_observations(item_id)",
+    "CREATE INDEX ix_alert_message_source ON alert_messages(source_id)",
+]
+CURRENT_VERSION = 4
 
 
 def migrate(engine):
@@ -95,6 +128,9 @@ def migrate(engine):
                     conn.exec_driver_sql(statement)
             if version < 3:
                 for statement in VERSION_3:
+                    conn.exec_driver_sql(statement)
+            if version < 4:
+                for statement in VERSION_4:
                     conn.exec_driver_sql(statement)
             conn.exec_driver_sql(f"PRAGMA user_version={CURRENT_VERSION}")
             conn.commit()
