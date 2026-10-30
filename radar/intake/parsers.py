@@ -148,6 +148,9 @@ def safe_link(url, source):
             return None
         if not any(host == d or host.endswith("." + d) for d in source.domains):
             return None
+        if host == "clicks.auctions.hibid.com":
+            # Never render the original tracking URL, even on the provider's domain.
+            return None
         # No redirect unwrapping, tracking requests or arbitrary relative URL resolution.
         if re.search(r"/(?:track|tracking|click|redirect)(?:/|$)", u.path, re.I):
             return None
@@ -162,8 +165,58 @@ def safe_link(url, source):
         return None
 
 
+def hibid_embedded_target(url):
+    """Offline only: recover an explicit target, never decode opaque tracking tokens.
+
+    The PR identifies this exact tracking host, not a universal wrapper schema.
+    Inspect only its path, allowing one percent-decoding pass and one absolute
+    HTTPS target. Query-string redirects, nested wrappers and ambiguous targets
+    are unsupported. Return only a canonical provider identity URL, without any
+    wrapper tokens, slug suffixes, query parameters or fragment.
+    """
+    if not isinstance(url, str) or len(url) > 8192 or re.search(r"[\s\x00-\x1f\x7f\\]", url):
+        return None
+    try:
+        wrapper = urlsplit(url)
+        if (
+            wrapper.scheme != "https"
+            or wrapper.hostname != "clicks.auctions.hibid.com"
+            or wrapper.username
+            or wrapper.password
+            or wrapper.port not in (None, 443)
+            or wrapper.fragment
+        ):
+            return None
+        path = unquote(wrapper.path, errors="strict")
+        if re.search(r"[\s\x00-\x1f\x7f\\]", path):
+            return None
+        starts = list(re.finditer(r"https?://", path, re.I))
+        if len(starts) != 1 or path[starts[0].start() - 1 : starts[0].start()] != "/":
+            return None
+        target = urlsplit(path[starts[0].start() :])
+        host = target.hostname or ""
+        if (
+            target.scheme != "https"
+            or not re.fullmatch(r"(?:[a-z0-9-]+\.)*hibid\.com", host)
+            or host == "clicks.auctions.hibid.com"
+            or target.username
+            or target.password
+            or target.port not in (None, 443)
+            or "%" in target.path
+            or any(segment in (".", "..") for segment in target.path.split("/"))
+        ):
+            return None
+        match = re.match(r"^/(lot|catalog)/(\d{1,30})(?:/|$)", target.path, re.I)
+        if match:
+            return f"https://{host}/{match.group(1).lower()}/{match.group(2)}"
+    except (ValueError, UnicodeError):
+        pass
+    return None
+
+
 def link_identity(url, source_id, source):
-    clean = safe_link(url, source)
+    embedded = hibid_embedded_target(url) if source_id == "hibid" else None
+    clean = safe_link(embedded or url, source)
     if not clean:
         return None
     path = urlsplit(clean).path
@@ -195,8 +248,11 @@ def classify(subject, text):
         ),
         (MessageType.ORDER_SHIPPED, r"order shipped|shipment confirmation"),
         (MessageType.OUTBID, r"outbid"),
-        (MessageType.AUCTION_WON, r"auction won|you(?: have)? won|winning bidder notice"),
-        (MessageType.BID_CONFIRMED, r"bid confirmed|bid confirmation|bid placed"),
+        (
+            MessageType.AUCTION_WON,
+            r"auction won|you(?: have)? won|winning bidder notice|winning bid notice",
+        ),
+        (MessageType.BID_CONFIRMED, r"bid confirmed|bid confirmation|bid placed|bid notification"),
         (
             MessageType.AUCTION_CLOSING_REMINDER,
             r"closing soon|auction closing|closing reminder|ending today",
@@ -231,6 +287,36 @@ class ParsedMessage(BaseModel):
     synthetic: bool = False
     data: dict = Field(default_factory=dict)
     candidates: list[Candidate] = Field(default_factory=list)
+
+
+def shopgoodwill_text_items(text, kind):
+    """Only explicit item markers, never arbitrary receipt/order/phone numbers."""
+    for block in re.split(r"\n\s*[-=]{3,}\s*\n", text):
+        patterns = [
+            (r"^\s*Item(?:\s+(?:ID|Number|No\.?))?\s*:\s*(\d{1,30})\s*$", "ITEM_LABEL"),
+            (r"\bitem\s*#\s*(\d{1,30})(?!\d)", "ITEM_HASH"),
+        ]
+        if kind in (MessageType.BID_CONFIRMED, MessageType.AUCTION_WON, MessageType.OUTBID):
+            # Some notices put the ID on its own line below the Item heading.
+            # A bare number elsewhere is not enough to identify a marketplace item.
+            patterns.append(
+                (
+                    r"^[ \t]*Item(?:[ \t]+(?:ID|Number))?[ \t]*:?[ \t]*\n"
+                    r"[ \t]*(\d{1,30})[ \t]*$",
+                    "NOTICE_ITEM_HEADING",
+                )
+            )
+            patterns.append(
+                (
+                    r"^[ \t]*Your bid (?:has been|was) (?:accepted|submitted) "
+                    r"for (?:the following )?item[ \t]*:[ \t]*\n"
+                    r"[ \t]*(\d{1,30})[ \t]*$",
+                    "NOTICE_BID_ITEM_CONTEXT",
+                )
+            )
+        for pattern, method in patterns:
+            for match in re.finditer(pattern, block, re.I | re.M):
+                yield match.group(1), block, method
 
 
 def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received_override=None):
@@ -312,16 +398,22 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
     closing_raw = field(text, ["Auction closes", "Closing time", "Auction closing time"])
     closing = iso_aware(closing_raw)
     identities = []
+    identity_methods = {}
     catalogs = []
     unsafe = 0
+    recovered = 0
     for url, title, context in anchors[:MAX_LINKS]:
         identity = link_identity(url, source_id, source)
         if not identity:
             unsafe += 1
             continue
         link_kind, id_, clean = identity
+        method = "DIRECT_SOURCE_LINK"
+        if source_id == "hibid" and urlsplit(url).hostname == "clicks.auctions.hibid.com":
+            method = "EXPLICIT_EMBEDDED_HTTPS_TARGET"
+            recovered += 1
         if link_kind == "catalog":
-            catalogs.append({"auction_id": id_, "url": clean})
+            catalogs.append({"auction_id": id_, "url": clean, "identity_method": method})
             continue
         labels = source.field_labels if source.sample_verified else {}
         explicit_id = field(
@@ -332,11 +424,15 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
                 continue
             id_ = explicit_id
         identities.append((id_, clean, title, context))
-    # Explicit item ID without a link is useful for lifecycle correlation, never a catalog lot.
-    if not identities and source_id == "shopgoodwill":
-        id_ = field(text, ["Item ID"])
-        if id_ and re.fullmatch(r"\d{1,30}", id_):
-            identities = [(id_, None, "", text)]
+        identity_methods.setdefault(id_, method)
+    if source_id == "shopgoodwill":
+        item_ids = {i[0] for i in identities}
+        for id_, context, method in shopgoodwill_text_items(text, kind):
+            item_ids.add(id_)
+            if len(item_ids) > MAX_LINKS:
+                raise ValueError("Too many item references in one message")
+            identities.append((id_, None, "", context))
+            identity_methods.setdefault(id_, method)
     if not auction and len({c["auction_id"] for c in catalogs}) == 1:
         auction = catalogs[0]["auction_id"]
     unique = {}
@@ -352,7 +448,15 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
         price = amount(
             scoped, labels.get("price", ["Current price", "Current bid", "Price", "Bid amount"])
         )
-        final = amount(scoped, ["Final item subtotal", "Final item price"])
+        final = amount(
+            scoped,
+            ["Final item subtotal", "Final item price"]
+            + (
+                ["Item subtotal"]
+                if kind == MessageType.PAYMENT_RECEIVED and len({i[0] for i in identities}) == 1
+                else []
+            ),
+        )
         if kind == MessageType.PAYMENT_RECEIVED and final is not None:
             price = final
         shipping = amount(scoped, ["Shipping", "Shipping cost"])
@@ -423,6 +527,7 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
             query_supported=supported,
             evidence={
                 "url": url,
+                "identity_method": identity_methods.get(id_, "DIRECT_SOURCE_LINK"),
                 "title": title,
                 "quoted_price": price,
                 "quoted_service_fee": service_fee,
@@ -479,6 +584,7 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
         "received_override": received_override,
         "attachments_ignored": attachments,
         "unsafe_links_ignored": unsafe,
+        "wrapped_targets_recovered_offline": recovered,
         "components": components,
         "status": "PROVISIONAL" if unique else "NEEDS_REVIEW",
         "format_note": "Real search digest formats unverified; extracted values need owner review",

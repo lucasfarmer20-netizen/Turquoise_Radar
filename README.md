@@ -97,6 +97,11 @@ exercise the supported structures. See [alert setup and limitations](docs/ALERT-
 A separate synthetic demo is available with `.venv/bin/python -m radar.intake.demo`;
 never seed fixtures into owner inventory.
 
+The PR #4 compatibility follow-up recognizes ShopGoodwill Item/item # and bounded
+standalone notice IDs, plus explicit HiBid lot/catalog targets embedded in paths on
+the reported tracking host. Extraction stays offline; opaque tokens stay for review.
+See [supported patterns and limits](docs/ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
+
 ## Discovery engine (Task 003)
 
 Open **Discovery → Preview search plan → Run discovery**, keeping Fixture mode.
@@ -227,7 +232,7 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-165 tests (including all 128 retained Task 003 cases) cover financial breakdowns, highest feasible auction bids, fees and
+203 tests (including all 165 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests

@@ -10,14 +10,19 @@ assumed to grant API/crawling rights.
 
 | Source | Working owner path | Remaining restriction |
 |---|---|---|
-| ShopGoodwill | .eml/paste direct item links/labels, item/order events, receipts, structured/manual | Personal Shopper digest unverified; no website automation authorization |
-| HiBid | .eml/paste lot vs catalog links, explicit auction/price/fee evidence, structured/manual | Daily digest unverified; Shipping Available does not prove 99669 eligibility |
+| ShopGoodwill | .eml/paste item links, Item/item # and bounded notice IDs, item/order events, receipts, structured/manual | Personal Shopper digest unverified; no website automation authorization |
+| HiBid | .eml/paste direct or explicit offline embedded lot/catalog targets, auction/price/fee evidence, structured/manual | Daily digest unverified; Shipping Available does not prove 99669 eligibility |
 | EstateSales.org | Generic labelled/link intake, structured/manual | Optional source rules need permitted samples; automatic retrieval not authorized |
 | EstateSales.net | Generic labelled/link intake, structured/manual | Same; source fees and shipping remain per-sale evidence |
 | CTBids | Generic labelled/link intake, structured/manual | Same; no universal premium or Alaska quote assumed |
 | Poshmark | Owner CSV/JSON, direct links/copied text, generic alert evidence | No validated email template or API/crawling access claimed |
 | Mercari | Owner CSV/JSON, direct links/copied text, generic alert evidence | Same |
 | Other authorized estates | Separate configurable source entry/domains, generic/structured/manual | One entry per marketplace; verified samples required for optional custom extraction |
+
+PR #4 compatibility follow-up adds reported ShopGoodwill ID forms and bounded
+offline recovery of explicit targets on the reported HiBid tracking host. Real
+wrapper encoding is not supplied/verified; opaque tokens remain human-review
+evidence. See [exact compatibility limits](ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
 
 All unknown costs/attribution remain unknown. Owner-configured metadata is not an
 access grant. No direct mailbox integration or additional automated source adapter

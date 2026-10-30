@@ -21,7 +21,7 @@ from radar.db import (
     SavedSourceSearch,
     SearchPattern,
 )
-from radar.intake.parsers import parse_message
+from radar.intake.parsers import hibid_embedded_target, parse_message, safe_link
 from radar.intake.registry import SourceDefinition
 from radar.intake.service import import_alerts
 from radar.intake.views import estate_groups, inbox_cards, search_status
@@ -72,6 +72,223 @@ def test_message_classification(client, file, kind):
     parsed = parse_message(raw(file), source, definition)
     assert parsed.message_type == kind
     assert parsed.synthetic
+
+
+@pytest.mark.parametrize(
+    "file,kind,method,price",
+    [
+        ("synthetic-shop-style-receipt.eml", "PAYMENT_RECEIVED", "ITEM_LABEL", "18.00"),
+        ("synthetic-shop-style-winning.eml", "AUCTION_WON", "ITEM_HASH", None),
+        ("synthetic-shop-style-bid.eml", "BID_CONFIRMED", "NOTICE_BID_ITEM_CONTEXT", "10.00"),
+    ],
+)
+def test_shopgoodwill_observed_style_id_markers(client, file, kind, method, price):
+    with client.app.state.sessions() as s:
+        definition = SourceDefinition.model_validate(s.get(IntakeSource, "shopgoodwill").data)
+    parsed = parse_message(raw(file), "shopgoodwill", definition)
+    assert parsed.message_type == kind
+    assert len(parsed.candidates) == 1
+    candidate = parsed.candidates[0]
+    assert candidate.item.source_listing_id == "910000000001"
+    assert candidate.evidence["identity_method"] == method
+    assert candidate.item.item_price == (Decimal(price) if price else None)
+    assert candidate.item.shipping_status == "UNKNOWN"
+    assert candidate.query is None and not candidate.query_supported
+    assert candidate.item.listing_url is None  # No invented/followed tracking destination.
+
+
+def test_shopgoodwill_style_lifecycle_receipt_reconciliation_and_repeat(client):
+    import_files(
+        client,
+        "shopgoodwill",
+        ["synthetic-shop-style-bid.eml", "synthetic-shop-style-winning.eml"],
+    )
+    with client.app.state.sessions() as s:
+        assert len(list(s.scalars(select(DiscoveredItem)))) == 1
+        assert not list(s.scalars(select(Feedback)))
+        assert not list(s.scalars(select(AlertInvoice)))
+    batch = import_files(
+        client,
+        "shopgoodwill",
+        ["synthetic-shop-style-receipt.eml", "synthetic-shop-style-receipt.eml"],
+    )
+    with client.app.state.sessions() as s:
+        invoice = s.scalar(select(AlertInvoice))
+        assert invoice.data["status"] == "RECONCILED"
+        assert invoice.data["components"]["item_subtotal"] == "18.00"
+        assert invoice.data["components"]["sales_tax"] == "0.00"
+        assert invoice.data["components"]["shipping_handling"] == "9.00"
+        assert invoice.data["components"]["order_total"] == "27.00"
+        assert len(invoice.data["item_ids"]) == 1
+        assert len(list(s.scalars(select(AlertObservation)))) == 3
+        assert s.get(AlertImport, batch).stats["duplicate_messages"] == 1
+        assert not list(s.scalars(select(Feedback)))
+    assert client.post("/invoices/1/confirm", data=paid_form()).status_code == 200
+    import_files(client, "shopgoodwill", ["synthetic-shop-style-bid.eml"])
+    with client.app.state.sessions() as s:
+        listing = s.get(Listing, 1)
+        assert listing.review_state == "PURCHASED"
+        assert listing.data["item_price"] == "18"
+        assert listing.data["shipping_cost"] == "8"
+        assert listing.data["shipping_status"] == "UNKNOWN"
+
+
+def test_shopgoodwill_style_multi_receipt_never_allocates_order_charges(client):
+    import_files(client, "shopgoodwill", ["synthetic-shop-style-multi-receipt.eml"])
+    with client.app.state.sessions() as s:
+        invoice = s.scalar(select(AlertInvoice))
+        assert invoice.data["status"] == "RECONCILED"
+        assert invoice.data["components"]["order_total"] == "51.00"
+        assert len(invoice.data["item_ids"]) == 2
+        for item in s.scalars(select(DiscoveredItem)):
+            assert item.normalized["shipping_cost"] is None
+            assert item.normalized["handling_fee"] is None
+            assert item.normalized["sales_tax"] is None
+    assert client.post("/invoices/1/confirm", data=paid_form()).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "subject,body",
+    [
+        ("Bid Notification", "SYNTHETIC contact number\n910000000099\n"),
+        ("Payment Receipt", "Order: 910000000099\nTax: $0.00\n99669\n"),
+        ("Newsletter", "Item\n910000000099\n"),
+        ("Bid Notification", "Phone: 910000000099\nOrder ID: 910000000098\n"),
+    ],
+)
+def test_shopgoodwill_never_guesses_arbitrary_numeric_identity(client, subject, body):
+    with client.app.state.sessions() as s:
+        definition = SourceDefinition.model_validate(s.get(IntakeSource, "shopgoodwill").data)
+    message = f"Subject: SYNTHETIC shopgoodwill.com {subject}\n\n{body}".encode()
+    assert not parse_message(message, "shopgoodwill", definition).candidates
+
+
+def test_shopgoodwill_text_item_reference_limit(client):
+    content = "Subject: SYNTHETIC Payment Receipt\n\n" + "\n".join(
+        f"Item: {910000000000 + i}" for i in range(101)
+    )
+    response = client.post("/inbox/import", data={"source_id": "shopgoodwill", "content": content})
+    assert response.status_code == 422
+    with client.app.state.sessions() as s:
+        assert not list(s.scalars(select(AlertMessage)))
+        assert not list(s.scalars(select(DiscoveredItem)))
+
+
+@pytest.mark.parametrize(
+    "embedded,expected",
+    [
+        ("https:%2F%2Fhibid.com%2Flot%2F910000000101%2Fring", "https://hibid.com/lot/910000000101"),
+        ("https://hibid.com/catalog/910000000100/estate", "https://hibid.com/catalog/910000000100"),
+        (
+            "https:%2F%2Fsynthetic-auctions.hibid.com%2Flot%2F910000000102%3Futm_source%3DSYNTHETIC",
+            "https://synthetic-auctions.hibid.com/lot/910000000102",
+        ),
+    ],
+)
+def test_hibid_offline_explicit_embedded_targets(embedded, expected):
+    wrapper = f"https://clicks.auctions.hibid.com/SYNTHETIC/{embedded}/1/SYNTHETIC"
+    assert hibid_embedded_target(wrapper) == expected
+    definition = SourceDefinition(name="HiBid", domains=["hibid.com"])
+    assert safe_link(wrapper, definition) is None
+    assert "SYNTHETIC" not in expected  # Canonical identities never contain wrapper tokens.
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://clicks.auctions.hibid.com/ls/click?upn=SYNTHETIC-OPAQUE",
+        "https://clicks.auctions.hibid.com/SYNTHETIC?url=https://hibid.com/lot/1",
+        "https://clicks.auctions.hibid.com.evil.invalid/SYNTHETIC/https://hibid.com/lot/1",
+        "https://other.hibid.com/SYNTHETIC/https://hibid.com/lot/1",
+        "http://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1",
+        "https://user@clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1",
+        "https://clicks.auctions.hibid.com:8443/SYNTHETIC/https://hibid.com/lot/1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/http://hibid.com/lot/1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com.evil.invalid/lot/1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://user@hibid.com/lot/1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com:8443/lot/1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/redirect/lot/1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1evil",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/../../catalog/2",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/%252e%252e/catalog/2",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https%253A%252F%252Fhibid.com%252Flot%252F1",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/https://hibid.com/lot/2",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1%0A",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1#SYNTHETIC",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1\\evil",
+        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/" + "x" * 8192,
+    ],
+)
+def test_hibid_opaque_unsafe_ambiguous_and_unverified_wrappers_stay_unresolved(url):
+    assert hibid_embedded_target(url) is None
+
+
+def test_hibid_html_anchor_without_href_value_needs_review(client):
+    message = EmailMessage()
+    message["Subject"] = "SYNTHETIC HiBid newsletter"
+    message.set_content("SYNTHETIC empty anchor")
+    message.add_alternative(
+        "<html><body><a href>SYNTHETIC no URL</a></body></html>", subtype="html"
+    )
+    with client.app.state.sessions.begin() as s:
+        import_alerts(s, "hibid", [message.as_bytes()])
+        assert not list(s.scalars(select(DiscoveredItem)))
+        assert s.scalar(select(AlertMessage)).data["status"] == "NEEDS_REVIEW"
+
+
+def test_hibid_embedded_newsletter_lots_catalog_and_repeated_import(client):
+    batch = import_files(client, "hibid", ["synthetic-hibid-embedded-promo.eml"] * 2)
+    with client.app.state.sessions() as s:
+        assert s.get(AlertImport, batch).stats["duplicate_messages"] == 1
+        message = s.scalar(select(AlertMessage))
+        assert message.message_type == "PROMOTIONAL_NEWSLETTER"
+        assert message.data["wrapped_targets_recovered_offline"] == 3
+        catalog = message.data["catalogs"][0]
+        assert catalog["auction_id"] == "910000000100"
+        assert catalog["url"] == "https://hibid.com/catalog/910000000100"
+        items = list(s.scalars(select(DiscoveredItem)))
+        assert len(items) == 2
+        assert {i.normalized["item_price"] for i in items} == {"12.00", "20.00"}
+        assert all(i.normalized["shipping_status"] == "UNKNOWN" for i in items)
+        assert all(i.normalized["shipping_cost"] is None for i in items)
+        assert all(i.normalized["raw_search_phrase"] is None for i in items)
+        for item in items:
+            assert "clicks.auctions" not in json.dumps(item.normalized)
+            assert "SYNTHETIC/https" not in json.dumps(item.original_data)
+        for observation in s.scalars(select(AlertObservation)):
+            assert observation.data["identity_method"] == "EXPLICIT_EMBEDDED_HTTPS_TARGET"
+            assert observation.query_text is None and not observation.attribution_verified
+    # A later direct-link alert is another observation of the same source item.
+    direct = b"Subject: SYNTHETIC HiBid newsletter\nX-Turquoise-Synthetic: true\n\nhttps://hibid.com/lot/910000000101/ring"
+    with client.app.state.sessions.begin() as s:
+        import_alerts(s, "hibid", [direct])
+        assert len(list(s.scalars(select(DiscoveredItem)))) == 2
+        assert len(list(s.scalars(select(AlertObservation)))) == 3
+
+
+def test_hibid_embedded_catalog_closing_notice_never_becomes_a_lot(client):
+    import_files(client, "hibid", ["synthetic-hibid-embedded-closing.eml"])
+    with client.app.state.sessions() as s:
+        message = s.scalar(select(AlertMessage))
+        assert message.message_type == "AUCTION_CLOSING_REMINDER"
+        assert message.data["catalogs"][0]["auction_id"] == "910000000100"
+        assert message.data["closing_time_raw"] == "November 5, 2026 7:00 PM CST"
+        assert message.data["closing_timezone_raw"] == "CST"
+        assert message.data["closing_at"] is None  # No invented timezone offset.
+        assert not list(s.scalars(select(DiscoveredItem)))
+
+
+def test_hibid_opaque_closing_notice_is_private_review_evidence_only(client):
+    import_files(client, "hibid", ["synthetic-hibid-opaque-closing.eml"])
+    with client.app.state.sessions() as s:
+        message = s.scalar(select(AlertMessage))
+        assert message.data["status"] == "NEEDS_REVIEW"
+        assert message.data["catalogs"] == []
+        assert not list(s.scalars(select(DiscoveredItem)))
+        definition = SourceDefinition.model_validate(s.get(IntakeSource, "shopgoodwill").data)
+        assert not parse_message(
+            raw("synthetic-hibid-embedded-promo.eml"), "shopgoodwill", definition
+        ).candidates
 
 
 def test_full_synthetic_intake_fifteen_items_and_no_auto_purchases(client):

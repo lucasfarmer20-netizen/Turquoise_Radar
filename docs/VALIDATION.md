@@ -167,3 +167,44 @@ six owner workflow pages responded with expected content.
   for v4/local alert intake. Reference-only ShopGoodwill/HiBid domains were added
   while preserving prior draft domains. Saving is confirmed; publication/application
   requires environment-settings review/save and publication and has not occurred.
+
+## PR #4 compatibility follow-up
+
+- Reviewed the pre-merge compatibility comment in PR #4 through GitHub's permitted
+  HTML page. API access still returned Forbidden. Continued on the existing
+  task/004-multi-source-discovery branch based on 583131576b407b8c34263fedf6169f3007ecca8f;
+  no merge and no Task 005 work.
+- **203 tests pass**: all 165 prior cases remain, with 38 new regression cases for
+  reported item markers, bounded notice-context IDs, receipt correlation, repeated
+  alerts, conservative multi-item charges, explicit embedded targets, malformed/
+  unsafe/ambiguous/opaque URLs and text-reference limits. Prior test function bodies
+  are unchanged. Ruff lint, formatting and Git whitespace checks pass. The existing
+  Starlette/AnyIO deprecation warning remains.
+- Synthetic ShopGoodwill Item/item #/standalone notice fixtures correlate one
+  marketplace item without a usable direct link. A paid receipt reconciles 18 item
+  subtotal + 0 tax + 9 shipping/handling = 27 total. Bid/win messages do not record
+  purchases. Explicit paid confirmation and later re-import preserve confirmed
+  costs/history. A two-item 36 + 3 + 12 = 51 invoice cannot apply per-item shipping,
+  tax or handling automatically.
+- Synthetic HiBid newsletters recover two distinct lot targets plus one catalog
+  from explicit literal/one-pass-percent-encoded HTTPS targets inside URL paths on
+  clicks.auctions.hibid.com. Only canonical provider identity URLs survive into
+  normalized candidate/catalog links. A later direct link deduplicates to the same
+  source item, preserving another observation. Catalog-only closing notices remain
+  without candidates; closing text and CST are retained without inventing an offset.
+- Opaque /ls/click?upn=... values and query-only redirects remain NEEDS_REVIEW.
+  Spoofed hosts, non-HTTPS, credentials, unsafe ports, ambiguous/nested targets,
+  double encoding and traversal paths are rejected. No tracking or marketplace
+  requests are permitted by the regression tests.
+- scripts/check-intake-compat.cjs runs against an empty disposable database, covering
+  desktop 1440x1000 and mobile 390x844, the 27 paid confirmation, re-import history,
+  multi-item non-allocation, embedded/catalog/opaque cases and twelve mobile pages.
+  No overflow, browser errors or external requests. Owner data is not used.
+- Seven additional .eml fixtures use only synthetic IDs, order references, tokens
+  and descriptions. No original email, address, tracking URL or customer data was
+  supplied or committed. Existing demo manifest/counts remain unchanged. Database
+  schema, financial engine, review workflow and eBay adapter/gates are unchanged.
+- The PR supplies the tracking host but no concrete real wrapper URL or encoding.
+  Explicit-target recovery is tested synthetically, not claimed as validation of a
+  particular real tracking scheme. Opaque links and unknown layouts remain review
+  evidence; actual Personal Shopper/HiBid daily digests remain provisional.

@@ -44,8 +44,8 @@ ShopGoodwill direct `/item/<numeric-ID>` references and HiBid `/lot/<numeric-ID>
 vs `/catalog/<numeric-ID>` references are recognized conservatively. Generic records
 need an explicitly supplied Item ID/Source listing ID/Lot ID and safe direct URL,
 or an owner-verified simple item-path prefix. A local lot number without its
-marketplace identity is not guessed into a global item ID. No tracking redirect
-is followed or decoded into an assumed destination.
+marketplace identity is not guessed into a global item ID. No tracking redirect is followed. The bounded offline HiBid exception below recovers
+only an explicit embedded target; it never guesses a destination from an opaque token.
 
 Explicit label suggestions include Title, Current bid/price, Seller/Auction House,
 Auction ID/Estate ID, Saved search/Search phrase, Lot closes, Shipping/Handling and
@@ -168,6 +168,8 @@ text and normalized observations are also private. The raw view is escaped text,
 never active HTML. Script, form, style, embedded content and image resources are
 not rendered; only validated HTTPS direct source links become clickable. Link
 userinfo, unsafe schemes, off-source hosts and tracking/redirect paths are rejected.
+Original tracking URLs are never clickable; only a validated canonical target from
+the offline exception below can be used as a source link.
 No tracking pixels, attachments, arbitrary URLs or external resources are fetched.
 Attached messages are not traversed as new body content; attachments never execute.
 MIME nesting/parts, decoded text, item links, upload counts and body sizes are bounded.
@@ -220,3 +222,58 @@ only after permitted sample review and record the sample kind/reference. A netwo
 domain allowance alone is never permission to scrape, crawl or automate accounts.
 Local owner-provided intake requires no marketplace API approval. Any later live
 connector/mailbox access needs separate documented authorization and scope.
+
+## PR #4 compatibility follow-up (Task 004.1)
+
+The [pre-merge compatibility comment](https://github.com/lucasfarmer20-netizen/Turquoise_Radar/pull/4)
+reports `Item: <digits>`, `item #<digits>` and standalone bid-notice IDs, plus the
+HiBid tracking host `clicks.auctions.hibid.com`. No original email or concrete real
+tracking URL/encoding was attached to the comment. Regression messages represent
+these reported structures using synthetic item/order IDs and synthetic tokens;
+they do not establish full compatibility with an actual private email template.
+
+ShopGoodwill now recognizes explicit Item/Item ID/Item Number labels and item #
+references, including several items without direct links. For bid/win/outbid notices,
+a number on its own line requires an immediately preceding Item heading or the
+explicit sentence `Your bid has been accepted/submitted for the following item:`
+(the `was` variant is also supported). Unlabelled numbers, order numbers, postal
+codes and contact numbers never become inferred item IDs. Winning Bid Notice and
+Bid Notification headings are classified as lifecycle events, not purchases.
+`Item Subtotal`, `Tax`, `Shipping and Handling` and `Order Total` reconcile a paid
+single-item receipt; its subtotal can supply the final item amount. Multiple item
+references retain all order charges at invoice level and cannot use the single-item
+confirmation action. Existing explicit ownership and six-component cost checks apply.
+
+HiBid recovery is **offline text extraction**, not a redirect request or general
+tracking-token decoder. It accepts only the exact reported tracking host over HTTPS
+and a single absolute HTTPS target visible in its URL path, either literally or
+after one percent-decoding pass. The target must be a provider-domain
+`/lot/<numeric-ID>` or `/catalog/<numeric-ID>` path. The stored/clickable target is
+canonicalized to that identity; wrapper prefixes/suffixes, query parameters and
+fragments are discarded. No tracking token is copied into candidate or catalog URLs.
+This is generic explicit-target recovery on the reported host; a particular real
+wrapper encoding has not been verified by the PR comment or supplied samples.
+
+Opaque paths (including opaque `/ls/click?upn=...` values), targets available only in
+query parameters, arbitrary hosts, credentials, unsafe ports/schemes, repeated
+encoding, nested or multiple targets and ambiguous paths remain unsupported review
+evidence. There is no base64-token guessing, cryptographic decoding or link following.
+Catalog-only reminders remain catalog-only, and original closing text/timezone is
+retained without creating a deadline or price for an individual lot. Newsletter
+links never receive saved-search attribution merely because a title contains a typo.
+The original private alert remains available as escaped evidence, including any
+unresolved links. Personal Shopper and daily digest formats remain provisional.
+
+A reproducible browser regression checks only an **empty disposable** database.
+With Playwright available to Node and Chromium installed, start a separate server:
+
+```bash
+RADAR_DATABASE_URL=sqlite:////tmp/radar-compat-check.db .venv/bin/uvicorn radar.main:app --host 127.0.0.1 --port 8004
+# In another shell (set NODE_PATH if Playwright is installed globally):
+node scripts/check-intake-compat.cjs
+```
+
+Use a fresh temporary database filename each run. The check aborts external requests,
+uses synthetic fixtures only and covers paid ownership confirmation, non-allocation,
+repeat imports, catalog-only/opaque notices and twelve mobile pages. It must never
+be pointed at owner inventory. `CHROMIUM_PATH` can select an installed Chromium binary.

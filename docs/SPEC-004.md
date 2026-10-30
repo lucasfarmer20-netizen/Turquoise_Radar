@@ -51,3 +51,14 @@ synthetic candidates, duplicates, missing Alaska costs and explicit review hando
 
 See [ALERT-SETUP.md](ALERT-SETUP.md) for implemented conventions, limitations and
 operational paths; [VALIDATION.md](VALIDATION.md) records verification evidence.
+
+## PR #4 compatibility follow-up
+
+Preserve all 165 Task 004 tests and keep the existing branch unmerged. Add bounded
+ShopGoodwill item-label/item #/notice-context IDs and actual-style receipt labels.
+Allow only offline recovery of explicit HTTPS HiBid lot/catalog targets on the
+reported tracking host. Do not guess opaque tokens, fetch any URL, expose wrapper
+tokens in canonical links or grant newsletter search attribution. Keep multi-item
+charges at order level and require the existing explicit single-item confirmation.
+Use synthetic-only fixtures and desktop/mobile regressions. See ALERT-SETUP.md for
+the distinction between reported patterns and unverified concrete wrapper encodings.

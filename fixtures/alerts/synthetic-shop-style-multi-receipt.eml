@@ -1,0 +1,20 @@
+Subject: SYNTHETIC shopgoodwill.com Payment Receipt
+Date: Thu, 29 Oct 2026 12:00:00 -0800
+Received: synthetic-local; Thu, 29 Oct 2026 12:01:00 -0800
+X-Turquoise-Synthetic: true
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Order Number: SYNTHETIC-COMPAT-MULTI
+Items Subtotal: $36.00
+Tax: $3.00
+Shipping and Handling: $12.00
+Order Total: $51.00
+
+Item: 910000000002
+Title: SYNTHETIC old ring
+Final item subtotal: $14.00
+---
+Item: 910000000003
+Title: SYNTHETIC old sterling lot
+Final item subtotal: $22.00
