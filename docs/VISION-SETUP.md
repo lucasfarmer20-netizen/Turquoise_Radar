@@ -121,12 +121,19 @@ including photo IDs, strict field sets and evidence restrictions, before saving.
 
 The endpoint is fixed to `https://api.anthropic.com/v1/messages`. Four photos remain
 up to four separate base64 `image/png` blocks, each paired with its photo ID/role;
-no composite image, remote URL source or marketplace fetch is used. Standard speed
-and `standard_only` service tier are requested. Explicit HTTP timeout is 45 seconds,
+no composite image, remote URL source or marketplace fetch is used. The optional
+`speed` parameter is omitted, preserving default standard inference; `standard_only`
+capacity is requested. The pinned SDK warns some models need a beta flag for any
+explicit speed value. No fast-mode beta is enabled. Explicit HTTP timeout is 45 seconds,
 with an outer bounded request lifetime. SDK retries and redirects are disabled.
 SDK content telemetry is explicitly disabled; SDK/HTTP debug payload logging is
-suppressed. Provider errors are stored/displayed as fixed codes, not response
-bodies, exception text, credentials or image bytes.
+suppressed. Provider errors use fixed categories and a six-field allowlisted
+`failure_diagnostics` record: exception class, HTTP status, provider error type,
+request ID, failure stage and category. No response bodies, exception messages,
+headers, credentials or image bytes enter diagnostics. Request/response hooks
+observe transport handoff and response headers without reading bodies. A response
+status alone does not identify Anthropic versus the proxy. See
+[diagnosis details and limitations](HAIKU-FAILURE-DIAGNOSIS.md).
 
 SDK 2.3.0 uses `Authorization: Bearer <API key>` internally and defaults to API
 version `2026-10-21`; this was checked in the pinned official source and mocked wire

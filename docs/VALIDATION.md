@@ -410,3 +410,32 @@ six owner workflow pages responded with expected content.
   The [pilot procedure](HAIKU-PILOT.md) requires a concrete selected-image review
   and new explicit approval before submitting the local application confirmation.
   No public exposure, real-photo upload/analysis or paid API request occurred.
+# Task 005 targeted Haiku failure follow-up — October 30, 2026
+
+- Branch base remains Task 005 merged main `2e2277673a2da6817e17b46658b1c564e5a70764`.
+  The prior uncommitted owner-supplied pricing and one-shot pilot work is preserved
+  as a separate prerequisite commit; error diagnostics are a separate repair commit.
+- Baseline full suite: 313 passed. Repair full suite: **342 passed** (301 Task 005,
+  12 pilot safeguards, 29 diagnostic regressions). Ruff and `git diff --check` pass.
+  Only the existing Starlette/AnyIO deprecation warning remains.
+- Mocked SDK responses cover HTTP 400/401/402/403/413/429/500/504/529, typed billing
+  and spend errors, HTML proxy rejection, unknown provider types, credential/schema
+  failures before transport, connection/proxy/timeouts, malformed JSON/envelopes,
+  Pydantic/photo-ID/truncation rejection, cleanup and outer cancellation deadlines.
+  Assertions cover retained metadata, excluded sensitive text, no retries, held
+  reservations and consumed one-shot guards.
+- Original pre-repair provider replayed entirely offline with MockTransport and
+  the existing processing image. Encoding/schema/request construction and synthetic
+  response parsing succeeded; this is not remote acceptance or photo analysis.
+- Desktop browser fixture workflow and nine Android-sized routes passed: upload,
+  zoom, fixture caching, separate deeper fixture, corrections, replacement/removal,
+  mixed sub-item review, paid disabled, zero errors/external browser requests.
+  A separate GET-only check of the real private owner case confirmed FAILED,
+  consumed Haiku guard, Sonnet disabled and no Android overflow.
+- Backup plus complete before/after table comparison confirmed all owner rows
+  unchanged; private photo hashes unchanged. Still one failed run, no billing
+  reconciliation, $0.505120 HELD_UNKNOWN. Original outcome and approval not rewritten.
+- App remains bound to 127.0.0.1 with fixture mode/general live disabled; no public
+  deployment, additional Anthropic call, credential change, retry or Task 006 work.
+- See [diagnosis and evidence limits](HAIKU-FAILURE-DIAGNOSIS.md). No definite root
+  cause or billing match is established; end-to-end confirmation remains untested.

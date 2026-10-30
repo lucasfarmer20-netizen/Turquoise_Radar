@@ -13,9 +13,11 @@ Owner-operated jewelry vision now supports private photos, free synthetic review
 
 See the [2026-10-30 Anthropic verification](docs/ANTHROPIC-VERIFICATION.md) for the
 corrected Task 005 checkout, 301-test result, and configured conservative prices
-from owner-supplied official references. Haiku is ready for a separately authorized
-pilot; Sonnet remains access-unverified. Fixture mode and live-disabled settings
-remain in force. No paid request or real-photo analysis has been performed.
+from owner-supplied official references. The owner subsequently authorized one
+Haiku pilot attempt, which failed without retained usage or response metadata.
+Its reservation remains held and the pilot is consumed. Sonnet remains disabled;
+fixture mode and general live-disabled settings remain in force. See the
+[targeted failure diagnosis and repair](docs/HAIKU-FAILURE-DIAGNOSIS.md).
 
 The [first Haiku pilot preparation](docs/HAIKU-PILOT.md) adds an opt-in one-request
 guard and documents the owner's direct conversation-upload path. The app runs on
@@ -266,7 +268,8 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-301 tests (including all 227 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
+342 tests (301 Task 005 tests, 12 pilot-safeguard cases and 29 failure-diagnostic cases)
+cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests

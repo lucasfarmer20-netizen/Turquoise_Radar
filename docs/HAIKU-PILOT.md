@@ -1,7 +1,11 @@
 # First Haiku pilot preparation — 2026-10-30
 
-The owner requested one explicitly authorized image-analysis attempt. **No paid
-request has been authorized or sent.** The owner cannot use a private workspace
+**Current status: the owner authorized one attempt; it failed and consumed the
+pilot. The $0.505120 reservation is held with unknown cost. No retry is permitted.**
+See the [targeted diagnosis and repair](HAIKU-FAILURE-DIAGNOSIS.md).
+
+The following records the earlier preparation, when no paid request had yet been
+authorized or sent. The owner cannot use a private workspace
 preview or VPN on Android and asked about a direct conversation-upload
 path instead. No public exposure or Task 006 deployment is part of this work.
 
@@ -9,7 +13,9 @@ path instead. No public exposure or Task 006 deployment is part of this work.
 
 Fetched GitHub main again: Task 005 remains
 `2e2277673a2da6817e17b46658b1c564e5a70764`. The existing `work` checkout contains a
-small local pilot guard on that base; no commit, push or merge was performed.
+small local pilot guard on that base; no commit, push or merge was performed
+during preparation. The subsequent diagnosis branch records that prerequisite
+work separately from the error-classification repair for review.
 
 The running app uses the explicit absolute database URL
 `sqlite:////workspace/Turquoise_Radar/data/radar.db`. Haiku's dated verified price
@@ -66,6 +72,9 @@ full 1M input ceiling and Haiku's higher tier, as documented in the
 [pricing report](ANTHROPIC-VERIFICATION.md).
 
 ## Immediate Android workflow through this conversation
+
+This describes the completed consent/intake process, not permission to repeat it.
+The consumed guard remains in force.
 
 1. The owner attaches a clear jewelry photograph as a file in the conversation
    (JPEG, PNG or WebP). The owner may supply known details separately for comparison.

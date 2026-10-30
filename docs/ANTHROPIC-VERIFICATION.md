@@ -1,7 +1,9 @@
 # Anthropic pilot readiness — 2026-10-30 UTC
 
-**Haiku is configured and ready for one future, explicitly owner-authorized
-real-photo pilot. No paid run is authorized or started by this configuration.**
+**Historical pricing-verification snapshot:** configuration alone authorized no
+paid request. The owner later authorized one pilot attempt, which failed and
+consumed the pilot. No further attempt is permitted; see the
+[failure diagnosis](HAIKU-FAILURE-DIAGNOSIS.md).
 Sonnet remains access-unverified and ineligible, as the owner requested while the
 historical 401 origin remains unresolved. Sonnet does not block Haiku readiness.
 
@@ -13,7 +15,8 @@ the pilot preparation document records the newer application/record counts.
 
 Effective settings remain `VISION_PROVIDER=fixture`, `VISION_LIVE_ENABLED=false`,
 $5.00 per UTC month, and 10 paid analyses per UTC day. No Messages API call, paid
-request, image upload/analysis, credential change or new development phase occurred.
+request, image upload/analysis, credential change or new development phase occurred
+during the pricing-verification work described below.
 
 ## Evidence and provenance
 
