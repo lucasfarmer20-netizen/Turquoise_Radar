@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
+HAIKU_QUICK_MAX_TOKENS = 32768
+
 
 class VisionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")

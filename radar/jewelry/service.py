@@ -19,6 +19,7 @@ from radar.db import (
     VisionSubItem,
 )
 from radar.jewelry.budget import budget_state, profile_for, reserve_amount, usage_cost
+from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS
 from radar.jewelry.errors import classify_failure
 from radar.jewelry.images import private_path, read_photo, write_photo
 from radar.jewelry.schemas import OWNER, PROMPT_VERSION, SCHEMA_VERSION, Correction, VisionResult
@@ -226,7 +227,11 @@ def plan(session, config, stage, provider):
         profile=profile,
         reservation=reserve,
         reasons=reasons,
-        output_limit=profile.max_output_tokens if profile else 2048,
+        output_limit=profile.max_output_tokens
+        if profile
+        else HAIKU_QUICK_MAX_TOKENS
+        if model == "claude-haiku-5-5" and stage == "QUICK"
+        else 2048,
         pilot_one_shot=config.pilot_one_shot,
     )
 

@@ -17,7 +17,7 @@ from radar.db import (
     VisionSubItem,
 )
 from radar.jewelry.budget import budget_state
-from radar.jewelry.config import VisionConfig, image_root
+from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS, VisionConfig, image_root
 from radar.jewelry.images import (
     MAX_BATCH_BYTES,
     MAX_FILE_BYTES,
@@ -364,7 +364,7 @@ def vision_routes(app, render):
             input_per_million=None,
             output_per_million=None,
             max_input_tokens=None,
-            max_output_tokens=2048,
+            max_output_tokens=HAIKU_QUICK_MAX_TOKENS if cfg.model == "claude-haiku-5-5" else 2048,
             standard_rates_through_input_limit=True,
         )
         with app.state.sessions() as s:

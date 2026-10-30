@@ -87,17 +87,24 @@ conservative bound: short Haiku requests will be overestimated. The profile's
 full-limit assertion describes coverage by this bound, not a claim that official
 prices are uniform. Sonnet uses **2.00 / 10.00**, with **2.50 / 4.00 / 0.10** caching.
 
-The application output cap remains **2,048 tokens**; the provider capability maximum
+The checked-in Haiku QUICK profile now allows **32,768 output tokens**; Sonnet's
+profile remains at **2,048**, blocked. The documented provider capability maximum
 is **128,000**. The full 1M input ceiling was not reduced to the cheaper 100K tier.
 
-| Model | Reservation for full input ceiling + 2,048 output | Access gate |
-| --- | ---: | --- |
-| Haiku 5.5 | $0.505120 | verified |
-| Sonnet 5.5 | $2.020480, if later separately eligible | unverified; blocked |
+| Model | Application output allowance | Reservation for full input ceiling | Access gate |
+| --- | ---: | ---: | --- |
+| Haiku 5.5 QUICK | 32,768 | $0.581920 | verified |
+| Sonnet 5.5 | 2,048 | $2.020480, if later separately eligible | unverified; blocked |
 
 Existing Decimal arithmetic rounds upward to microdollars:
-`(1,000,000 × input rate + 2,048 × output rate) / 1,000,000`.
+`(1,000,000 × 0.50 + 32,768 × 2.50) / 1,000,000 = 0.581920` for Haiku.
 Confirmed invoice billing remains separate from estimated usage costs.
+
+The original `profile-validation.json` and initial setup reports retain their
+historical 2,048-token results. The reviewed profile file is the new configuration;
+existing database profiles/runs are not rewritten by checking out this change.
+After merge, append this profile through the existing pricing workflow before a
+separately approved attempt. See [output allowance change](HAIKU-OUTPUT-ALLOWANCE.md).
 
 The current adapter requests **uncached, synchronous, global standard inference**:
 it sends no cache control, batch, regional selection or tools, and requests

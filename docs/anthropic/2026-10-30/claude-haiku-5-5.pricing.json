@@ -15,8 +15,8 @@
   "model_access_evidence": "model-access-recheck.json",
   "access_decision": "Haiku successful Models lookup accepted",
   "application_profile": "claude-haiku-5-5.price-profile.json",
-  "reservation_usd": "0.505120",
-  "reservation_scope": "Full 1M input, 2048 output, uncached synchronous global standard; Haiku higher tier applied at every input length",
+  "reservation_usd": "0.581920",
+  "reservation_scope": "Full 1M input, 32768 output, uncached synchronous global standard; Haiku higher tier applied at every input length",
   "cache_pricing_configured": true,
   "prompt_caching_requested_by_adapter": false,
   "unsupported_conditions": [
@@ -28,7 +28,7 @@
   "limits": {
     "provider_max_input_tokens": 1000000,
     "provider_max_output_tokens": 128000,
-    "application_max_output_tokens": 2048,
+    "application_max_output_tokens": 32768,
     "monthly_budget_usd": "5.00",
     "daily_paid_analysis_limit": 10
   },

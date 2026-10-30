@@ -160,6 +160,13 @@ HTTPX/eBay behavior is unchanged.
 
 ## Cost, limits, cache and concurrency
 
+- The reviewed Haiku QUICK profile allows 32,768 output tokens and reserves
+  $0.581920 at the conservative full-context rates. This changes only the output
+  allowance: implicit thinking behavior and effort are preserved, with no thinking
+  parameter added. The production VisionResult schema, validators, 2 MiB response
+  limit and timeouts are unchanged. After merge, append the revised profile through
+  the existing settings workflow; prior profiles/runs stay immutable. See
+  [Haiku output allowance](HAIKU-OUTPUT-ALLOWANCE.md).
 - Paid requests are off by default. Ten paid starts per UTC day and $5 per UTC
   month are defaults, not an account quota or an Anthropic credit-balance readout.
 - Fixture runs never count toward paid usage. Page views/uploads/corrections never

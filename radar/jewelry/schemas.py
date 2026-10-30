@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS
 from radar.jewelry.validation import reference_error, rule_error
 
 PROMPT_VERSION = "jewelry-3"
@@ -252,7 +253,7 @@ class PriceProfile(Strict):
     cache_write_5m_per_million: Decimal | None = Field(default=None, ge=0, le=10000)
     cache_write_1h_per_million: Decimal | None = Field(default=None, ge=0, le=10000)
     max_input_tokens: int = Field(ge=100000, le=2000000)
-    max_output_tokens: int = Field(ge=512, le=8192)
+    max_output_tokens: int = Field(ge=512, le=HAIKU_QUICK_MAX_TOKENS)
     standard_rates_through_input_limit: Literal[True]
 
     @field_validator("source")
