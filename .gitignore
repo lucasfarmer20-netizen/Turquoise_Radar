@@ -1,8 +1,51 @@
+# Local configuration and credentials. Keep the documented, non-secret template.
+.env
+.env.*
+!.env.example
+.envrc
+.secrets/
+secrets/
+credentials*.json
+service-account*.json
+*.pem
+*.key
+
+# Python environments, caches, and package/build outputs.
 .venv/
+venv/
+env/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 .ruff_cache/
-.env
-data/
+.cache/
 *.egg-info/
+build/
+dist/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Local databases, including SQLite journal/WAL/SHM sidecars.
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Temporary files and generated local artifacts.
+tmp/
+temp/
+scratch/
+artifacts/
+screenshots/
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*~
+.DS_Store
