@@ -11,6 +11,16 @@ execution. No live API requests were made during implementation. No
 paid API calls during development, purchasing automation, accounts, or background monitoring.
 Owner-operated jewelry vision now supports private photos, free synthetic reviews and an explicitly gated Anthropic SDK provider.
 
+See the [2026-10-30 Anthropic verification](docs/ANTHROPIC-VERIFICATION.md) for the
+corrected Task 005 checkout, 301-test result, and configured conservative prices
+from owner-supplied official references. Haiku is ready for a separately authorized
+pilot; Sonnet remains access-unverified. Fixture mode and live-disabled settings
+remain in force. No paid request or real-photo analysis has been performed.
+
+The [first Haiku pilot preparation](docs/HAIKU-PILOT.md) adds an opt-in one-request
+guard and documents the owner's direct conversation-upload path. The app runs on
+private workspace loopback; no public phone preview or deployment was created.
+
 ## Run
 
 Python **3.12+** and [uv](https://docs.astral.sh/uv/) are required. Dependencies and
@@ -90,7 +100,7 @@ Fixture observations are labelled synthetic and do not analyze real image conten
 Live Anthropic Haiku (`claude-haiku-5-5`) / Sonnet (`claude-sonnet-5-5`) requests need
 secure credentials, explicit live flags, dated verified pricing/model eligibility,
 per-request owner confirmation and atomic budget allowance. They are off by default;
-a key alone does not enable spending. No real Anthropic request was made.
+a key alone does not enable spending. No paid Anthropic inference request was made.
 
 Read [vision setup, privacy and spending controls](docs/VISION-SETUP.md). For an
 isolated illustrated demonstration, run `.venv/bin/python -m radar.jewelry.demo`

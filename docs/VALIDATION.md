@@ -323,3 +323,90 @@ six owner workflow pages responded with expected content.
   no current rates, assigned quotas, credit balance or live model availability is
   claimed. Live provider behavior is tested with SDK mocks, not a paid end-to-end
   request. All committed test artwork is generated synthetically from code.
+
+## Anthropic verification follow-up — 2026-10-30
+
+- Corrected the stale checkout from Task 004 `4648ee0` to fetched main
+  `2e2277673a2da6817e17b46658b1c564e5a70764` by fast-forwarding the existing `work`
+  branch. All prior local changes are preserved in stash
+  `0eef0614d6eeac12b98ccc2f9b262b0faf9e7c0a`; previous evidence was restored.
+- After `uv sync --frozen`, the complete suite passed **301 tests**, including 71
+  vision and three vision-migration cases added since the old 227-test checkout.
+  The count difference was stale code, not a demonstrated regression. The existing
+  Starlette/AnyIO deprecation warning remains. Ruff and whitespace checks pass.
+- Haiku and Sonnet individual Models GETs now return 200 through both the original
+  legacy method and the pinned SDK's current authentication/version. No original
+  401 JSON error type/provenance headers were retained, and managed diagnostics
+  returned no records. Current access is verified; historical error origin is not.
+- Both public documentation URLs still fail with proxy tunnel 403; the web tool
+  also fails without content. Owner-supplied rates are clearly distinguished from
+  independent verification. No cache or modifier prices were invented.
+- Dated inactive application-schema candidates preserve Haiku's 100K tier by using
+  its higher supplied rates across the full 1M context ceiling. With 2048 output,
+  existing reservation code yields 0.505120 USD for Haiku and 2.020480 for Sonnet.
+  Offline checks cover schema, tier boundaries, conservative costs, unknown cache/
+  regional usage, and rejection of inactive profiles using in-memory SQLite only.
+- No owner database, application code, runtime flags, network configuration,
+  credentials, API retries or activation gates were changed. No Messages API call,
+  paid request or real-photo analysis occurred. See the
+  [current report and readiness limitations](ANTHROPIC-VERIFICATION.md).
+
+## Owner-supplied official pricing configuration — 2026-10-30
+
+- The owner supplied complete official pricing/cache/modifier references and
+  authorized their use. Source URLs/date/provenance are stored in
+  `docs/anthropic/2026-10-30/owner-supplied-pricing.json`; no independent runtime
+  access to those documents is claimed. This supersedes the preceding pricing
+  blocker, without resolving or reclassifying the historical Sonnet 401.
+- Haiku is configured at the higher full-context rates: input/output 0.50/2.50,
+  5-minute/1-hour cache creation 0.625/1.00, cache read 0.05 USD per million.
+  Sonnet has 2.00/10.00, 2.50/4.00, and 0.10 respectively, but its access flag
+  remains false per owner instruction. Both profiles are dated 2026-10-30.
+- The absent default `data/radar.db` was initialized using existing migrations;
+  one transaction appended the profiles. No application code changed. No inventory,
+  photos, cases or runs were seeded. The private database stays ignored by Git.
+- Offline checks exercised 100K/100,001 prompt boundaries including cached input,
+  both cache-write durations, reads, microdollar ceiling rounding, full-input
+  reservation and unsupported regional/service/tool usage. Haiku's upper-bound
+  profile never underestimates the owner's supplied tier schedule. Cache prices
+  do not enable caching; full-context cache writes exceed the uncached reservation
+  and would need separate reservation review before enabling that request mode.
+- The real local preflight accepts Haiku's profile with only the deliberately
+  disabled-live blocker; Sonnet remains access-blocked. Reservations are 0.505120
+  USD for Haiku and, if separately eligible later, 2.020480 for Sonnet at 2048 output.
+  Budget remains 5.00 USD/month with zero accounted spend, and 0/10 daily paid runs.
+- **301 tests passed**; Ruff and whitespace checks passed. Only the existing
+  Starlette/AnyIO deprecation warning remains. Effective configuration is fixture /
+  live disabled. No network request, Messages call, paid request or real-photo
+  analysis was made during this configuration. Haiku is ready for one future
+  explicitly authorized pilot; no pilot was started.
+
+## Single-request pilot preparation — 2026-10-30
+
+- Re-fetched main; latest Task 005 is still `2e2277673a2da6817e17b46658b1c564e5a70764`.
+  Added a local, opt-in `VISION_PILOT_ONE_SHOT` guard within the existing workflow.
+  No Task 006 work, deployment, commit, push or merge was performed.
+- Pilot mode keeps provider fixture/general live false, requires explicit existing
+  model/photo/allowance consent, restricts the model to Haiku QUICK, and checks all
+  prior owner Anthropic runs under the atomic reservation transaction. The first
+  reservation consumes the pilot across cases/dates/restarts, including failures.
+  Sonnet, forced additional attempts and concurrent second calls are blocked.
+- **313 tests pass**: all prior 301 plus 12 pilot tests. Ruff and whitespace checks
+  pass; only the existing Starlette/AnyIO warning remains. A template closing-tag
+  error found by the full suite was fixed before the final successful run.
+- Started the actual app on 127.0.0.1:8000, explicitly using the absolute default
+  database with the verified Haiku profile and unverified Sonnet profile. A private
+  SQLite backup precedes setup; all original rows remain unchanged after startup.
+  One neutral owner-requested pilot listing/case was added; no facts, photos or
+  runs were invented or seeded. Existing spending limits remain 5 USD/month and
+  10/day, with the additional one-attempt guard.
+- Four real loopback routes pass Android-sized browser checks: no overflow,
+  browser errors or external requests. The model and 0.505120 allowance are visible,
+  consent is unchecked, empty-photo submission and Sonnet are disabled, and pilot
+  force-rerun controls are absent. Database profiles exactly match dated files;
+  zero photos and zero paid runs remain.
+- No authenticated phone-preview capability is available. The owner has no private
+  workspace preview/VPN and asked about direct conversation upload instead.
+  The [pilot procedure](HAIKU-PILOT.md) requires a concrete selected-image review
+  and new explicit approval before submitting the local application confirmation.
+  No public exposure, real-photo upload/analysis or paid API request occurred.

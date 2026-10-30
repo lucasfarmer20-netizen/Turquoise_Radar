@@ -1,0 +1,15 @@
+{
+  "model": "claude-haiku-5-5",
+  "verified_on": "2026-10-30",
+  "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+  "conditions": "Owner-supplied official Anthropic references dated 2026-10-30; runtime did not independently retrieve the documents. Sources and complete tiers/modifiers: docs/anthropic/2026-10-30/owner-supplied-pricing.json. Global default (no surcharge), standard_only, standard speed, synchronous workflow; no batch, fast/priority, US-only or server tools. US-only costs 1.1x across input/output/cache and is outside this profile. Haiku uses the higher tier conservatively across the full 1M input ceiling: actual prompts <=100K are cheaper; above 100K, counting cached input, the higher tier applies to the entire request. Cache rates are supplied for usage accounting; the current adapter does not request caching. Reservation covers uncached standard input; enabling cache writes requires separate reservation review. Output cap 2048 is the app request limit, not the provider maximum of 128000. Haiku metadata access verified by successful Models GET; per-run authorization and live gates remain required.",
+  "model_access_verified": true,
+  "input_per_million": "0.50",
+  "output_per_million": "2.50",
+  "cache_read_per_million": "0.05",
+  "cache_write_5m_per_million": "0.625",
+  "cache_write_1h_per_million": "1.00",
+  "max_input_tokens": 1000000,
+  "max_output_tokens": 2048,
+  "standard_rates_through_input_limit": true
+}

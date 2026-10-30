@@ -187,7 +187,25 @@ def plan(session, config, stage, provider):
     reserve = reserve_amount(profile) if profile else Decimal(0)
     reasons = []
     if provider == "anthropic":
-        if config.provider != "anthropic" or not config.live_enabled:
+        if config.pilot_one_shot:
+            # The owner can authorize one Haiku attempt while general live mode stays off.
+            # analyze() checks this under BEGIN IMMEDIATE before reserving the run.
+            if config.provider != "fixture" or config.live_enabled:
+                reasons.append("One-request pilot requires fixture mode and general live disabled")
+            if stage != "QUICK" or model != "claude-haiku-5-5":
+                reasons.append(
+                    "One-request pilot permits only Haiku quick analysis; Sonnet is disabled"
+                )
+            used = session.scalar(
+                select(VisionRun.id)
+                .where(VisionRun.owner_id == OWNER, VisionRun.provider == "anthropic")
+                .limit(1)
+            )
+            if used is not None:
+                reasons.append(
+                    "One-request pilot already consumed; no further paid attempts allowed"
+                )
+        elif config.provider != "anthropic" or not config.live_enabled:
             reasons.append(
                 "Paid vision is disabled; select fixture or explicitly configure live mode"
             )
@@ -208,6 +226,7 @@ def plan(session, config, stage, provider):
         reservation=reserve,
         reasons=reasons,
         output_limit=profile.max_output_tokens if profile else 2048,
+        pilot_one_shot=config.pilot_one_shot,
     )
 
 
@@ -315,6 +334,11 @@ async def analyze(
             cost_status="HELD_UNKNOWN" if provider == "anthropic" else "NOT_APPLICABLE",
             data=dict(
                 prompt_version=PROMPT_VERSION,
+                authorization_scope=(
+                    "single_haiku_pilot"
+                    if provider == "anthropic" and config.pilot_one_shot
+                    else "standard_per_request"
+                ),
                 schema_version=SCHEMA_VERSION,
                 photo_ids=[p.id for p in photos],
                 image_hashes=[p.content_hash for p in photos],

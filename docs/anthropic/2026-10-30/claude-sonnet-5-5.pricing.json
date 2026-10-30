@@ -1,0 +1,42 @@
+{
+  "prepared_on": "2026-10-30",
+  "pricing_verified_on": "2026-10-30",
+  "verification_method": "owner_supplied_official_references",
+  "independently_retrieved_by_this_runtime": false,
+  "sources": [
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+    "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
+    "https://platform.claude.com/docs/en/api/service-tiers"
+  ],
+  "reference_evidence": "owner-supplied-pricing.json",
+  "model_id": "claude-sonnet-5-5",
+  "model_access_verified": false,
+  "model_access_evidence": "model-access-recheck.json",
+  "access_decision": "Owner requires unverified access while historical 401 remains unexplained; later 200 rechecks do not override that decision",
+  "application_profile": "claude-sonnet-5-5.price-profile.json",
+  "reservation_usd": "2.020480",
+  "reservation_scope": "Full 1M input, 2048 output, uncached synchronous global standard; Haiku higher tier applied at every input length",
+  "cache_pricing_configured": true,
+  "prompt_caching_requested_by_adapter": false,
+  "unsupported_conditions": [
+    "US-only inference",
+    "batch",
+    "fast/priority",
+    "server tools"
+  ],
+  "limits": {
+    "provider_max_input_tokens": 1000000,
+    "provider_max_output_tokens": 128000,
+    "application_max_output_tokens": 2048,
+    "monthly_budget_usd": "5.00",
+    "daily_paid_analysis_limit": 10
+  },
+  "required_configuration": {
+    "VISION_PROVIDER": "fixture",
+    "VISION_LIVE_ENABLED": "false"
+  },
+  "pricing_status": "OWNER_VERIFIED",
+  "pilot_preflight_eligible": false,
+  "paid_calls_authorized": false
+}

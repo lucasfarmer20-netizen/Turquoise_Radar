@@ -10,6 +10,7 @@ class VisionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     provider: Literal["fixture", "anthropic"] = "fixture"
     live_enabled: bool = False
+    pilot_one_shot: bool = False
     model: str = "claude-haiku-5-5"
     deep_model: str = "claude-sonnet-5-5"
     api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
@@ -22,6 +23,7 @@ class VisionConfig(BaseModel):
         return cls(
             provider=os.getenv("VISION_PROVIDER", "fixture"),
             live_enabled=os.getenv("VISION_LIVE_ENABLED", "false").lower() == "true",
+            pilot_one_shot=os.getenv("VISION_PILOT_ONE_SHOT", "false").lower() == "true",
             model=os.getenv("VISION_MODEL", "claude-haiku-5-5"),
             deep_model=os.getenv("VISION_DEEP_MODEL", "claude-sonnet-5-5"),
             api_key=os.getenv("ANTHROPIC_API_KEY", ""),
