@@ -228,7 +228,8 @@ connector/mailbox access needs separate documented authorization and scope.
 The [pre-merge compatibility comment](https://github.com/lucasfarmer20-netizen/Turquoise_Radar/pull/4)
 reports `Item: <digits>`, `item #<digits>` and standalone bid-notice IDs, plus the
 HiBid tracking host `clicks.auctions.hibid.com`. The owner subsequently supplied
-a sanitized, observed `/CL0/` URL structure and percent-encoding rules. Regression
+a sanitized, observed `/CL0/` URL structure, percent-encoding rules and a corrected
+catalog example on `clicks.alerts.hibid.com` targeting an auction-house subdomain. Regression
 messages use synthetic item/order IDs and tokens. This confirms the narrow observed
 URL shape, not an API contract or a complete real newsletter template.
 
@@ -245,8 +246,9 @@ references retain all order charges at invoice level and cannot use the single-i
 confirmation action. Existing explicit ownership and six-component cost checks apply.
 
 HiBid recovery is **offline text extraction**, not a redirect request or general
-tracking-token decoder. It accepts the exact HTTPS host `clicks.auctions.hibid.com`
-and the owner-confirmed shape:
+tracking-token decoder. Its parser allowlist accepts only the exact HTTPS tracking
+hosts `clicks.auctions.hibid.com` and `clicks.alerts.hibid.com`, using the
+owner-confirmed shape:
 
 ```text
 /CL0/<embedded HTTPS destination>/1/<opaque message ID>/<opaque token>
@@ -262,9 +264,11 @@ supported.
 The decoded destination must be an allowlisted HTTPS HiBid
 `/lot/<numeric-ID>` or `/catalog/<numeric-ID>` path (an optional simple title slug is
 allowed). The decoded path alone determines the identity kind; link text does not.
-Both pasted owner examples used `/lot/`, despite one being labelled catalog. The
-owner's accompanying clarification explicitly confirms `/catalog/` destinations;
-a synthetic catalog fixture uses that distinct path.
+The corrected owner catalog example uses `clicks.alerts.hibid.com` and an
+auction-house `*.hibid.com/catalog/<ID>` destination. Lot examples use
+`clicks.auctions.hibid.com` with a `/lot/<ID>` destination. The host does not itself
+determine identity kind. Both tracking hosts are excluded as destination hosts and
+never become clickable source URLs. These parser rules grant no network access.
 
 The stored/clickable URL is canonicalized to the provider identity; destination UTM
 parameters and all opaque tracking data are discarded. The URL structure is an

@@ -242,6 +242,44 @@ def test_hibid_requires_confirmed_cl0_prefix():
     )
 
 
+@pytest.mark.parametrize(
+    "tracking_host,destination",
+    [
+        ("clicks.alerts.hibid.com.evil.invalid", "synthetic-auction-house.hibid.com"),
+        ("clicks.alerts-extra.hibid.com", "synthetic-auction-house.hibid.com"),
+        ("alerts.hibid.com", "synthetic-auction-house.hibid.com"),
+        ("clicks.alerts.hibid.com", "synthetic-auction-house.hibid.com.evil.invalid"),
+        ("clicks.alerts.hibid.com", "clicks.auctions.hibid.com"),
+        ("clicks.alerts.hibid.com", "clicks.alerts.hibid.com"),
+    ],
+)
+def test_hibid_alerts_catalog_rejects_spoofed_hosts_and_tracking_destinations(
+    tracking_host, destination
+):
+    url = (
+        f"https://{tracking_host}/CL0/https:%2F%2F{destination}%2Fcatalog%2F940000000001"
+        "/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN"
+    )
+    assert hibid_embedded_target(url) is None
+
+
+def test_hibid_alerts_opaque_url_is_never_a_clickable_source_link(client):
+    url = "https://clicks.alerts.hibid.com/ls/click?upn=SYNTHETIC_OPAQUE_TOKEN"
+    definition = SourceDefinition(name="HiBid", domains=["hibid.com"])
+    assert safe_link(url, definition) is None
+    message = EmailMessage()
+    message["Subject"] = "SYNTHETIC HiBid Auction Closing Reminder"
+    message["X-Turquoise-Synthetic"] = "true"
+    message.set_content("SYNTHETIC opaque catalog example")
+    message.add_alternative(f'<a href="{url}">SYNTHETIC catalog</a>', subtype="html")
+    with client.app.state.sessions.begin() as s:
+        import_alerts(s, "hibid", [message.as_bytes()])
+        alert = s.scalar(select(AlertMessage))
+        assert alert.data["status"] == "NEEDS_REVIEW"
+        assert alert.data["catalogs"] == []
+        assert not list(s.scalars(select(DiscoveredItem)))
+
+
 def test_hibid_label_does_not_override_decoded_lot_path(client):
     message = EmailMessage()
     message["Subject"] = "SYNTHETIC HiBid Auction Catalog"
@@ -312,7 +350,7 @@ def test_hibid_embedded_newsletter_lots_catalog_and_repeated_import(client):
         assert message.data["wrapped_targets_recovered_offline"] == 3
         catalog = message.data["catalogs"][0]
         assert catalog["auction_id"] == "910000000100"
-        assert catalog["url"] == "https://hibid.com/catalog/910000000100"
+        assert catalog["url"] == "https://synthetic-auction-house.hibid.com/catalog/910000000100"
         items = list(s.scalars(select(DiscoveredItem)))
         assert len(items) == 2
         assert {i.normalized["item_price"] for i in items} == {"12.00", "20.00"}
@@ -339,6 +377,10 @@ def test_hibid_embedded_catalog_closing_notice_never_becomes_a_lot(client):
         message = s.scalar(select(AlertMessage))
         assert message.message_type == "AUCTION_CLOSING_REMINDER"
         assert message.data["catalogs"][0]["auction_id"] == "910000000100"
+        assert message.data["catalogs"][0]["url"] == (
+            "https://synthetic-auction-house.hibid.com/catalog/910000000100"
+        )
+        assert message.data["wrapped_targets_recovered_offline"] == 1
         assert message.data["closing_time_raw"] == "November 5, 2026 7:00 PM CST"
         assert message.data["closing_timezone_raw"] == "CST"
         assert message.data["closing_at"] is None  # No invented timezone offset.

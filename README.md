@@ -100,7 +100,8 @@ never seed fixtures into owner inventory.
 The PR #4 compatibility follow-up recognizes ShopGoodwill Item/item # and bounded
 standalone notice IDs, plus explicit HiBid lot/catalog targets embedded in paths on
 the owner-confirmed `/CL0/` tracking structure. Extraction stays offline and ignores
-opaque tracking data; ambiguous layouts stay for review.
+opaque tracking data; ambiguous layouts stay for review. The corrected catalog shape on
+`clicks.alerts.hibid.com` supports auction-house HiBid subdomains.
 See [supported patterns and limits](docs/ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
 
 ## Discovery engine (Task 003)
@@ -233,7 +234,7 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-220 tests (including all 165 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
+227 tests (including all 165 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests

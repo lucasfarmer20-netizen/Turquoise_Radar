@@ -22,8 +22,10 @@ assumed to grant API/crawling rights.
 PR #4 compatibility follow-up adds reported ShopGoodwill ID forms and bounded
 offline recovery of explicit targets in the owner-confirmed HiBid `/CL0/`
 tracking-link structure. The destination is isolated before decoding; opaque tokens
-are never searched for IDs. Unknown wrapper layouts remain human-review evidence;
-this observed structure is not an API contract. See [exact compatibility limits](ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
+are never searched for IDs. Unknown wrapper layouts remain human-review evidence.
+The exact parser tracking-host allowlist is `clicks.auctions.hibid.com` and
+`clicks.alerts.hibid.com`; corrected catalog fixtures target an auction-house
+HiBid subdomain. This observed structure is not an API contract. See [exact compatibility limits](ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
 
 All unknown costs/attribution remain unknown. Owner-configured metadata is not an
 access grant. No direct mailbox integration or additional automated source adapter

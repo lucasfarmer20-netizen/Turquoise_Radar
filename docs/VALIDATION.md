@@ -234,3 +234,22 @@ six owner workflow pages responded with expected content.
   receipt still reconciles 27; multi-item allocation remains blocked. Only the
   two synthetic HiBid fixture shapes were updated; original owner data, financial
   logic, SQLite v4 schema and eBay gates are unchanged. PR #4 remains unmerged.
+
+## Corrected HiBid catalog tracking host
+
+- Added the owner's corrected catalog host `clicks.alerts.hibid.com` to the exact
+  parser allowlist alongside `clicks.auctions.hibid.com`. No network permissions
+  were added. Both hosts remain blocked as clickable originals and as nested
+  destinations; only the isolated allowlisted provider destination is returned.
+- Updated synthetic catalog fixtures to the corrected `/CL0/` structure targeting
+  `synthetic-auction-house.hibid.com/catalog/910000000100`. Catalog-only reminders
+  retain their closing evidence, count one offline recovery and create no lots.
+  Browser checks assert the canonical house URL and no active tracking-host links.
+- **227 tests pass**, preserving all 165 original Task 004 tests. Seven additional
+  regressions cover spoofed alerts hosts, off-domain destinations, nested tracking
+  destinations and opaque alerts evidence. Ruff lint/format, JavaScript syntax and
+  whitespace checks pass; only the existing Starlette/AnyIO warning remains.
+- Desktop and twelve mobile views pass with zero errors, overflow or external
+  requests. Paid receipt and multi-item allocation checks still pass. Only synthetic
+  fixtures are committed; owner data, schema, financial logic and eBay gates are
+  unchanged. Changes remain on PR #4's branch; no merge or Task 005 work.

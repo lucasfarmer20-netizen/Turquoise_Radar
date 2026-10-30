@@ -19,6 +19,7 @@ MAX_MESSAGE_BYTES = 512_000
 MAX_MESSAGES = 10
 MAX_BATCH_BYTES = 3_000_000
 MAX_LINKS = 100
+HIBID_TRACKING_HOSTS = frozenset({"clicks.auctions.hibid.com", "clicks.alerts.hibid.com"})
 
 
 class MessageType(StrEnum):
@@ -148,7 +149,7 @@ def safe_link(url, source):
             return None
         if not any(host == d or host.endswith("." + d) for d in source.domains):
             return None
-        if host == "clicks.auctions.hibid.com":
+        if host in HIBID_TRACKING_HOSTS:
             # Never render the original tracking URL, even on the provider's domain.
             return None
         # No redirect unwrapping, tracking requests or arbitrary relative URL resolution.
@@ -179,7 +180,7 @@ def hibid_embedded_target(url):
         wrapper = urlsplit(url)
         if (
             wrapper.scheme != "https"
-            or wrapper.hostname != "clicks.auctions.hibid.com"
+            or wrapper.hostname not in HIBID_TRACKING_HOSTS
             or wrapper.username
             or wrapper.password
             or wrapper.port not in (None, 443)
@@ -210,7 +211,7 @@ def hibid_embedded_target(url):
         if (
             target.scheme != "https"
             or not re.fullmatch(r"(?:[a-z0-9-]+\.)*hibid\.com", host)
-            or host == "clicks.auctions.hibid.com"
+            or host in HIBID_TRACKING_HOSTS
             or target.username
             or target.password
             or target.port not in (None, 443)
@@ -424,7 +425,7 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
             continue
         link_kind, id_, clean = identity
         method = "DIRECT_SOURCE_LINK"
-        if source_id == "hibid" and urlsplit(url).hostname == "clicks.auctions.hibid.com":
+        if source_id == "hibid" and urlsplit(url).hostname in HIBID_TRACKING_HOSTS:
             method = "EXPLICIT_EMBEDDED_HTTPS_TARGET"
             recovered += 1
         if link_kind == "catalog":

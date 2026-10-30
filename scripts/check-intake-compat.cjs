@@ -73,9 +73,11 @@ const path = require('node:path');
     await page.goto(base + '/inbox/messages/6');
     assert.match(await page.locator('main').innerText(), /AUCTION_CLOSING_REMINDER/);
     assert.match(await page.locator('main').innerText(), /CST/);
-    const catalog = page.locator('a[href="https://hibid.com/catalog/910000000100"]');
+    const catalog = page.locator(
+      'a[href="https://synthetic-auction-house.hibid.com/catalog/910000000100"]');
     assert.equal(await catalog.count(), 1);
-    assert.equal(await page.locator('a[href*="clicks.auctions.hibid.com"]').count(), 0);
+    assert.equal(await page.locator(
+      'a[href*="clicks.auctions.hibid.com"], a[href*="clicks.alerts.hibid.com"]').count(), 0);
     await page.goto(base + '/inbox/messages/7');
     assert.match(await page.locator('main').innerText(), /NEEDS_REVIEW/);
     assert.match(await page.locator('main').innerText(), /No identifiable item references/);
