@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import select
 
 from radar.db import Feedback, Listing, SearchPattern, Setting, database
-from radar.migrations import VERSION_1
+from radar.migrations import CURRENT_VERSION, VERSION_1
 
 
 def phase001_database(path):
@@ -80,10 +80,10 @@ def test_populated_phase001_copy_migrates_preserving_all_data(tmp_path):
         assert s.get(Feedback, 1).note == "old history"
     engine.dispose()
     with sqlite3.connect(path) as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert c.execute("PRAGMA user_version").fetchone()[0] == CURRENT_VERSION
         for table in ("search_patterns", "settings", "feedback"):
             assert c.execute(f"SELECT * FROM {table}").fetchall() == before[table]
-    assert Path(str(path) + ".pre-v2.bak").exists()
+    assert Path(str(path) + f".pre-v{CURRENT_VERSION}.bak").exists()
     engine, _ = database(f"sqlite:///{path}")  # repeated migration is a no-op
     engine.dispose()
 
@@ -95,7 +95,7 @@ def test_fresh_database_migrates(tmp_path):
         assert list(s.scalars(select(Listing))) == []
     engine.dispose()
     with sqlite3.connect(path) as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert c.execute("PRAGMA user_version").fetchone()[0] == CURRENT_VERSION
         assert {"listing_edits", "comparable_sales"} <= {
             row[0] for row in c.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }

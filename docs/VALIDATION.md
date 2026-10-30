@@ -80,3 +80,43 @@ hosting calls. API-assisted PR creation remains blocked until api.github.com acc
 The task branch is prepared for publication without merging main. Saved Task 002
 startup checks also passed against the migrated default database: health and all
 six owner workflow pages responded with expected content.
+
+
+## Task 003 validation
+
+- Base: updated main `7f437e9503823b539a90cf6eb3f62bdcaf8e4351` (merged Task 002 PR).
+  Work is on `task/003-ebay-discovery`; no merge to main is authorized.
+- **128 tests pass**, including all 91 prior cases and mocked OAuth/Browse,
+  permissions, production/source gates, retries/Retry-After, pagination, exact
+  query/correction preservation, multi-query deduplication, unknown Alaska costs,
+  explicit review handoff and populated Phase 002 migration/rollback tests.
+- HTTP transport in discovery tests is mocked; unmocked async HTTP is explicitly
+  rejected. No real production/sandbox calls or credentials were used.
+- Ruff lint, Ruff format checks and git whitespace checks pass. One existing
+  Starlette/AnyIO deprecation warning remains; no assertions or tests are disabled.
+- SQLite v3 migration tested on a populated Phase 002 fixture containing owner
+  evidence, feedback, preferences, comparables and edit history. Every prior value
+  was unchanged; new tables were empty. Failure rolled back without losing data.
+- A copy of the actual Phase 002 database was also migrated: 25 listings, 25
+  patterns, one settings row and zero feedback/comparable/edit rows; all prior
+  column values and original JSON were identical after migration.
+- Desktop 1440×1100 and mobile 390×844 Chromium passed: empty-state/plan preview,
+  fixture run (4 queries, 11 observations, 6 identities, 5 duplicates), repeat run
+  (zero new), KEYWORD correction, independent item history, review handoff/evidence
+  editor, group disable and smaller result budgets. Seven mobile views had no
+  horizontal overflow. Browser errors and external network requests were both zero.
+- Fixture image references are preserved but represented by explicit non-live
+  placeholders. Browser/API fixtures do not imply current marketplace inventory.
+- Official documentation access returned proxy 403. Current account quotas,
+  production approval and live API responses remain unverified; fixture discovery
+  is fully validated independently of those prerequisites.
+- The restarted private app passed /health, /discovery, /discovery/plan, workbench
+  and queue readiness checks against the migrated default database. It retained
+  all 25 owner/default listings and had zero automatic discovery runs. Startup
+  added only the two bounded jar/bulk vocabulary patterns and three missing query
+  groups; no existing pattern or owner preference was overwritten.
+- Task 003 startup/migration instructions and optional api.sandbox.ebay.com access
+  were saved to the environment draft, preserving prior documentation/GitHub API
+  entries. No production API host was added. Saving is not runtime application or
+  publication; documentation, credentials and permitted sandbox access remain
+  prerequisites for real API validation.

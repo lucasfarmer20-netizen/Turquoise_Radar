@@ -80,3 +80,69 @@ def database(url=None):
 
     migrate(engine)
     return engine, sessionmaker(engine, expire_on_commit=False)
+
+
+class DiscoveryGroup(Base):
+    __tablename__ = "discovery_groups"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON)
+
+
+class DiscoveryRun(Base):
+    __tablename__ = "discovery_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mode: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="RUNNING")
+    options: Mapped[dict] = mapped_column(JSON)
+    started_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    new_count: Mapped[int] = mapped_column(default=0)
+    duplicate_count: Mapped[int] = mapped_column(default=0)
+    invalid_count: Mapped[int] = mapped_column(default=0)
+    errors: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class SearchExecution(Base):
+    __tablename__ = "search_executions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("discovery_runs.id"))
+    source: Mapped[str] = mapped_column(String)
+    mode: Mapped[str] = mapped_column(String)
+    group_ids: Mapped[list] = mapped_column(JSON)
+    pattern_id: Mapped[str | None] = mapped_column(ForeignKey("search_patterns.id"))
+    original_query: Mapped[str] = mapped_column(String)
+    transmitted_query: Mapped[str] = mapped_column(String)
+    corrected_queries: Mapped[list] = mapped_column(JSON, default=list)
+    correction_state: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    parameters: Mapped[dict] = mapped_column(JSON)
+    results_returned: Mapped[int] = mapped_column(default=0)
+    unique_listings: Mapped[int] = mapped_column(default=0)
+    new_count: Mapped[int] = mapped_column(default=0)
+    duplicate_count: Mapped[int] = mapped_column(default=0)
+    errors: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String, default="RUNNING")
+    executed_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DiscoveredItem(Base):
+    __tablename__ = "discovered_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    identity: Mapped[str] = mapped_column(String, unique=True)
+    source: Mapped[str] = mapped_column(String)
+    ebay_item_id: Mapped[str] = mapped_column(String)
+    normalized: Mapped[dict] = mapped_column(JSON)
+    original_data: Mapped[dict] = mapped_column(JSON)
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
+    first_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DiscoveryObservation(Base):
+    __tablename__ = "discovery_observations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    execution_id: Mapped[int] = mapped_column(ForeignKey("search_executions.id"))
+    item_id: Mapped[int] = mapped_column(ForeignKey("discovered_items.id"))
+    raw_data: Mapped[dict] = mapped_column(JSON)
+    corrected_query: Mapped[str | None] = mapped_column(String)
+    correction_state: Mapped[str] = mapped_column(String)
+    observed_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)

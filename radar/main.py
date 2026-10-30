@@ -19,6 +19,8 @@ from radar.anomalies import (
     seed_patterns,
 )
 from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
+from radar.discovery.routes import discovery_routes
+from radar.discovery.service import discovery_history, seed_discovery
 from radar.owner_routes import owner_routes
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
 from radar.sources import import_rows, upsert_listing
@@ -55,6 +57,7 @@ def create_app(database_url=None):
         app.state.engine, app.state.sessions = database(database_url)
         with app.state.sessions.begin() as session:
             seed_patterns(session)
+            seed_discovery(session)
         yield
         app.state.engine.dispose()
 
@@ -184,6 +187,7 @@ def create_app(database_url=None):
                 "detail.html",
                 v=view(row, preferences(s), patterns),
                 feedback=feedback,
+                discovery_observations=discovery_history(s, listing_id),
                 outcomes=list(
                     s.scalars(select(ComparableSale).where(ComparableSale.listing_id == listing_id))
                 ),
@@ -351,6 +355,7 @@ def create_app(database_url=None):
         return RedirectResponse("/settings", status_code=303)
 
     owner_routes(app, render, preferences, view)
+    discovery_routes(app, render, preferences)
     return app
 
 

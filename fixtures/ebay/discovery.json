@@ -1,0 +1,420 @@
+{
+  "synthetic": true,
+  "notice": "Non-live handcrafted fixtures; no marketplace or owner purchase history.",
+  "items": {
+    "1": {
+      "itemId": "v1|SYNTHETIC-001|0",
+      "title": "SYNTHETIC nature america blue stone ring",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/1",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-1"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/1.jpg"
+      },
+      "price": {
+        "value": "18",
+        "currency": "USD"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "7",
+            "currency": "USD"
+          }
+        }
+      ]
+    },
+    "2": {
+      "itemId": "v1|SYNTHETIC-002|0",
+      "title": "SYNTHETIC turqoise sterlng ring",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/2",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-2"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/2.jpg"
+      },
+      "price": {
+        "value": "16",
+        "currency": "USD"
+      }
+    },
+    "3": {
+      "itemId": "v1|SYNTHETIC-003|0",
+      "title": "SYNTHETIC silver jewelry lot gross 100g",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/3",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-0"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/3.jpg"
+      },
+      "price": {
+        "value": "40",
+        "currency": "USD"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "15",
+            "currency": "USD"
+          }
+        }
+      ]
+    },
+    "4": {
+      "itemId": "v1|SYNTHETIC-004|0",
+      "title": "SYNTHETIC mixed estate jewelry with plated clasp",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/4",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-1"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/4.jpg"
+      },
+      "price": {
+        "value": "24",
+        "currency": "USD"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "7",
+            "currency": "USD"
+          }
+        }
+      ]
+    },
+    "5": {
+      "itemId": "v1|SYNTHETIC-005|0",
+      "title": "SYNTHETIC signed Southwestern cuff research",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/5",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-2"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/5.jpg"
+      },
+      "price": {
+        "value": "65",
+        "currency": "USD"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "7",
+            "currency": "USD"
+          }
+        }
+      ]
+    },
+    "6": {
+      "itemId": "v1|SYNTHETIC-006|0",
+      "title": "SYNTHETIC blue stone ring auction",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/6",
+      "buyingOptions": [
+        "AUCTION"
+      ],
+      "seller": {
+        "username": "synthetic-seller-0"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/6.jpg"
+      },
+      "currentBidPrice": {
+        "value": "12.50",
+        "currency": "USD"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "7",
+            "currency": "USD"
+          }
+        }
+      ],
+      "itemEndDate": "2026-01-05T12:00:00.000Z"
+    },
+    "7": {
+      "itemId": "v1|SYNTHETIC-007|0",
+      "title": "SYNTHETIC old stamped jewelry, price unavailable",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/7",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-1"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/7.jpg"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "0",
+            "currency": "USD"
+          }
+        }
+      ]
+    },
+    "8": {
+      "itemId": "v1|SYNTHETIC-008|0",
+      "title": "SYNTHETIC heavy silver coral lot",
+      "itemWebUrl": "https://example.invalid/ebay-fixture/8",
+      "buyingOptions": [
+        "FIXED_PRICE"
+      ],
+      "seller": {
+        "username": "synthetic-seller-2"
+      },
+      "condition": "Pre-owned (synthetic)",
+      "categories": [
+        {
+          "categoryId": "999999",
+          "categoryName": "Synthetic jewelry fixture"
+        }
+      ],
+      "itemCreationDate": "2026-01-01T12:00:00.000Z",
+      "image": {
+        "imageUrl": "https://example.invalid/ebay-fixture/8.jpg"
+      },
+      "price": {
+        "value": "90",
+        "currency": "USD"
+      },
+      "shippingOptions": [
+        {
+          "shippingCostType": "FIXED",
+          "shippingCost": {
+            "value": "7",
+            "currency": "USD"
+          }
+        }
+      ]
+    }
+  },
+  "queries": {
+    "nature america": {
+      "ids": [
+        "1",
+        "6",
+        "2",
+        "5"
+      ],
+      "corrected_query": "Native American"
+    },
+    "turqoise": {
+      "ids": [
+        "2",
+        "1",
+        "4",
+        "6"
+      ]
+    },
+    "turquiose": {
+      "ids": [
+        "2",
+        "5"
+      ]
+    },
+    "turquise": {
+      "ids": [
+        "1",
+        "2"
+      ]
+    },
+    "sterlng": {
+      "ids": [
+        "2",
+        "3"
+      ]
+    },
+    "old blue stone ring": {
+      "ids": [
+        "1",
+        "2",
+        "4",
+        "6"
+      ]
+    },
+    "silver ring blue rock": {
+      "ids": [
+        "1",
+        "2",
+        "6"
+      ]
+    },
+    "green stone silver ring": {
+      "ids": [
+        "2"
+      ]
+    },
+    "silver jewelry lot": {
+      "ids": [
+        "3",
+        "4",
+        "8",
+        "7"
+      ]
+    },
+    "heavy silver bracelet": {
+      "ids": [
+        "8",
+        "5"
+      ]
+    },
+    "grandma's silver jewelry": {
+      "ids": [
+        "4",
+        "3"
+      ]
+    },
+    "mystery silver jewelry": {
+      "ids": [
+        "7",
+        "3"
+      ]
+    },
+    "Navaho": {
+      "ids": [
+        "5",
+        "1"
+      ],
+      "corrected_query": "Navajo"
+    },
+    "Navjo": {
+      "ids": [
+        "5",
+        "1"
+      ]
+    },
+    "Zunni": {
+      "ids": [
+        "5",
+        "2"
+      ]
+    },
+    "old stamped jewelry": {
+      "ids": [
+        "7",
+        "5"
+      ]
+    },
+    "925 blue stone": {
+      "ids": [
+        "2",
+        "1"
+      ]
+    },
+    "western silver ring": {
+      "ids": [
+        "1",
+        "2",
+        "6"
+      ]
+    },
+    "vintage blue stone cuff": {
+      "ids": [
+        "5"
+      ]
+    },
+    "costume jewelry estate lot": {
+      "ids": [
+        "4",
+        "7"
+      ]
+    },
+    "silver jewelry jar": {
+      "ids": [
+        "4",
+        "3",
+        "8"
+      ]
+    },
+    "bulk silver jewelry": {
+      "ids": [
+        "3",
+        "4",
+        "8"
+      ]
+    }
+  }
+}

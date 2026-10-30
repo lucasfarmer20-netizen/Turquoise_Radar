@@ -182,6 +182,10 @@ class ListingInput(BaseModel):
     collector_evidence: str | None = None
     combined_shipping_available: bool | None = None
     synthetic: bool = False
+    buying_options: list[str] = Field(default_factory=list)
+    item_end_time: datetime | None = None
+    shipping_evidence: str | None = None
+    discovery_mode: Literal["fixture", "sandbox", "production"] | None = None
     pasted_text: (
         Annotated[str, StringConstraints(strip_whitespace=False, max_length=30000)] | None
     ) = None

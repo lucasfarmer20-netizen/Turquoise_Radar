@@ -1,6 +1,10 @@
 # Authorized source evaluation — Phase 003 candidate
 
-Assessment date: **2026-10-29**. Task 002 implements **no live connector**.
+Assessment date: **2026-10-29**. Task 003 implements an official eBay adapter with
+fixture-first operation; **no real sandbox or production API calls were executed**.
+Production remains disabled pending final approval and explicit authorization.
+See [eBay setup](EBAY-SETUP.md) for exact implemented endpoints, filters, OAuth,
+retry/pagination limits, correction handling and the activation checklist.
 
 ## Evidence status and access limitation
 
@@ -13,9 +17,9 @@ Official current terms, numerical quotas, pricing and production eligibility
 remain **unverified in this environment**. The URLs below are authoritative places
 to verify, not a claim that their current page contents were read successfully.
 
-## Recommendation: official eBay Browse API, conditional on approval
+## Selected architecture: official eBay Browse API, conditional on approval
 
-Choose **one approved, read-only eBay Browse integration** for Phase 003 after
+Use the implemented **read-only eBay Browse integration** for authorized testing after
 current documentation and the owner's application eligibility are verified.
 It is a stronger first candidate than an undocumented marketplace scraping path:
 its published REST API design offers a defined acquisition contract, OAuth and
@@ -75,8 +79,28 @@ See [calculation conventions](CALIBRATION.md) for exact implementation.
 
 ## Adapter boundary
 
-Manual, CSV/JSON and Quick Capture work now. `SourceAdapter` retains capability
+Manual, CSV/JSON, Quick Capture and fixture discovery work now. The official eBay
+adapter is ready for permitted API testing, not proof of production approval. `SourceAdapter` retains capability
 metadata for enabled state, exact-match support, effective-query visibility,
 polling interval, request limit, retry cap and access method. Remote capabilities
 remain disabled placeholders. Store untouched source observations at ingestion;
 never fabricate effective queries, Alaska eligibility or source authorization.
+
+
+## Task 003 implementation status
+
+- Implemented: client-credentials OAuth, Browse keyword search, fixed/auction/both
+  filters, USD price bounds, newlyListed/price sorting, bounded pagination,
+  timeouts/pacing and safe bounded retry handling, explicit production gates.
+- Query experiments omit auto_correct or send KEYWORD; OFF is never sent. A source
+  autoCorrections.q is recorded independently. Omission does not prove literal matching.
+- Fixture data is synthetic, credentials-free and local. Statistics are generated
+  only by actual owner-triggered fixture runs, with conspicuous NON-LIVE labels.
+- Summary shipping/context is not accepted as Alaska confirmation; no resale,
+  purity, net weight, maker/tribal attribution or purchasing action is inferred.
+- Current documentation remains inaccessible under the running proxy policy.
+  Final approval, credentials, live schema validation and numerical assigned quotas
+  remain unverified. No claim of sandbox connectivity or production readiness is made.
+- Sandbox testing needs api.sandbox.ebay.com access and secure environment keyset
+  bindings. Production additionally needs api.ebay.com access after explicit
+  authorization; that production host is not added by Task 003.

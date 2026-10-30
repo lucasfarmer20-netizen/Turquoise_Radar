@@ -1,11 +1,13 @@
 # Turquoise Radar
 
 A private, local-first jewelry sourcing workbench for Soldotna, Alaska **99669**.
-Phase 002 connects local CSV/JSON and manual entry to exact search anomalies,
+Phase 003 connects local CSV/JSON and manual entry to exact search anomalies,
 Decimal financial analysis, evidence-gated sterling melt analysis, deterministic
 ranking, a responsive dark dashboard, and owner feedback. Quick Capture, evidence
 editing, a review queue, comparable sales and source-separated anomaly metrics
-support real owner-operated sourcing. No live marketplaces,
+support real owner-operated sourcing. Official eBay discovery is implemented with
+fixture-first operation, gated sandbox/production configuration and manual-only
+execution. No live API requests were made during implementation. No
 paid AI, purchasing automation, accounts, or background monitoring.
 
 ## Run
@@ -40,7 +42,7 @@ export RADAR_DATABASE_URL=sqlite:///./data/private.db
 `.env.example` documents shell configuration; the app does not automatically load
 `.env`. SQLite files live in ignored `data/`; retain/back up that directory to
 preserve listings, preferences, and feedback. Ordered SQLite migrations initialize
-or upgrade the schema; existing populated databases are backed up before v2.
+or upgrade the schema; existing populated databases are backed up before v3.
 See [migration and calibration details](docs/CALIBRATION.md).
 
 ## Demo walkthrough
@@ -73,6 +75,21 @@ Re-seeding is idempotent by identity, but **updates existing demo listing values
 It preserves first observations, feedback, and existing preferences. Keep demo and
 real inventory in separate databases. The seed initializes synthetic spot/auction
 settings only when no saved preferences exist.
+
+## Discovery engine (Task 003)
+
+Open **Discovery → Preview search plan → Run discovery**, keeping Fixture mode.
+No credentials are required. A fresh default run records 11 synthetic observations
+from four exact queries, deduplicating to six identities with five duplicate
+observations. Open **Full discovery history**, then **Send to review queue** to use
+the existing owner evidence editor. Repeat with KEYWORD to inspect source-reported
+correction without replacing the original `nature america` query.
+
+Fixture, sandbox and production identities are separate. Fixture statistics are
+non-live test counts, not marketplace results. Production is disabled by default
+and requires explicit environment approval/enablement plus individual run consent;
+credentials alone never activate it. No recurring monitoring is implemented.
+Read [eBay setup, permissions and limitations](docs/EBAY-SETUP.md) before any API use.
 
 ## Owner workflow (Task 002)
 
@@ -189,7 +206,7 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-91 tests (including all 55 retained Phase 001 cases, with corrected fee expectations) cover financial breakdowns, highest feasible auction bids, fees and
+128 tests (including the 91 retained Phase 001/002 cases) cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests
@@ -206,13 +223,13 @@ normalization/import/dedup; `anomalies`: curated patterns and query plans;
 `finance` / `melt`: independent Decimal engines; `analysis`: classification;
 `main` / templates / static: dashboard and feedback; `vision`: interface only.
 `capture` / `owner_routes` / `workflow`: capture, evidence editing and queue;
-`comparables`: manual resale evidence; `migrations`: ordered transactional upgrades.
+`comparables`: manual resale evidence; `migrations`: ordered transactional upgrades;
+`discovery`: eBay/OAuth, fixture adapter, bounded plans, observations and UI routes.
 
 See [master specification](docs/SPEC.md), [source capabilities](docs/SOURCES.md),
 [roadmap](docs/ROADMAP.md), and [development rules](AGENTS.md).
-See [Task 002 usage and financial conventions](docs/CALIBRATION.md) and the
-[Task 002 specification](docs/SPEC-002.md). The recommended Phase 003 source is
-the official eBay Browse API, conditional on verified current documentation and
-production approval. Official source documentation is currently blocked by the
-cloud network policy; saved access additions require environment review/save and
-publication. No live connector or production scraper is implemented.
+See [Task 002 usage and financial conventions](docs/CALIBRATION.md),
+[Task 003 specification](docs/SPEC-003.md), and [eBay setup](docs/EBAY-SETUP.md).
+The next step is authorized sandbox validation after credentials, permitted access
+and current official documentation are available. Production approval is pending;
+no live request, public deployment or automated purchasing is authorized by 003.
