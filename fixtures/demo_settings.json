@@ -1,0 +1,32 @@
+{
+  "ring_low": "15",
+  "ring_high": "25",
+  "resale_low": "35",
+  "resale_high": "60",
+  "min_profit": "15",
+  "min_roi": "0.60",
+  "resale_channel": "whatnot_planning",
+  "resale_profiles": {
+    "whatnot_planning": {
+      "commission": "0.10",
+      "processing": "0.029",
+      "processing_fixed": "0.30",
+      "packaging": "1",
+      "outbound_shipping": "0"
+    }
+  },
+  "buyer_profiles": {
+    "demo_auction": {
+      "premium_rate": "0.20",
+      "service_rate": "0",
+      "tax_rate": "0.05",
+      "per_lot_fee": "3"
+    }
+  },
+  "spot_usd_per_troy_oz": "30",
+  "spot_timestamp": "2026-01-01T00:00:00Z",
+  "spot_source": "SYNTHETIC SCENARIO, NOT CURRENT SPOT",
+  "refiner_payout": "0.80",
+  "require_verified_material": true,
+  "melt_max_ratio": "0.85"
+}

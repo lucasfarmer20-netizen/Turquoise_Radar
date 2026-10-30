@@ -1,0 +1,2 @@
+source,source_listing_id,raw_title,item_price,buyer_premium,buyer_service_fee,sales_tax,shipping_cost,handling_fee,shipping_status,raw_search_phrase,synthetic
+DEMO Poshmark,synthetic-001,Nature america blue stone ring,16,0,0,0,5,0,CONFIRMED_TO_ALASKA,nature america,True
