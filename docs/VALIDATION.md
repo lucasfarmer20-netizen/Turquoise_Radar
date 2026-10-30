@@ -480,3 +480,26 @@ six owner workflow pages responded with expected content.
 - Original database rows and private-file hashes still match the preservation
   snapshot. No Anthropic API request, jewelry retry, billing modification or new
   development phase was performed. No merge was performed.
+
+## Haiku QUICK 32,768-token allowance — October 30, 2026
+
+- Based on merged PR #7 main `86ffa01956e6beea644466df4524d021bf93b1dd`.
+  Raised the reviewed Haiku profile, price-profile schema ceiling and QUICK
+  defaults to 32,768 output tokens. The existing Decimal formula now yields
+  **$0.581920** with that profile; no budgeting algorithm or rate change was needed.
+- **449 tests pass**, including all 441 previous cases and eight new allowance
+  regressions. Ruff, formatting and whitespace checks pass. The existing
+  Starlette/AnyIO deprecation warning remains.
+- Mocked SDK requests differ only in `max_tokens`. Provider source, production
+  VisionResult validators, prompt, thinking/effort behavior, response-size safeguard
+  and retry policy remain unchanged. The tests cover exact reservation/usage math,
+  no double-counting thinking, append-only profile installation, immutable old
+  holds, consumed guards, cache separation, stale amount rejection, insufficient
+  budget and full reservation retention on failure.
+- Compared all 26 actual database tables and hashes of 22 private files with the
+  pre-change snapshot: unchanged. No actual database profile was appended during
+  development. After merge, use the existing pricing workflow to append the reviewed
+  profile before preparing any separately approved request.
+- No Anthropic request, retry, new authorization, billing reconciliation, automatic
+  merge, thinking optimization or Task 006 work occurred. See
+  [output allowance and activation steps](HAIKU-OUTPUT-ALLOWANCE.md).

@@ -268,8 +268,8 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-441 tests (301 Task 005 tests, 12 pilot-safeguard cases, 29 failure-diagnostic cases
-and 99 structured-validation/buffer-safety regressions)
+449 tests (301 Task 005 tests, 12 pilot-safeguard cases, 29 failure-diagnostic cases,
+99 structured-validation/buffer-safety regressions and 8 output-allowance cases)
 cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
