@@ -39,3 +39,5 @@ original findings and distinct Haiku/Sonnet runs. Use SDK mock transports, not l
 API tests. Refresh dependencies with uv sync --frozen after lockfile changes; do not
 update/publish cloud configuration for ordinary code or dependency-lock changes when
 the existing installation/startup commands still work.
+Bump prompt/schema versions when analysis contracts change; retain original cached
+findings rather than silently reinterpret them.

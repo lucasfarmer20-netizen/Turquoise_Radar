@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-PROMPT_VERSION = "jewelry-1"
+PROMPT_VERSION = "jewelry-2"
 SCHEMA_VERSION = "1"
 OWNER = "local-owner"
 Role = Literal["FRONT", "BACK_HALLMARK", "STONE", "SIDE_DETAIL"]

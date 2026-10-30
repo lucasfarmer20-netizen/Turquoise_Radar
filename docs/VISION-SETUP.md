@@ -89,7 +89,9 @@ For later, separately authorized live use:
    input-context ceiling**, output limit and explicit account/model verification.
 5. Review the displayed model and maximum allowance. Select photos and explicitly
    confirm transmission/payment for each live run. Sonnet additionally requires
-   a separate deeper-investigation confirmation. There is no automatic escalation.
+   a separate deeper-investigation confirmation. Sonnet independently examines the
+   selected photos for ambiguous marks, construction, mixed-lot details and conflicts;
+   the comparison keeps both original reports. There is no automatic escalation.
 
 The initial live blocker list explains missing key, disabled mode, unverified
 pricing/model eligibility or insufficient budget. There is no “test key” request
