@@ -208,3 +208,29 @@ six owner workflow pages responded with expected content.
   Explicit-target recovery is tested synthetically, not claimed as validation of a
   particular real tracking scheme. Opaque links and unknown layouts remain review
   evidence; actual Personal Shopper/HiBid daily digests remain provisional.
+
+## Owner-confirmed HiBid CL0 structure
+
+- The owner supplied sanitized examples and confirmed `/CL0/`, one-pass percent
+  encoding and `/lot/` versus `/catalog/` destination paths. Both pasted URLs
+  themselves contained `/lot/`; classification follows the actual decoded path,
+  not the descriptive label. No original email or customer information was supplied.
+- Extraction now requires the observed `/CL0/<destination>/1/<message>/<token>`
+  shape on HTTPS clicks.auctions.hibid.com. It separates the unique raw tracking
+  boundary before decoding only the destination. Encoded `%2F`, `%3F` and `%26`
+  are supported. Opaque suffixes never supply IDs, even when they contain encoded
+  URLs or plausible item numbers. Unknown layouts/ambiguous boundaries need review.
+- Canonical lot/catalog links omit UTM parameters and opaque data. The observed
+  email convention does not establish a HiBid API contract or validate every
+  newsletter/saved-search layout. Existing actual-format limitations remain scoped
+  to the full templates, rather than to this now-confirmed URL structure.
+- **220 tests pass**, retaining all 165 original Task 004 cases. Seventeen additional
+  CL0 cases cover lot/catalog destinations, encoded query/boundary isolation,
+  opaque lookalike targets, malformed/missing/ambiguous suffixes, bad escapes,
+  unsupported prefixes and path-vs-label identity. Host/scheme/security cases use
+  complete CL0 envelopes so they continue to test destination validation.
+- Ruff lint/format and whitespace checks pass. Desktop and twelve mobile views
+  pass with zero browser errors, overflow or external requests. The synthetic
+  receipt still reconciles 27; multi-item allocation remains blocked. Only the
+  two synthetic HiBid fixture shapes were updated; original owner data, financial
+  logic, SQLite v4 schema and eBay gates are unchanged. PR #4 remains unmerged.

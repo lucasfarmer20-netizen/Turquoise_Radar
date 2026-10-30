@@ -227,10 +227,10 @@ connector/mailbox access needs separate documented authorization and scope.
 
 The [pre-merge compatibility comment](https://github.com/lucasfarmer20-netizen/Turquoise_Radar/pull/4)
 reports `Item: <digits>`, `item #<digits>` and standalone bid-notice IDs, plus the
-HiBid tracking host `clicks.auctions.hibid.com`. No original email or concrete real
-tracking URL/encoding was attached to the comment. Regression messages represent
-these reported structures using synthetic item/order IDs and synthetic tokens;
-they do not establish full compatibility with an actual private email template.
+HiBid tracking host `clicks.auctions.hibid.com`. The owner subsequently supplied
+a sanitized, observed `/CL0/` URL structure and percent-encoding rules. Regression
+messages use synthetic item/order IDs and tokens. This confirms the narrow observed
+URL shape, not an API contract or a complete real newsletter template.
 
 ShopGoodwill now recognizes explicit Item/Item ID/Item Number labels and item #
 references, including several items without direct links. For bid/win/outbid notices,
@@ -245,14 +245,31 @@ references retain all order charges at invoice level and cannot use the single-i
 confirmation action. Existing explicit ownership and six-component cost checks apply.
 
 HiBid recovery is **offline text extraction**, not a redirect request or general
-tracking-token decoder. It accepts only the exact reported tracking host over HTTPS
-and a single absolute HTTPS target visible in its URL path, either literally or
-after one percent-decoding pass. The target must be a provider-domain
-`/lot/<numeric-ID>` or `/catalog/<numeric-ID>` path. The stored/clickable target is
-canonicalized to that identity; wrapper prefixes/suffixes, query parameters and
-fragments are discarded. No tracking token is copied into candidate or catalog URLs.
-This is generic explicit-target recovery on the reported host; a particular real
-wrapper encoding has not been verified by the PR comment or supplied samples.
+tracking-token decoder. It accepts the exact HTTPS host `clicks.auctions.hibid.com`
+and the owner-confirmed shape:
+
+```text
+/CL0/<embedded HTTPS destination>/1/<opaque message ID>/<opaque token>
+```
+
+The raw `/1/` boundary must be unique and the two opaque suffix segments must be
+nonempty. The parser isolates the destination **before** one percent-decoding pass:
+`%2F` becomes `/`, `%3F` becomes `?`, and `%26` becomes `&`. It never decodes or searches
+the opaque suffix for identities. Unknown prefixes/suffix layouts and ambiguous
+boundaries remain for review. Query-string redirects on the outer wrapper are not
+supported.
+
+The decoded destination must be an allowlisted HTTPS HiBid
+`/lot/<numeric-ID>` or `/catalog/<numeric-ID>` path (an optional simple title slug is
+allowed). The decoded path alone determines the identity kind; link text does not.
+Both pasted owner examples used `/lot/`, despite one being labelled catalog. The
+owner's accompanying clarification explicitly confirms `/catalog/` destinations;
+a synthetic catalog fixture uses that distinct path.
+
+The stored/clickable URL is canonicalized to the provider identity; destination UTM
+parameters and all opaque tracking data are discarded. The URL structure is an
+owner-observed email convention, not a guaranteed HiBid API or future-template
+contract. No original tracking URL, token or private email was used as a fixture.
 
 Opaque paths (including opaque `/ls/click?upn=...` values), targets available only in
 query parameters, arbitrary hosts, credentials, unsafe ports/schemes, repeated

@@ -20,9 +20,10 @@ assumed to grant API/crawling rights.
 | Other authorized estates | Separate configurable source entry/domains, generic/structured/manual | One entry per marketplace; verified samples required for optional custom extraction |
 
 PR #4 compatibility follow-up adds reported ShopGoodwill ID forms and bounded
-offline recovery of explicit targets on the reported HiBid tracking host. Real
-wrapper encoding is not supplied/verified; opaque tokens remain human-review
-evidence. See [exact compatibility limits](ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
+offline recovery of explicit targets in the owner-confirmed HiBid `/CL0/`
+tracking-link structure. The destination is isolated before decoding; opaque tokens
+are never searched for IDs. Unknown wrapper layouts remain human-review evidence;
+this observed structure is not an API contract. See [exact compatibility limits](ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
 
 All unknown costs/attribution remain unknown. Owner-configured metadata is not an
 access grant. No direct mailbox integration or additional automated source adapter

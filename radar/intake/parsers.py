@@ -168,11 +168,10 @@ def safe_link(url, source):
 def hibid_embedded_target(url):
     """Offline only: recover an explicit target, never decode opaque tracking tokens.
 
-    The PR identifies this exact tracking host, not a universal wrapper schema.
-    Inspect only its path, allowing one percent-decoding pass and one absolute
-    HTTPS target. Query-string redirects, nested wrappers and ambiguous targets
-    are unsupported. Return only a canonical provider identity URL, without any
-    wrapper tokens, slug suffixes, query parameters or fragment.
+    Accept the owner-confirmed /CL0/<destination>/1/<message>/<token> shape only.
+    Separate the destination before one percent-decoding pass; opaque suffixes
+    never participate in identity extraction. This observed email shape is not an
+    API contract. Return only a canonical provider identity URL.
     """
     if not isinstance(url, str) or len(url) > 8192 or re.search(r"[\s\x00-\x1f\x7f\\]", url):
         return None
@@ -185,15 +184,28 @@ def hibid_embedded_target(url):
             or wrapper.password
             or wrapper.port not in (None, 443)
             or wrapper.fragment
+            or wrapper.query
+            or not wrapper.path.startswith("/CL0/")
         ):
             return None
-        path = unquote(wrapper.path, errors="strict")
+        payload = wrapper.path[len("/CL0/") :]
+        # A second literal separator or an incomplete/ambiguous suffix is not a
+        # basis for guessing which part of the link represents the destination.
+        if len(list(re.finditer(r"(?=/1/)", payload))) != 1:
+            return None
+        encoded_target, opaque = payload.split("/1/", 1)
+        opaque_segments = opaque.split("/")
+        if len(opaque_segments) != 2 or not all(opaque_segments):
+            return None
+        if re.search(r"%(?![0-9a-fA-F]{2})", encoded_target):
+            return None
+        path = unquote(encoded_target, errors="strict")
         if re.search(r"[\s\x00-\x1f\x7f\\]", path):
             return None
         starts = list(re.finditer(r"https?://", path, re.I))
-        if len(starts) != 1 or path[starts[0].start() - 1 : starts[0].start()] != "/":
+        if len(starts) != 1 or starts[0].start() != 0:
             return None
-        target = urlsplit(path[starts[0].start() :])
+        target = urlsplit(path)
         host = target.hostname or ""
         if (
             target.scheme != "https"
@@ -202,11 +214,14 @@ def hibid_embedded_target(url):
             or target.username
             or target.password
             or target.port not in (None, 443)
+            or target.fragment
             or "%" in target.path
             or any(segment in (".", "..") for segment in target.path.split("/"))
         ):
             return None
-        match = re.match(r"^/(lot|catalog)/(\d{1,30})(?:/|$)", target.path, re.I)
+        match = re.fullmatch(
+            r"/(lot|catalog)/(\d{1,30})(?:/[A-Za-z0-9._~-]+)?/?", target.path, re.I
+        )
         if match:
             return f"https://{host}/{match.group(1).lower()}/{match.group(2)}"
     except (ValueError, UnicodeError):

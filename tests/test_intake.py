@@ -186,37 +186,104 @@ def test_shopgoodwill_text_item_reference_limit(client):
     ],
 )
 def test_hibid_offline_explicit_embedded_targets(embedded, expected):
-    wrapper = f"https://clicks.auctions.hibid.com/SYNTHETIC/{embedded}/1/SYNTHETIC"
+    wrapper = (
+        f"https://clicks.auctions.hibid.com/CL0/{embedded}"
+        "/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN"
+    )
     assert hibid_embedded_target(wrapper) == expected
     definition = SourceDefinition(name="HiBid", domains=["hibid.com"])
     assert safe_link(wrapper, definition) is None
     assert "SYNTHETIC" not in expected  # Canonical identities never contain wrapper tokens.
 
 
+@pytest.mark.parametrize("kind", ["lot", "catalog"])
+def test_hibid_owner_confirmed_cl0_query_and_opaque_boundary(kind):
+    # Split the raw tracking separator BEFORE decoding %2F, %3F and %26.
+    url = (
+        f"https://clicks.auctions.hibid.com/CL0/https:%2F%2Fhibid.com%2F{kind}%2F920000000001"
+        "%3Futm_source=SYNTHETIC_SOURCE%26utm_medium=email"
+        "%26utm_campaign=SYNTHETIC_CAMPAIGN%2F1%2Fcatalog%2F999999999"
+        "/1/SYNTHETIC_MESSAGE_ID/"
+        "SYNTHETIC_https:%2F%2Fhibid.com%2Flot%2F999999998"
+    )
+    assert hibid_embedded_target(url) == f"https://hibid.com/{kind}/920000000001"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001",  # Missing separator/suffix.
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001/1/SYNTHETIC_MESSAGE",  # Missing token.
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001/1//SYNTHETIC_TOKEN",
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001/1/SYNTHETIC_MESSAGE/",
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001/1/SYNTHETIC_MESSAGE/SYNTHETIC_TOKEN/extra",
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001/1/1/SYNTHETIC_TOKEN",
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001/1/SYNTHETIC_MESSAGE/1/SYNTHETIC_TOKEN",
+        "SYNTHETIC_PREFIXhttps:%2F%2Fhibid.com%2Flot%2F920000000001/1/SYNTHETIC_MESSAGE/SYNTHETIC_TOKEN",
+        "SYNTHETIC_OPAQUE/1/SYNTHETIC_MESSAGE/https:%2F%2Fhibid.com%2Flot%2F920000000001",
+        "https:%2F%2Fexample.invalid%2Flot%2F920000000001/1/SYNTHETIC_MESSAGE/https:%2F%2Fhibid.com%2Flot%2F920000000001",
+        "https:%2F%2Fhibid.com%2Flot%2FSYNTHETIC_LOT_ID/1/SYNTHETIC_MESSAGE/SYNTHETIC_TOKEN",
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001%23SYNTHETIC/1/SYNTHETIC_MESSAGE/SYNTHETIC_TOKEN",
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001%ZZ/1/SYNTHETIC_MESSAGE/SYNTHETIC_TOKEN",
+    ],
+)
+def test_hibid_cl0_ambiguous_or_opaque_destination_is_not_an_identity(payload):
+    assert hibid_embedded_target("https://clicks.auctions.hibid.com/CL0/" + payload) is None
+
+
+def test_hibid_requires_confirmed_cl0_prefix():
+    assert (
+        hibid_embedded_target(
+            "https://clicks.auctions.hibid.com/SYNTHETIC/"
+            "https:%2F%2Fhibid.com%2Flot%2F920000000001"
+            "/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_TOKEN"
+        )
+        is None
+    )
+
+
+def test_hibid_label_does_not_override_decoded_lot_path(client):
+    message = EmailMessage()
+    message["Subject"] = "SYNTHETIC HiBid Auction Catalog"
+    message["X-Turquoise-Synthetic"] = "true"
+    message.set_content("SYNTHETIC path identity example")
+    message.add_alternative(
+        '<a href="https://clicks.auctions.hibid.com/CL0/'
+        "https:%2F%2Fhibid.com%2Flot%2F920000000001"
+        '/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_TOKEN">SYNTHETIC Auction catalog</a>',
+        subtype="html",
+    )
+    with client.app.state.sessions.begin() as s:
+        import_alerts(s, "hibid", [message.as_bytes()])
+        alert = s.scalar(select(AlertMessage))
+        assert alert.data["catalogs"] == []
+        assert s.scalar(select(DiscoveredItem)).normalized["source_listing_id"] == "920000000001"
+
+
 @pytest.mark.parametrize(
     "url",
     [
         "https://clicks.auctions.hibid.com/ls/click?upn=SYNTHETIC-OPAQUE",
-        "https://clicks.auctions.hibid.com/SYNTHETIC?url=https://hibid.com/lot/1",
-        "https://clicks.auctions.hibid.com.evil.invalid/SYNTHETIC/https://hibid.com/lot/1",
-        "https://other.hibid.com/SYNTHETIC/https://hibid.com/lot/1",
-        "http://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1",
-        "https://user@clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1",
-        "https://clicks.auctions.hibid.com:8443/SYNTHETIC/https://hibid.com/lot/1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/http://hibid.com/lot/1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com.evil.invalid/lot/1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://user@hibid.com/lot/1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com:8443/lot/1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/redirect/lot/1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1evil",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/../../catalog/2",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/%252e%252e/catalog/2",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https%253A%252F%252Fhibid.com%252Flot%252F1",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/https://hibid.com/lot/2",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1%0A",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1#SYNTHETIC",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1\\evil",
-        "https://clicks.auctions.hibid.com/SYNTHETIC/https://hibid.com/lot/1/" + "x" * 8192,
+        "https://clicks.auctions.hibid.com/SYNTHETIC?url=https://hibid.com/lot/930000000001",
+        "https://clicks.auctions.hibid.com.evil.invalid/CL0/https://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://other.hibid.com/CL0/https://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "http://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://user@clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com:8443/CL0/https://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/http://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com.evil.invalid/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://user@hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com:8443/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/redirect/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001evil/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/../../catalog/2/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/%252e%252e/catalog/2/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https%253A%252F%252Fhibid.com%252Flot%252F1/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/https://hibid.com/lot/2/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001%0A/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN#SYNTHETIC",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001\\evil/1/SYNTHETIC_MESSAGE_ID/SYNTHETIC_OPAQUE_TOKEN",
+        "https://clicks.auctions.hibid.com/CL0/https://hibid.com/lot/930000000001/" + "x" * 8192,
     ],
 )
 def test_hibid_opaque_unsafe_ambiguous_and_unverified_wrappers_stay_unresolved(url):

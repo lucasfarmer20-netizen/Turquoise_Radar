@@ -57,8 +57,9 @@ operational paths; [VALIDATION.md](VALIDATION.md) records verification evidence.
 Preserve all 165 Task 004 tests and keep the existing branch unmerged. Add bounded
 ShopGoodwill item-label/item #/notice-context IDs and actual-style receipt labels.
 Allow only offline recovery of explicit HTTPS HiBid lot/catalog targets on the
-reported tracking host. Do not guess opaque tokens, fetch any URL, expose wrapper
+owner-confirmed `/CL0/` structure, isolating its destination before percent-decoding.
+Do not guess opaque tokens, fetch any URL, expose wrapper
 tokens in canonical links or grant newsletter search attribution. Keep multi-item
 charges at order level and require the existing explicit single-item confirmation.
 Use synthetic-only fixtures and desktop/mobile regressions. See ALERT-SETUP.md for
-the distinction between reported patterns and unverified concrete wrapper encodings.
+the distinction between the observed email URL structure and a guaranteed API contract.
