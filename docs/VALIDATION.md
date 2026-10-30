@@ -28,3 +28,19 @@ change the environment's network access policy.
 Screenshots were inspected as transient `/tmp/turquoise-radar-*.png` artifacts.
 The reusable environment draft has `install_script` and `start_skill` saved;
 publication and restoration in a new task have not been tested or claimed.
+
+## Publication audit
+
+The complete Phase 001 implementation was published to GitHub `main` as
+`535e508d8e2596b440447b5810bd8f0b77b553b5`. The subsequent publication audit
+expanded `.gitignore` to cover local environment variants, common credential files,
+virtual environments, SQLite files/sidecars outside `data/`, caches, build outputs,
+and temporary/artifact directories. The non-secret `.env.example`, synthetic
+fixtures, and vendored runtime assets remain versioned intentionally.
+
+The hygiene follow-up uses a separate branch because `main` already has history.
+No existing remote commits are overwritten. Ignore rules are a preventive measure;
+review staged contents before committing, because arbitrary source files can also
+contain secrets. The audit checks tracked paths and common credential signatures
+without printing potential secret values. It is not a guarantee that a general
+secret scanner would detect every possible credential format.
