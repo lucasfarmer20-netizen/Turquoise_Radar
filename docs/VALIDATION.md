@@ -44,3 +44,39 @@ review staged contents before committing, because arbitrary source files can als
 contain secrets. The audit checks tracked paths and common credential signatures
 without printing potential secret values. It is not a guarantee that a general
 secret scanner would detect every possible credential format.
+
+
+## Task 002 validation
+
+- Branch `task/002-owner-calibration` starts at updated main
+  `a7541b1e42f31d5f022d9325a30e249aab6cadfb` (merged publication-hygiene PR).
+- **91 tests pass**: all 55 Phase 001 cases retained, with expected monetary values
+  and explicit synthetic assumptions updated for the corrected resale model, plus
+  36 calibration/capture/workflow/comparable/migration cases. No tests are skipped.
+- Ruff lint and formatting pass. Existing upstream AnyIO/Starlette deprecation
+  warning remains; no test assertion was disabled.
+- Fee regression: a $50 sale with buyer shipping $8 and tax $4 gives $4 item-only
+  commission and $2.10 processing on $62, including one $0.30 fee. With $1 packaging
+  and $20 landed cost, net resale is $42.90, profit $22.90, ROI 114.5%, and maximum
+  item price $18.81 when inbound shipping is $8 and targets are $15 / 60%.
+- Fresh, populated Phase 001 fixture, repeat migration, future-version refusal,
+  migration rollback and latest-feedback state preservation are tested.
+- An additional check migrated a copy of the actual prepared Phase 001 SQLite DB:
+  25 listings, 25 patterns, one preferences row and zero feedback rows; all prior
+  column values and raw/original JSON were unchanged. No real data was re-seeded.
+- Desktop 1440×1000 and mobile 390×844 Chromium checks exercised copied-text
+  extraction, owner edits/confirmation, financial recalculation, queue state,
+  purchase feedback, comparable capture/confirmation/linking, source effectiveness,
+  HTMX filtering and nine mobile views, with no page overflow or browser errors.
+  Browser mutations used a separate synthetic temporary SQLite DB.
+- Direct official eBay/Whatnot documentation requests failed with proxy 403;
+  numerical current quotas/production terms and current fee tiers are not claimed
+  verified. Additions for developer.ebay.com and help.whatnot.com are saved to
+  the environment draft, preserving api.github.com. They require user settings
+  review/save and publication; they have not been applied to the runtime.
+
+The implementation makes no live marketplace, paid vision, purchase or public
+hosting calls. API-assisted PR creation remains blocked until api.github.com access is applied.
+The task branch is prepared for publication without merging main. Saved Task 002
+startup checks also passed against the migrated default database: health and all
+six owner workflow pages responded with expected content.

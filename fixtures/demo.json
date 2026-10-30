@@ -23,7 +23,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Mercari",
@@ -49,7 +62,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.net",
@@ -75,7 +101,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.org",
@@ -101,7 +140,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO CTBids",
@@ -127,7 +179,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Poshmark",
@@ -153,7 +218,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Mercari",
@@ -179,7 +257,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.net",
@@ -209,7 +300,20 @@
     "stated_weight": "100",
     "weight_kind": "net_silver",
     "weight_verified": true,
-    "weight_evidence": "SYNTHETIC independently measured net metal"
+    "weight_evidence": "SYNTHETIC independently measured net metal",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.org",
@@ -240,7 +344,20 @@
     "weight_kind": "net_silver",
     "weight_verified": true,
     "weight_evidence": "SYNTHETIC independently measured net metal",
-    "weight_unit": "dwt"
+    "weight_unit": "dwt",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO CTBids",
@@ -270,7 +387,20 @@
     "stated_weight": "65",
     "weight_kind": "net_silver",
     "weight_verified": true,
-    "weight_evidence": "SYNTHETIC independently measured net metal"
+    "weight_evidence": "SYNTHETIC independently measured net metal",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Poshmark",
@@ -298,7 +428,20 @@
     "material_evidence": "seller_claim",
     "synthetic": true,
     "hallmark_text": "SYNTHETIC unread maker mark",
-    "collector_evidence": "Unresolved stamp needs review"
+    "collector_evidence": "Unresolved stamp needs review",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": false
   },
   {
     "source": "DEMO Mercari",
@@ -326,7 +469,20 @@
     "material_evidence": "seller_claim",
     "synthetic": true,
     "hallmark_text": "SYNTHETIC unread maker mark",
-    "collector_evidence": "Unresolved stamp needs review"
+    "collector_evidence": "Unresolved stamp needs review",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": false
   },
   {
     "source": "DEMO EstateSales.net",
@@ -352,7 +508,20 @@
     "resale_high": "45",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.org",
@@ -378,7 +547,20 @@
     "resale_high": null,
     "resale_basis": null,
     "material_evidence": "plated",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": false
   },
   {
     "source": "DEMO CTBids",
@@ -404,7 +586,19 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Poshmark",
@@ -430,7 +624,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Mercari",
@@ -458,7 +665,17 @@
     "material_evidence": "seller_claim",
     "synthetic": true,
     "buyer_profile": "demo_auction",
-    "sale_auction_id": "synthetic-auction"
+    "sale_auction_id": "synthetic-auction",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.net",
@@ -486,7 +703,17 @@
     "material_evidence": "seller_claim",
     "synthetic": true,
     "buyer_profile": "demo_auction",
-    "sale_auction_id": "synthetic-auction"
+    "sale_auction_id": "synthetic-auction",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.org",
@@ -515,7 +742,20 @@
     "synthetic": true,
     "stated_weight": "120",
     "weight_kind": "gross",
-    "weight_evidence": "SYNTHETIC gross seller weight"
+    "weight_evidence": "SYNTHETIC gross seller weight",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": false
   },
   {
     "source": "DEMO CTBids",
@@ -542,7 +782,20 @@
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
     "synthetic": true,
-    "category": "costume jewelry"
+    "category": "costume jewelry",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Mercari",
@@ -569,7 +822,20 @@
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
     "synthetic": true,
-    "combined_shipping_available": true
+    "combined_shipping_available": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO Mercari",
@@ -596,7 +862,20 @@
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
     "synthetic": true,
-    "combined_shipping_available": true
+    "combined_shipping_available": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO EstateSales.net",
@@ -622,7 +901,20 @@
     "resale_high": null,
     "resale_basis": null,
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": false
   },
   {
     "source": "DEMO EstateSales.org",
@@ -648,7 +940,20 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   },
   {
     "source": "DEMO CTBids",
@@ -675,7 +980,19 @@
     "resale_basis": null,
     "material_evidence": "seller_claim",
     "synthetic": true,
-    "category": "miscellaneous estate lots"
+    "category": "miscellaneous estate lots",
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": false
   },
   {
     "source": "DEMO Poshmark",
@@ -701,6 +1018,19 @@
     "resale_high": "60",
     "resale_basis": "Manually supplied SYNTHETIC resale scenario",
     "material_evidence": "seller_claim",
-    "synthetic": true
+    "synthetic": true,
+    "cost_status": {
+      "item_price": "CONFIRMED",
+      "buyer_premium": "CONFIRMED",
+      "buyer_service_fee": "CONFIRMED",
+      "sales_tax": "CONFIRMED",
+      "shipping_cost": "CONFIRMED",
+      "handling_fee": "CONFIRMED"
+    },
+    "resale_buyer_shipping": "0",
+    "resale_buyer_tax": "0",
+    "resale_shipping_status": "CONFIRMED",
+    "resale_tax_status": "CONFIRMED",
+    "resale_confirmed": true
   }
 ]

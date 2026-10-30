@@ -80,7 +80,7 @@ def test_entire_synthetic_pipeline_and_routes(client):
     detail = client.get("/listings/1")
     assert detail.status_code == 200 and "Native American" in detail.text
     assert "Exact phrase sent" in detail.text
-    assert "$21.00" in detail.text and "$16.89" in detail.text
+    assert "$21.00" in detail.text and "$17.79" in detail.text
     assert client.get("/health").json()["status"] == "ok"
     for route in ("/patterns", "/entry", "/settings"):
         assert client.get(route).status_code == 200

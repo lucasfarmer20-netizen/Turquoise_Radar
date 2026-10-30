@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from radar.finance import MaximumBuy, Scenario, landed_cost, max_buy_price, scenario
 from radar.melt import MeltResult, calculate_melt
-from radar.schemas import Preferences, Shipping
+from radar.schemas import Preferences, Shipping, ValueStatus
 
 
 class Analysis(BaseModel):
@@ -14,6 +14,8 @@ class Analysis(BaseModel):
     confidence: str
     landed: Decimal | None
     costs: dict[str, Decimal | None]
+    cost_status: dict[str, str]
+    acquisition_explanations: list[str]
     low: Scenario | None
     high: Scenario | None
     maximum_buy: MaximumBuy
@@ -23,10 +25,44 @@ class Analysis(BaseModel):
 
 
 def analyze(item, prefs: Preferences) -> Analysis:
+    # Explicitly marked UNKNOWN amounts cannot supply numerical evidence.
+    item = item.model_copy(
+        update={
+            key: None
+            for key, status in item.cost_status.items()
+            if status == ValueStatus.UNKNOWN
+            and key
+            in (
+                "item_price",
+                "buyer_premium",
+                "buyer_service_fee",
+                "sales_tax",
+                "shipping_cost",
+                "handling_fee",
+            )
+        }
+    )
     costs, landed, unknown = landed_cost(item, prefs)
     fees = prefs.resale_profiles[prefs.resale_channel]
-    low = scenario(item.resale_low, fees, landed) if item.resale_low is not None else None
-    high = scenario(item.resale_high, fees, landed) if item.resale_high is not None else None
+    resale_args = dict(
+        buyer_shipping=item.resale_buyer_shipping,
+        buyer_tax=item.resale_buyer_tax,
+        category=item.selling_category,
+        tier=item.commission_tier,
+    )
+    state_args = dict(
+        shipping_status=item.resale_shipping_status, tax_status=item.resale_tax_status
+    )
+    low = (
+        scenario(item.resale_low, fees, landed, **resale_args, **state_args)
+        if item.resale_low is not None
+        else None
+    )
+    high = (
+        scenario(item.resale_high, fees, landed, **resale_args, **state_args)
+        if item.resale_high is not None
+        else None
+    )
     maximum = max_buy_price(
         item.resale_low,
         fees,
@@ -38,10 +74,50 @@ def analyze(item, prefs: Preferences) -> Analysis:
         fixed_premium=item.buyer_premium,
         fixed_service=item.buyer_service_fee,
         fixed_tax=item.sales_tax,
+        invoice_allocation=item.invoice_fee_allocation,
+        invoice_confirmed=item.invoice_allocation_confirmed,
+        **resale_args,
     )
     melt = calculate_melt(item, prefs, landed)
     evidence, risks, categories = [], [], []
     score = 10
+    buyer = prefs.buyer_profiles.get(item.buyer_profile) if item.buyer_profile else None
+    unconfirmed = []
+    cost_status = {}
+    for key, value in costs.items():
+        if value is None:
+            cost_status[key] = "UNKNOWN"
+            continue
+        configured = (
+            key in ("buyer_premium", "buyer_service_fee", "sales_tax")
+            and getattr(item, key) is None
+            and buyer
+        )
+        if key in ("shipping_cost", "handling_fee") and getattr(item, key) is None and buyer:
+            configured = True
+        status = (
+            buyer.verification_status
+            if configured
+            else item.cost_status.get(key, ValueStatus.ESTIMATED)
+        )
+        cost_status[key] = str(status)
+        if status != ValueStatus.CONFIRMED:
+            unconfirmed.append(key)
+    if unconfirmed:
+        risks.append("ESTIMATED or unconfirmed acquisition inputs: " + ", ".join(unconfirmed))
+    if low and low.missing:
+        risks.append("UNKNOWN resale inputs: " + ", ".join(low.missing))
+    if item.resale_low is not None and not item.resale_confirmed:
+        risks.append("Owner confirmation of resale evidence/scenario required")
+    if low and (
+        fees.verification_status != ValueStatus.CONFIRMED
+        or any(v != "CONFIRMED" for v in low.input_status.values())
+    ):
+        risks.append("Resale transaction/fee inputs are estimated or unconfirmed")
+    if not item.condition:
+        risks.append("Condition evidence is missing")
+    if item.material_evidence == "unknown":
+        risks.append("Material evidence is missing")
     if unknown:
         risks.append("UNKNOWN costs: " + ", ".join(unknown))
     if item.shipping_status != Shipping.CONFIRMED_TO_ALASKA:
@@ -88,6 +164,18 @@ def analyze(item, prefs: Preferences) -> Analysis:
     risks.extend(melt.warnings)
     critical = bool(
         unknown
+        or unconfirmed
+        or not item.condition
+        or item.material_evidence == "unknown"
+        or (
+            item.resale_low is not None
+            and (
+                not item.resale_confirmed
+                or bool(low and low.missing)
+                or fees.verification_status != ValueStatus.CONFIRMED
+                or bool(low and any(v != "CONFIRMED" for v in low.input_status.values()))
+            )
+        )
         or landed is None
         or missing_profile
         or item.shipping_status != Shipping.CONFIRMED_TO_ALASKA
@@ -113,6 +201,25 @@ def analyze(item, prefs: Preferences) -> Analysis:
         confidence=confidence,
         landed=landed,
         costs=costs,
+        cost_status=cost_status,
+        acquisition_explanations=(
+            [
+                f"Profile source: {buyer.source}; as of {buyer.as_of}; "
+                f"{buyer.verification_status}.",
+                f"Premium {buyer.premium_rate} on {buyer.premium_base}; "
+                f"service {buyer.service_rate} "
+                f"on {buyer.service_base} + fixed {buyer.fixed_marketplace_fee} "
+                f"+ per lot {buyer.per_lot_fee}.",
+                f"Tax {buyer.tax_rate} on {buyer.tax_base}. Invoice allocation: "
+                f"{item.invoice_fee_allocation}; confirmed={item.invoice_allocation_confirmed}.",
+                "Explicit observed amounts override profile rates at every proposed bid.",
+            ]
+            if buyer
+            else [
+                "Observed absolute fees are fixed at each proposed bid; confirm that "
+                "the source does not instead charge a percentage."
+            ]
+        ),
         low=low,
         high=high,
         maximum_buy=maximum,

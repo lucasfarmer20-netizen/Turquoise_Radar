@@ -660,3 +660,9 @@ Build Phase 001 now.
 
 See tests/ for executable acceptance checks and fixtures/ for synthetic inputs.
 Remote sources and vision remain interfaces only. No historical purchases are seeded.
+
+
+## Phase 002
+
+See [Task 002 owner calibration specification](SPEC-002.md) and
+[implemented conventions and workflows](CALIBRATION.md).
