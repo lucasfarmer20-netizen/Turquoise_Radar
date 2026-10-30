@@ -295,8 +295,8 @@ def test_mixed_lot_valid_references_and_no_rewriting():
 @pytest.mark.parametrize(
     "problem,rule",
     [
-        ("long_summary", "FIELD_LENGTH"),
-        ("long_description", "FIELD_LENGTH"),
+        ("empty_summary", "FIELD_LENGTH"),
+        ("long_hallmark", "FIELD_LENGTH"),
         ("required", "REQUIRED_FIELD"),
         ("unknown_class", "ENUM_VALUE"),
         ("bad_id", "FIELD_PATTERN"),
@@ -307,10 +307,10 @@ def test_mixed_lot_valid_references_and_no_rewriting():
 )
 def test_format_and_status_constraints_are_not_relaxed(problem, rule):
     data = payload()
-    if problem == "long_summary":
-        data["summary"] = "x" * 801
-    if problem == "long_description":
-        data["findings"][0]["description"] = "x" * 351
+    if problem == "empty_summary":
+        data["summary"] = ""
+    if problem == "long_hallmark":
+        data["findings"][0]["hallmark_transcription"] = "A" * 41
     if problem == "required":
         del data["summary"]
     if problem == "unknown_class":
@@ -332,7 +332,7 @@ def test_prompt_names_valid_unknown_classification_and_version_changes():
     from radar.jewelry.schemas import PROMPT_VERSION, SCHEMA_VERSION
 
     assert "classification UNKNOWN" in SYSTEM_PROMPT and "INCONCLUSIVE" not in SYSTEM_PROMPT
-    assert PROMPT_VERSION == "jewelry-3" and SCHEMA_VERSION == "2"
+    assert PROMPT_VERSION == "jewelry-3" and SCHEMA_VERSION == "3"
 
 
 def test_diagnostic_unknown_types_context_messages_and_paths_cannot_leak():
@@ -470,7 +470,7 @@ def test_failed_parse_retains_only_safe_http_usage_and_keeps_hold(client, caplog
     if problem == "unsafe":
         data["findings"][0]["description"] = "This is sterling silver."
     if problem == "too_long":
-        data["findings"][0]["description"] = "PRIVATE_TEXT" * 80
+        data["findings"][0]["hallmark_transcription"] = "PRIVATE_TEXT" * 80
     if problem == "wrong_reference":
         data["findings"][0]["image_id"] = "f" * 32
     calls = []

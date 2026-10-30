@@ -268,8 +268,9 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-449 tests (301 Task 005 tests, 12 pilot-safeguard cases, 29 failure-diagnostic cases,
-99 structured-validation/buffer-safety regressions and 8 output-allowance cases)
+489 tests (301 Task 005 tests, 12 pilot-safeguard cases, 29 failure-diagnostic cases,
+99 structured-validation/buffer-safety regressions, 8 output-allowance cases
+and 40 long-narrative cases)
 cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
@@ -278,6 +279,8 @@ use local fixtures and temporary databases; no live marketplace requests.
 The [structured-validation repair](docs/VISION-VALIDATION-REPAIR.md) documents
 cautious wording, evidence gates and value-free diagnostics; no live API test is
 part of this validation.
+The [narrative field audit](docs/VISION-NARRATIVE-LIMITS.md) documents acceptance
+and full, escaped display of long evidence-safe reports without prose truncation.
 
 HTMX 2.0.8 is vendored with its license in `radar/static/vendor/`; runtime needs
 no CDN or paid APIs. Its SHA-256 is
