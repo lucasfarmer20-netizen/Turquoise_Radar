@@ -134,8 +134,15 @@ to 32 allowlisted field paths, validation types, fixed rule IDs and rule categor
 Unknown names/types become fixed placeholders. Inputs, contexts, URLs and raw
 messages are excluded; no model-generated text enters these diagnostics.
 
-Before SDK output parsing, the HTTP response hook buffers the same successful
-response in memory and extracts only bounded numeric token counters, an allowlisted
+Before SDK output parsing, the HTTP response hook buffers at most **2 MiB of decoded
+response bytes**, including error responses. It checks actual streamed bytes even
+when Content-Length is missing, invalid or misleading; an advertised oversize is
+rejected before reading. Compressed responses are limited after decoding. Oversize
+closes the stream and produces `RESPONSE_TOO_LARGE`, with no retry or release of
+the reservation. This caps response buffering, not total process memory; decoding
+chunks, bounded copies and JSON objects have additional overhead.
+
+For successful responses, the hook extracts only bounded numeric token counters, an allowlisted
 stop reason, HTTP status and sanitized request ID. The SDK then parses that same
 response normally: there is no second request and no validation bypass. No response
 body, content, stop sequence, arbitrary headers, credentials or image bytes are

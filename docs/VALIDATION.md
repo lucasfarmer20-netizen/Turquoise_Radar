@@ -465,3 +465,18 @@ six owner workflow pages responded with expected content.
   new pilot preparation, public deployment or Task 006 work occurred. The historical
   rejected field and exact root cause remain unknown because those details were
   not retained. See [repair and evidence limits](VISION-VALIDATION-REPAIR.md).
+
+### PR #7 final response-buffer safety check — October 30, 2026
+
+- Found that response buffering had no size cap. Added a 2 MiB decoded-body limit
+  for successful and error responses, with streamed counting independent of length
+  headers, early rejection of advertised oversize and immediate stream closure.
+  The SDK's fixed local size failure is classified as `RESPONSE_TOO_LARGE`, not a
+  transport failure. No retry or reservation release follows this failure.
+- **441 tests pass**, including 16 additional buffer regressions: exact boundary,
+  overflow, prebuffered bodies, absent/invalid/lying length headers, gzip expansion,
+  error responses, SDK wrapping and retained spending controls. Ruff, formatting
+  and whitespace checks pass; the existing Starlette/AnyIO warning remains.
+- Original database rows and private-file hashes still match the preservation
+  snapshot. No Anthropic API request, jewelry retry, billing modification or new
+  development phase was performed. No merge was performed.

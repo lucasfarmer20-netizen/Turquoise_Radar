@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+import gzip
 import json
 
 import httpx
@@ -14,7 +15,13 @@ from sqlalchemy import select
 from test_vision import new_case, pilot_test_config, submit, upload
 
 from radar.db import VisionFinding, VisionRun
-from radar.jewelry.errors import FailureTrace, classify_failure, numeric_usage
+from radar.jewelry.errors import (
+    MAX_RESPONSE_BYTES,
+    FailureTrace,
+    ResponseTooLargeError,
+    classify_failure,
+    numeric_usage,
+)
 from radar.jewelry.schemas import Finding, VisionResult, guarded_text
 from radar.jewelry.validation import validation_diagnostics
 from radar.vision import SYSTEM_PROMPT, AnthropicVisionProvider, VisionImage
@@ -391,7 +398,8 @@ def test_wrapped_validation_and_diagnostic_bounds():
     assert "PRIVATE_" not in json.dumps(details)
 
 
-def test_sdk_accepts_caution_from_same_buffered_response_without_rewriting():
+@pytest.mark.parametrize("compressed", [False, True])
+def test_sdk_accepts_caution_from_same_buffered_response_without_rewriting(compressed):
     async def check():
         data = payload()
         data["summary"] = "This piece is not authenticated."
@@ -410,13 +418,20 @@ def test_sdk_accepts_caution_from_same_buffered_response_without_rewriting():
                         "stop_reason": "end_turn",
                     }
                 ).encode()
+                if compressed:
+                    raw = gzip.compress(raw)
                 yield raw[:100]
                 yield raw[100:]
 
         async def handler(request):
             calls.append(1)
             return httpx2.Response(
-                200, headers={"request-id": "req_SYNTHETIC_SUCCESS"}, stream=Chunks()
+                200,
+                headers={
+                    "request-id": "req_SYNTHETIC_SUCCESS",
+                    **({"content-encoding": "gzip"} if compressed else {}),
+                },
+                stream=Chunks(),
             )
 
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(handler)) as http:
@@ -444,7 +459,7 @@ def test_sdk_accepts_caution_from_same_buffered_response_without_rewriting():
 
 
 @pytest.mark.parametrize(
-    "problem", ["unsafe", "too_long", "truncated", "wrong_reference", "incomplete"]
+    "problem", ["unsafe", "too_long", "truncated", "wrong_reference", "incomplete", "oversize"]
 )
 def test_failed_parse_retains_only_safe_http_usage_and_keeps_hold(client, caplog, problem):
     cfg = pilot_test_config(client)
@@ -462,6 +477,16 @@ def test_failed_parse_retains_only_safe_http_usage_and_keeps_hold(client, caplog
 
     async def handler(request):
         calls.append(1)
+        if problem == "oversize":
+
+            class Oversize(httpx2.AsyncByteStream):
+                async def __aiter__(self):
+                    for _ in range(40):
+                        yield b"x" * (64 * 1024)
+
+            return httpx2.Response(
+                200, headers={"request-id": "req_SYNTHETIC_INVALID"}, stream=Oversize()
+            )
         return httpx2.Response(
             200,
             headers={"request-id": "req_SYNTHETIC_INVALID"},
@@ -510,21 +535,34 @@ def test_failed_parse_retains_only_safe_http_usage_and_keeps_hold(client, caplog
         assert row.accounted_usd == row.reserved_usd and row.estimated_usd is None
         assert row.confirmed_usd is None and row.data["result"] is None
         assert not list(s.scalars(select(VisionFinding)))
-        assert d["http_status"] == 200 and d["category"] == "INVALID_RESULT"
-        assert meta["request_id"] == "req_SYNTHETIC_INVALID"
-        assert meta["usage"]["input_tokens"] == 7884 and row.data["usage"] == meta["usage"]
-        assert meta["stop_reason"] == (
-            "max_tokens" if problem in {"truncated", "incomplete"} else "end_turn"
+        assert d["http_status"] == 200
+        assert d["category"] == (
+            "RESPONSE_TOO_LARGE" if problem == "oversize" else "INVALID_RESULT"
         )
-        assert (
-            d["validation_errors"][0]["rule_id"]
-            == {
-                "unsafe": "NO_VERIFIED_MATERIAL_CLAIM",
-                "too_long": "FIELD_LENGTH",
-                "truncated": "VALID_JSON",
-                "wrong_reference": "AUTHORIZED_PHOTO_REFERENCE",
-                "incomplete": "COMPLETE_STRUCTURED_RESPONSE",
-            }[problem]
+        assert meta["request_id"] == "req_SYNTHETIC_INVALID"
+        assert row.data["usage"] == meta["usage"]
+        if problem == "oversize":
+            assert meta["usage"] == {} and meta["stop_reason"] is None
+            assert d["exception_class"] == "ResponseTooLargeError"
+            assert "validation_errors" not in d
+        else:
+            assert meta["usage"]["input_tokens"] == 7884
+            assert (
+                d["validation_errors"][0]["rule_id"]
+                == {
+                    "unsafe": "NO_VERIFIED_MATERIAL_CLAIM",
+                    "too_long": "FIELD_LENGTH",
+                    "truncated": "VALID_JSON",
+                    "wrong_reference": "AUTHORIZED_PHOTO_REFERENCE",
+                    "incomplete": "COMPLETE_STRUCTURED_RESPONSE",
+                }[problem]
+            )
+        assert meta["stop_reason"] == (
+            "max_tokens"
+            if problem in {"truncated", "incomplete"}
+            else "end_turn"
+            if problem != "oversize"
+            else None
         )
         assert d["failure_stage"] == (
             "POST_RESPONSE_VALIDATION"
@@ -538,6 +576,81 @@ def test_failed_parse_retains_only_safe_http_usage_and_keeps_hold(client, caplog
     )
     assert calls == [1] and "PRIVATE_" not in caplog.text
     asyncio.run(sdk.close())
+
+
+@pytest.mark.parametrize("status", [200, 500])
+@pytest.mark.parametrize("mode", ["absent", "lying", "invalid", "advertised", "gzip"])
+def test_response_limit_stops_stream_before_buffering_and_closes(status, mode):
+    async def check():
+        consumed = []
+        closed = []
+
+        class Chunks(httpx2.AsyncByteStream):
+            async def __aiter__(self):
+                if mode == "gzip":
+                    consumed.append(1)
+                    yield gzip.compress(b"x" * (MAX_RESPONSE_BYTES * 4))
+                else:
+                    for _ in range(100):
+                        consumed.append(1)
+                        yield b"x" * (64 * 1024)
+                raise AssertionError("Must stop reading an oversized response")
+
+            async def aclose(self):
+                closed.append(1)
+
+        headers = {"request-id": "req_SYNTHETIC_SIZE"}
+        if mode in {"lying", "invalid", "advertised"}:
+            headers["content-length"] = {
+                "lying": "1",
+                "invalid": "PRIVATE_INVALID",
+                "advertised": str(MAX_RESPONSE_BYTES + 1),
+            }[mode]
+        if mode == "gzip":
+            headers["content-encoding"] = "gzip"
+        response = httpx2.Response(status, headers=headers, stream=Chunks())
+        trace = FailureTrace("SYNTHETIC_SECRET")
+        with pytest.raises(ResponseTooLargeError) as exc:
+            await trace.response(response)
+        assert len(consumed) == (0 if mode == "advertised" else 1 if mode == "gzip" else 33)
+        assert closed == [1] and response.is_closed
+        with pytest.raises(httpx2.ResponseNotRead):
+            _ = response.content
+        diagnostic = trace.classify(exc.value)
+        assert diagnostic["category"] == "RESPONSE_TOO_LARGE"
+        assert diagnostic["http_status"] == status
+        assert diagnostic["failure_stage"] == (
+            "RESPONSE_PARSING" if status == 200 else "HTTP_RESPONSE"
+        )
+        assert trace.response_metadata["usage"] == {}
+        assert "PRIVATE_" not in json.dumps(diagnostic)
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("buffered", [False, True])
+@pytest.mark.parametrize("extra", [0, 1])
+def test_response_limit_exact_boundary_and_prebuffered_responses(buffered, extra):
+    async def check():
+        raw = b"{}" + b" " * (MAX_RESPONSE_BYTES - 2 + extra)
+
+        class Chunks(httpx2.AsyncByteStream):
+            async def __aiter__(self):
+                for index in range(0, len(raw), 64 * 1024):
+                    yield raw[index : index + 64 * 1024]
+
+        response = httpx2.Response(200, **({"content": raw} if buffered else {"stream": Chunks()}))
+        trace = FailureTrace("")
+        if extra:
+            with pytest.raises(ResponseTooLargeError):
+                await trace.response(response)
+        else:
+            await trace.response(response)
+            assert await response.aread() == raw
+            assert response.json() == {}
+        assert response.is_closed
+
+    asyncio.run(check())
 
 
 def test_safe_response_metadata_discards_text_stop_reason_and_request_id():

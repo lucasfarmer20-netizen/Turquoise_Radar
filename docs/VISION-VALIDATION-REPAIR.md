@@ -59,8 +59,21 @@ identify the containing object/root rather than a single field. Arbitrary field
 names and unknown error types are replaced with constants. At most 32 entries
 are retained. No seller or model-generated text is stored through this channel.
 
-The public HTTP response hook buffers the same successful response before SDK
-post-parsing. It inspects the envelope in memory only and retains bounded integer
+The HTTP response hook buffers the same response before SDK post-parsing, capped
+at **2 MiB of decoded bytes** for both success and error responses. It reads in
+64 KiB pieces and rejects oversized Content-Length before reading, while counting
+actual decoded bytes regardless of missing/invalid/understated length headers.
+Gzip expansion is bounded too. Oversized streams close immediately and retain only
+safe metadata with `RESPONSE_TOO_LARGE`; the reservation remains held and no retry
+is permitted. The cap bounds retained body bytes, not all process memory: bounded
+decoding chunks, copies and JSON objects also consume memory.
+
+After the bounded read succeeds, the helper populates the pinned HTTPX2 response
+content cache so the SDK consumes the same decoded body without another request or
+second decompression. This small dependency integration is tested with chunked and
+gzip responses and should be rechecked on HTTPX2 upgrades.
+
+For successful responses, it inspects the envelope in memory only and retains bounded integer
 usage counters, an allowlisted stop reason, status and sanitized request ID.
 Content, response ID, stop sequence, arbitrary envelope fields and bodies are not
 retained. The SDK still performs `messages.parse()` with `VisionResult`, followed
@@ -73,8 +86,9 @@ the entire reservation, with no inferred actual cost or automatic release.
 
 ## Verification
 
-The baseline was 342 tests. The complete repaired suite passes **425 tests**,
-including 83 new synthetic regressions. Tests use mock transports and temporary
+The baseline was 342 tests. The complete repaired suite passes **441 tests**,
+including 99 new synthetic regressions (16 added in the final buffer-safety check).
+Tests use mock transports and temporary
 databases, with external transports blocked in the new regression module.
 They cover accepted caution verbatim, adversarial negations, unchanged bans,
 partial marks, maker evidence, mixed-lot references, bounds/enums, wrapped errors,
@@ -82,6 +96,9 @@ diagnostic redaction, malformed/truncated output and HTTP-200 parsing failures.
 A chunked mocked response confirms that metadata extraction and SDK parsing use
 the same response exactly once. Service tests verify retained reservations,
 no persisted invalid findings and rejection of another one-shot attempt.
+Buffer tests cover the exact limit, overflow, prebuffered responses, missing/invalid/
+misleading length headers, gzip expansion, early stream closure, error bodies and
+SDK-wrapped size failures without retries or reservation release.
 
 Ruff and formatting checks pass. The existing Starlette/AnyIO deprecation warning
 is unchanged. Desktop fixture workflows and nine Android-sized routes also pass

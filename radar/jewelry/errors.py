@@ -2,12 +2,55 @@
 
 import asyncio
 import re
+from contextlib import aclosing
 
 import anthropic
 import httpx2
 from pydantic import ValidationError
 
 from radar.jewelry.validation import validation_diagnostics
+
+# Far above the bounded VisionResult schema and current output-token limits.
+# Enforce on decoded bytes, not an untrusted/compressed Content-Length alone.
+MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+
+
+class ResponseTooLargeError(ValueError):
+    def __init__(self):
+        super().__init__("Provider response exceeds the local size limit")
+
+
+async def read_bounded_response(response):
+    try:
+        advertised = int(response.headers.get("content-length", ""))
+    except ValueError:
+        advertised = None
+    if advertised is not None and advertised > MAX_RESPONSE_BYTES:
+        await response.aclose()
+        raise ResponseTooLargeError()
+    try:
+        buffered = response.content
+    except httpx2.ResponseNotRead:
+        buffered = None
+    if buffered is not None:
+        if len(buffered) > MAX_RESPONSE_BYTES:
+            await response.aclose()
+            raise ResponseTooLargeError()
+        return
+    chunks = bytearray()
+    try:
+        async with aclosing(response.aiter_bytes(chunk_size=64 * 1024)) as parts:
+            async for part in parts:
+                if len(chunks) + len(part) > MAX_RESPONSE_BYTES:
+                    raise ResponseTooLargeError()
+                chunks.extend(part)
+    finally:
+        await response.aclose()
+    # The pinned HTTPX2 aread() uses this cache. Preserve the same decoded response
+    # for the SDK without resetting its consumed stream or decoding gzip twice.
+    # Assignment occurs only after the complete body passes the byte limit.
+    response._content = bytes(chunks)
+
 
 ERROR_TYPES = frozenset(
     {
@@ -62,6 +105,7 @@ EXCEPTION_CLASSES = frozenset(
         "RetryableError",
         "ValidationError",
         "PydanticCustomError",
+        "ResponseTooLargeError",
         "JSONDecodeError",
         "ValueError",
         "TypeError",
@@ -106,6 +150,12 @@ def classify_failure(error, *, stage="PROVIDER_EXECUTION", status=None, request_
     status 402 or a typed billing/spend signal, never guesses from arbitrary message text.
     """
     stage = stage if stage in STAGES else "PROVIDER_EXECUTION"
+    # The SDK wraps exceptions raised by HTTP response hooks as connection errors.
+    # Unwrap only our fixed local size error; do not inspect arbitrary error text.
+    if isinstance(error, anthropic.APIConnectionError) and isinstance(
+        error.__cause__, ResponseTooLargeError
+    ):
+        error = error.__cause__
     provider_type = None
     if isinstance(error, (anthropic.APIStatusError, anthropic.APIResponseValidationError)):
         status = error.status_code
@@ -121,7 +171,9 @@ def classify_failure(error, *, stage="PROVIDER_EXECUTION", status=None, request_
         )
     if type(status) is not int or not 100 <= status <= 599:
         status = None
-    if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
+    if isinstance(error, ResponseTooLargeError):
+        category = "RESPONSE_TOO_LARGE"
+    elif isinstance(error, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
         category = "INTERRUPTED"
     elif isinstance(error, (anthropic.APITimeoutError, httpx2.TimeoutException, TimeoutError)) or (
         status in {408, 504}
@@ -247,12 +299,12 @@ class FailureTrace:
             "usage": {},
             "stop_reason": None,
         }
+        # Limit error bodies too: otherwise the SDK would buffer them without a cap.
+        # HTTPX hooks run before SDK post-parsers; preserve the SAME response.
+        # The body is inspected in memory only; no body/text/content is retained here.
+        await read_bounded_response(response)
         if not response.is_success:
             return
-        # HTTPX response hooks run before SDK post-parsers. Buffer through the public
-        # API so the SDK can read the SAME response afterwards, never another request.
-        # The body is inspected in memory only; no body/text/content is retained here.
-        await response.aread()
         try:
             envelope = response.json()
         except (ValueError, UnicodeError):
