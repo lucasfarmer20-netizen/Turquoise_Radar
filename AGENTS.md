@@ -18,3 +18,12 @@ from requested location or a generic US shipping amount. Use mocked HTTP transpo
 for tests, ordered transactional migrations for schema changes, and keep fixture /
 sandbox statistics separate from real marketplace performance. Do not merge task
 branches without review.
+
+Task 004 owner alerts are private data: never commit original emails, addresses,
+tracking links or real purchase history. Only named synthetic fixture .eml files
+are permitted. Never log complete bodies, render active email HTML, load email
+resources, execute attachments or fetch linked listings. Bid/win/payment/shipment
+imports do not themselves establish ownership. Use explicit owner confirmation
+and reconciled paid evidence for actual costs; never allocate multi-item shipping
+equally by default. Provisional search-digest formats and generic promotions cannot
+receive exact-query success credit. Keep current eBay authorization gates unchanged.

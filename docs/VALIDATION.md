@@ -120,3 +120,136 @@ six owner workflow pages responded with expected content.
   entries. No production API host was added. Saving is not runtime application or
   publication; documentation, credentials and permitted sandbox access remain
   prerequisites for real API validation.
+
+
+## Task 004 validation
+
+- Branch task/004-multi-source-discovery is based on merged Task 003 main
+  f37f63e175190e38a8b87f99a0404d254e09bfbc. eBay adapter/configuration/gates are unchanged.
+- **165 tests pass**, including every retained Task 003 case and new classification,
+  .eml/text/MIME, duplicates, source identities, query provenance, grouping, receipts,
+  real-vs-estimated costs, HTML/URL safety, attachment, size and v4 migration tests.
+- Ruff lint/format and whitespace checks pass; one existing Starlette/AnyIO
+  deprecation warning remains, with no skipped/disabled tests.
+- The source fixture demo yields 15 identities: 5 ShopGoodwill, 5 HiBid, 3 CTBids,
+  1 EstateSales.org and 1 EstateSales.net. Thirteen unique messages retain 23
+  independent observations; a repeated alert creates duplicate accounting, not
+  another message/item. No purchase feedback is seeded.
+- Tests cover bid/outbid/win/paid/shipped correlation; a paid single-item receipt
+  reconciles 18 subtotal + 0 tax + 9 combined shipping/handling = 27 order total.
+  A two-item receipt keeps its 12 shipping/handling at order level. Nonzero order
+  tax, premiums, service fees and separate shipping/handling never become first-lot
+  costs merely because their labels precede the first lot. Conflicts,
+  incomplete amounts, non-USD and mismatches cannot apply paid landed costs.
+- v4 migration/rollback tests use populated v3 tables, including eBay query histories,
+  original observations, financial edits, feedback, comparables and settings.
+  A copy of the actual default v3 DB also retained every old row/column unchanged:
+  25 listings, 27 patterns, one preferences row, three query groups and all prior
+  observation/review tables. New email data is not seeded into owner inventory.
+- Desktop 1440×1000 / mobile 390×844 Chromium passed uploads from five sources,
+  duplicate handling, 15-candidate/source filtering, review handoff, 27 paid-cost
+  confirmation, multi-item non-allocation, purchase preservation after repeat import,
+  irrelevant status, explicit query confirmation, exact clipboard copy and setup
+  flags, and catalog-only reminder evidence. Ten mobile views had no horizontal
+  overflow. Browser errors and external requests were both zero.
+- Original bodies are escaped text only. No actual owner email, address, tracking
+  link or purchase record was used in checked-in fixtures. Original .eml files are
+  ignored except explicitly named synthetic fixtures; private data/backups stay ignored.
+- Official ShopGoodwill/HiBid help requests returned proxy 403; current terms and
+  actual search-digest formats remain unverified. No scraping or account/API access
+  is inferred from website availability or owner-reported features.
+
+- Restarted the private default app on Task 004 and verified ten readiness routes
+  returned 200, including health destination 99669. Startup retained 25 existing
+  listings, zero feedback, zero alert messages/observations/invoices; only eight
+  reference sources and 168 recommended saved searches were initialized.
+- Reusable install/start instructions were saved in the cloud configuration draft
+  for v4/local alert intake. Reference-only ShopGoodwill/HiBid domains were added
+  while preserving prior draft domains. Saving is confirmed; publication/application
+  requires environment-settings review/save and publication and has not occurred.
+
+## PR #4 compatibility follow-up
+
+- Reviewed the pre-merge compatibility comment in PR #4 through GitHub's permitted
+  HTML page. API access still returned Forbidden. Continued on the existing
+  task/004-multi-source-discovery branch based on 583131576b407b8c34263fedf6169f3007ecca8f;
+  no merge and no Task 005 work.
+- **203 tests pass**: all 165 prior cases remain, with 38 new regression cases for
+  reported item markers, bounded notice-context IDs, receipt correlation, repeated
+  alerts, conservative multi-item charges, explicit embedded targets, malformed/
+  unsafe/ambiguous/opaque URLs and text-reference limits. Prior test function bodies
+  are unchanged. Ruff lint, formatting and Git whitespace checks pass. The existing
+  Starlette/AnyIO deprecation warning remains.
+- Synthetic ShopGoodwill Item/item #/standalone notice fixtures correlate one
+  marketplace item without a usable direct link. A paid receipt reconciles 18 item
+  subtotal + 0 tax + 9 shipping/handling = 27 total. Bid/win messages do not record
+  purchases. Explicit paid confirmation and later re-import preserve confirmed
+  costs/history. A two-item 36 + 3 + 12 = 51 invoice cannot apply per-item shipping,
+  tax or handling automatically.
+- Synthetic HiBid newsletters recover two distinct lot targets plus one catalog
+  from explicit literal/one-pass-percent-encoded HTTPS targets inside URL paths on
+  clicks.auctions.hibid.com. Only canonical provider identity URLs survive into
+  normalized candidate/catalog links. A later direct link deduplicates to the same
+  source item, preserving another observation. Catalog-only closing notices remain
+  without candidates; closing text and CST are retained without inventing an offset.
+- Opaque /ls/click?upn=... values and query-only redirects remain NEEDS_REVIEW.
+  Spoofed hosts, non-HTTPS, credentials, unsafe ports, ambiguous/nested targets,
+  double encoding and traversal paths are rejected. No tracking or marketplace
+  requests are permitted by the regression tests.
+- scripts/check-intake-compat.cjs runs against an empty disposable database, covering
+  desktop 1440x1000 and mobile 390x844, the 27 paid confirmation, re-import history,
+  multi-item non-allocation, embedded/catalog/opaque cases and twelve mobile pages.
+  No overflow, browser errors or external requests. Owner data is not used.
+- Seven additional .eml fixtures use only synthetic IDs, order references, tokens
+  and descriptions. No original email, address, tracking URL or customer data was
+  supplied or committed. Existing demo manifest/counts remain unchanged. Database
+  schema, financial engine, review workflow and eBay adapter/gates are unchanged.
+- The PR supplies the tracking host but no concrete real wrapper URL or encoding.
+  Explicit-target recovery is tested synthetically, not claimed as validation of a
+  particular real tracking scheme. Opaque links and unknown layouts remain review
+  evidence; actual Personal Shopper/HiBid daily digests remain provisional.
+
+## Owner-confirmed HiBid CL0 structure
+
+- The owner supplied sanitized examples and confirmed `/CL0/`, one-pass percent
+  encoding and `/lot/` versus `/catalog/` destination paths. Both pasted URLs
+  themselves contained `/lot/`; classification follows the actual decoded path,
+  not the descriptive label. No original email or customer information was supplied.
+- Extraction now requires the observed `/CL0/<destination>/1/<message>/<token>`
+  shape on HTTPS clicks.auctions.hibid.com. It separates the unique raw tracking
+  boundary before decoding only the destination. Encoded `%2F`, `%3F` and `%26`
+  are supported. Opaque suffixes never supply IDs, even when they contain encoded
+  URLs or plausible item numbers. Unknown layouts/ambiguous boundaries need review.
+- Canonical lot/catalog links omit UTM parameters and opaque data. The observed
+  email convention does not establish a HiBid API contract or validate every
+  newsletter/saved-search layout. Existing actual-format limitations remain scoped
+  to the full templates, rather than to this now-confirmed URL structure.
+- **220 tests pass**, retaining all 165 original Task 004 cases. Seventeen additional
+  CL0 cases cover lot/catalog destinations, encoded query/boundary isolation,
+  opaque lookalike targets, malformed/missing/ambiguous suffixes, bad escapes,
+  unsupported prefixes and path-vs-label identity. Host/scheme/security cases use
+  complete CL0 envelopes so they continue to test destination validation.
+- Ruff lint/format and whitespace checks pass. Desktop and twelve mobile views
+  pass with zero browser errors, overflow or external requests. The synthetic
+  receipt still reconciles 27; multi-item allocation remains blocked. Only the
+  two synthetic HiBid fixture shapes were updated; original owner data, financial
+  logic, SQLite v4 schema and eBay gates are unchanged. PR #4 remains unmerged.
+
+## Corrected HiBid catalog tracking host
+
+- Added the owner's corrected catalog host `clicks.alerts.hibid.com` to the exact
+  parser allowlist alongside `clicks.auctions.hibid.com`. No network permissions
+  were added. Both hosts remain blocked as clickable originals and as nested
+  destinations; only the isolated allowlisted provider destination is returned.
+- Updated synthetic catalog fixtures to the corrected `/CL0/` structure targeting
+  `synthetic-auction-house.hibid.com/catalog/910000000100`. Catalog-only reminders
+  retain their closing evidence, count one offline recovery and create no lots.
+  Browser checks assert the canonical house URL and no active tracking-host links.
+- **227 tests pass**, preserving all 165 original Task 004 tests. Seven additional
+  regressions cover spoofed alerts hosts, off-domain destinations, nested tracking
+  destinations and opaque alerts evidence. Ruff lint/format, JavaScript syntax and
+  whitespace checks pass; only the existing Starlette/AnyIO warning remains.
+- Desktop and twelve mobile views pass with zero errors, overflow or external
+  requests. Paid receipt and multi-item allocation checks still pass. Only synthetic
+  fixtures are committed; owner data, schema, financial logic and eBay gates are
+  unchanged. Changes remain on PR #4's branch; no merge or Task 005 work.

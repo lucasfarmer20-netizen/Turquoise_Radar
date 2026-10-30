@@ -49,3 +49,9 @@ screenshots/
 *.swp
 *~
 .DS_Store
+
+# Private owner messages never belong in source control. Only named synthetic fixtures do.
+*.eml
+!fixtures/alerts/synthetic-*.eml
+*.mbox
+*.msg

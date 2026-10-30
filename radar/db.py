@@ -130,6 +130,7 @@ class DiscoveredItem(Base):
     identity: Mapped[str] = mapped_column(String, unique=True)
     source: Mapped[str] = mapped_column(String)
     ebay_item_id: Mapped[str] = mapped_column(String)
+    inbox_status: Mapped[str] = mapped_column(String, default="NEW")
     normalized: Mapped[dict] = mapped_column(JSON)
     original_data: Mapped[dict] = mapped_column(JSON)
     listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
@@ -146,3 +147,75 @@ class DiscoveryObservation(Base):
     corrected_query: Mapped[str | None] = mapped_column(String)
     correction_state: Mapped[str] = mapped_column(String)
     observed_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class IntakeSource(Base):
+    __tablename__ = "intake_sources"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON)
+    last_successful_import: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+
+
+class AlertImport(Base):
+    __tablename__ = "alert_imports"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("intake_sources.id"))
+    stats: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AlertMessage(Base):
+    __tablename__ = "alert_messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("intake_sources.id"))
+    digest: Mapped[str] = mapped_column(String, unique=True)
+    raw_b64: Mapped[str] = mapped_column(Text)
+    safe_text: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(Text)
+    message_type: Mapped[str] = mapped_column(String)
+    data: Mapped[dict] = mapped_column(JSON)
+    received_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    imported_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_imported_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    import_count: Mapped[int] = mapped_column(default=1)
+    synthetic: Mapped[bool] = mapped_column(default=False)
+
+
+class AlertObservation(Base):
+    __tablename__ = "alert_observations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("alert_messages.id"))
+    item_id: Mapped[int] = mapped_column(ForeignKey("discovered_items.id"))
+    data: Mapped[dict] = mapped_column(JSON)
+    query_text: Mapped[str | None] = mapped_column(Text)
+    attribution_verified: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AlertInvoice(Base):
+    __tablename__ = "alert_invoices"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("intake_sources.id"))
+    identity: Mapped[str] = mapped_column(String, unique=True)
+    order_id: Mapped[str] = mapped_column(String)
+    data: Mapped[dict] = mapped_column(JSON)
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
+    confirmed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+
+
+class InvoiceEvidence(Base):
+    __tablename__ = "invoice_evidence"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("alert_invoices.id"))
+    message_id: Mapped[int] = mapped_column(ForeignKey("alert_messages.id"))
+
+
+class SavedSourceSearch(Base):
+    __tablename__ = "saved_source_searches"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("intake_sources.id"))
+    phrase: Mapped[str] = mapped_column(Text)
+    group_name: Mapped[str] = mapped_column(String)
+    selected: Mapped[bool] = mapped_column(default=False)
+    configured: Mapped[bool] = mapped_column(default=False)

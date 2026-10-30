@@ -1,7 +1,7 @@
 # Turquoise Radar
 
 A private, local-first jewelry sourcing workbench for Soldotna, Alaska **99669**.
-Phase 003 connects local CSV/JSON and manual entry to exact search anomalies,
+Phase 004 connects local CSV/JSON and manual entry to exact search anomalies,
 Decimal financial analysis, evidence-gated sterling melt analysis, deterministic
 ranking, a responsive dark dashboard, and owner feedback. Quick Capture, evidence
 editing, a review queue, comparable sales and source-separated anomaly metrics
@@ -42,7 +42,7 @@ export RADAR_DATABASE_URL=sqlite:///./data/private.db
 `.env.example` documents shell configuration; the app does not automatically load
 `.env`. SQLite files live in ignored `data/`; retain/back up that directory to
 preserve listings, preferences, and feedback. Ordered SQLite migrations initialize
-or upgrade the schema; existing populated databases are backed up before v3.
+or upgrade the schema; existing populated databases are backed up before v4.
 See [migration and calibration details](docs/CALIBRATION.md).
 
 ## Demo walkthrough
@@ -75,6 +75,34 @@ Re-seeding is idempotent by identity, but **updates existing demo listing values
 It preserves first observations, feedback, and existing preferences. Keep demo and
 real inventory in separate databases. The seed initializes synthetic spot/auction
 settings only when no saved preferences exist.
+
+## Multi-source inbox (Task 004)
+
+Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
+paste notifications or enter structured/copied listings. ShopGoodwill and HiBid
+parsers separate search matches, promotions, closing reminders, bidding, wins,
+payments and shipment notices. Generic estate sources share safe labelled/link
+intake. No marketplace page or mailbox is fetched.
+
+Review original evidence, exact query provenance, duplicates and missing costs;
+then send candidates to the existing review queue. **Purchase receipts** reconcile
+explicit paid components without inferring ownership from bids or splitting
+multi-item shipping equally. **Saved search assistant** copies exact phrases and
+records owner-managed setup, while **Seller / auction groups** show known costs
+and independently confirmed combined-shipping evidence.
+
+The actual Personal Shopper / HiBid daily digest formats remain provisional.
+No real owner emails were supplied for validation; clearly synthetic fixtures
+exercise the supported structures. See [alert setup and limitations](docs/ALERT-SETUP.md).
+A separate synthetic demo is available with `.venv/bin/python -m radar.intake.demo`;
+never seed fixtures into owner inventory.
+
+The PR #4 compatibility follow-up recognizes ShopGoodwill Item/item # and bounded
+standalone notice IDs, plus explicit HiBid lot/catalog targets embedded in paths on
+the owner-confirmed `/CL0/` tracking structure. Extraction stays offline and ignores
+opaque tracking data; ambiguous layouts stay for review. The corrected catalog shape on
+`clicks.alerts.hibid.com` supports auction-house HiBid subdomains.
+See [supported patterns and limits](docs/ALERT-SETUP.md#pr-4-compatibility-follow-up-task-0041).
 
 ## Discovery engine (Task 003)
 
@@ -206,7 +234,7 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-128 tests (including the 91 retained Phase 001/002 cases) cover financial breakdowns, highest feasible auction bids, fees and
+227 tests (including all 165 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests
@@ -224,12 +252,14 @@ normalization/import/dedup; `anomalies`: curated patterns and query plans;
 `main` / templates / static: dashboard and feedback; `vision`: interface only.
 `capture` / `owner_routes` / `workflow`: capture, evidence editing and queue;
 `comparables`: manual resale evidence; `migrations`: ordered transactional upgrades;
-`discovery`: eBay/OAuth, fixture adapter, bounded plans, observations and UI routes.
+`discovery`: eBay/OAuth, fixture adapter, bounded plans, observations and UI routes;
+`intake`: safe owner-message parsing, source registry, reconciliation and multi-source inbox.
 
 See [master specification](docs/SPEC.md), [source capabilities](docs/SOURCES.md),
 [roadmap](docs/ROADMAP.md), and [development rules](AGENTS.md).
 See [Task 002 usage and financial conventions](docs/CALIBRATION.md),
 [Task 003 specification](docs/SPEC-003.md), and [eBay setup](docs/EBAY-SETUP.md).
-The next step is authorized sandbox validation after credentials, permitted access
-and current official documentation are available. Production approval is pending;
+Local multi-source intake works without API approval. Next, validate the provisional
+formats with permitted owner samples and improve auction cost allocations; eBay
+sandbox validation still requires secure credentials, access and current docs. Production approval is pending;
 no live request, public deployment or automated purchasing is authorized by 003.

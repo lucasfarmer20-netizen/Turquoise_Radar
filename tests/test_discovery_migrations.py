@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy import select
 
 from radar.db import DiscoveryGroup, Listing, database
-from radar.migrations import VERSION_1, VERSION_2
+from radar.migrations import CURRENT_VERSION, VERSION_1, VERSION_2
 
 
 def test_populated_phase002_schema_and_json_preserved(tmp_path):
@@ -81,7 +81,7 @@ def test_populated_phase002_schema_and_json_preserved(tmp_path):
         assert not list(s.scalars(select(DiscoveryGroup)))  # schema migration does not seed data
     engine.dispose()
     with sqlite3.connect(path) as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert c.execute("PRAGMA user_version").fetchone()[0] == CURRENT_VERSION
         for table in tables:
             assert c.execute(f"SELECT * FROM {table}").fetchall() == before[table]
         tables_after = {
@@ -94,7 +94,7 @@ def test_populated_phase002_schema_and_json_preserved(tmp_path):
             "search_executions",
             "discovered_items",
         } <= tables_after
-    assert Path(str(path) + ".pre-v3.bak").exists()
+    assert Path(str(path) + f".pre-v{CURRENT_VERSION}.bak").exists()
     engine, _ = database(f"sqlite:///{path}")
     engine.dispose()
 

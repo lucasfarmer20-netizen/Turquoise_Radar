@@ -1,0 +1,20 @@
+Subject: SYNTHETIC Payment received multi-item invoice
+Date: Thu, 29 Oct 2026 12:00:00 -0800
+Received: synthetic-local; Thu, 29 Oct 2026 12:01:00 -0800
+X-Turquoise-Synthetic: true
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Order ID: SYNTHETIC-ORDER-2
+Items subtotal: $36.00
+Sales tax: $0.00
+Shipping/Handling: $12.00
+Order total: $48.00
+
+Title: SYNTHETIC turqoise sterlng ring
+https://shopgoodwill.com/item/900000000002
+Final item subtotal: $14.00
+---
+Title: SYNTHETIC mixed estate jewelry lot
+https://shopgoodwill.com/item/900000000003
+Final item subtotal: $22.00

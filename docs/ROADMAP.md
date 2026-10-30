@@ -36,10 +36,18 @@ Next: verify current official documentation, sandbox keyset/permission and accou
 quotas; run one authorized small sandbox test. Production remains disabled until
 final approval and explicit owner authorization. No recurring monitoring is added.
 
-## 004 — Seller/auction optimization
+## 004 — Multi-source owner alert intake (implemented; real digest samples provisional)
 
-Model actual combined-shipping quotations, per-order taxes/fees and marginal cost
-allocation. Add multi-lot optimization only after tested fee structures exist.
+Private .eml/paste and structured/manual intake, eight-source register plus custom
+entries, message classification, ShopGoodwill item/order correlation and explicit
+paid-receipt reconciliation. Multi-Source Inbox, source/opportunity filters, exact
+saved-search clipboard/setup tracking, stable identities and independent histories,
+review handoff and seller/auction grouping are operational without API approval.
+SQLite v4 preserves Phase 003 data. No scraping, mailbox OAuth or automatic buying.
+
+Next: permitted actual format validation, especially Personal Shopper / HiBid daily
+digests, and independently supported invoice allocations/auction economics. A full
+multi-lot optimizer remains deferred; no shipping discount is assumed.
 
 ## 005 — Optional vision and alerts
 

@@ -21,6 +21,10 @@ from radar.anomalies import (
 from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
 from radar.discovery.routes import discovery_routes
 from radar.discovery.service import discovery_history, seed_discovery
+from radar.intake.limits import AlertBodyLimit
+from radar.intake.registry import seed_sources
+from radar.intake.routes import intake_routes
+from radar.intake.views import alert_history
 from radar.owner_routes import owner_routes
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
 from radar.sources import import_rows, upsert_listing
@@ -58,10 +62,12 @@ def create_app(database_url=None):
         with app.state.sessions.begin() as session:
             seed_patterns(session)
             seed_discovery(session)
+            seed_sources(session)
         yield
         app.state.engine.dispose()
 
     app = FastAPI(title="Turquoise Radar", lifespan=lifespan)
+    app.add_middleware(AlertBodyLimit)
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
     @app.middleware("http")
@@ -188,6 +194,7 @@ def create_app(database_url=None):
                 v=view(row, preferences(s), patterns),
                 feedback=feedback,
                 discovery_observations=discovery_history(s, listing_id),
+                alert_observations=alert_history(s, listing_id),
                 outcomes=list(
                     s.scalars(select(ComparableSale).where(ComparableSale.listing_id == listing_id))
                 ),
@@ -259,7 +266,11 @@ def create_app(database_url=None):
             prior = list(s.scalars(select(Feedback).where(Feedback.listing_id == listing_id)))
             # Milestone counters apply once per listing. A repeated Sold edits profit by delta.
             pattern = s.get(SearchPattern, listing.data.get("search_pattern_id") or "")
-            if pattern and listing.data.get("raw_search_phrase") == pattern.phrase:
+            if (
+                pattern
+                and listing.data.get("raw_search_phrase") == pattern.phrase
+                and listing.data.get("query_attribution_verified") is not False
+            ):
                 if data.action == "Interested" and not any(f.action == "Interested" for f in prior):
                     pattern.useful_matches += 1
                 if data.action == "Purchased" and not any(f.action == "Purchased" for f in prior):
@@ -356,6 +367,7 @@ def create_app(database_url=None):
 
     owner_routes(app, render, preferences, view)
     discovery_routes(app, render, preferences)
+    intake_routes(app, render, preferences)
     return app
 
 
