@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block content %}<p class="eyebrow">OWNER SOURCING / QUICK CAPTURE</p><h1>Paste it. Check it. Price it.</h1><p class="muted">Copy text from a listing. Suggestions are extracted locally and remain unverified until you review them. URLs are never fetched.</p><section class="panel"><form method="post" action="/capture/preview" class="stack"><label>Listing URL (optional)<input type="url" name="listing_url" placeholder="Paste the source listing link"></label><label>Source<input name="source" value="manual"></label><label>Copied listing text<textarea name="pasted_text" rows="14" required maxlength="30000" placeholder="Old blue stone sterling ring, size 7
+Current bid: $12
+Shipping: $8
+Weight: 6.4g
+Seller: example-seller
+Query: nature america"></textarea></label><button>Extract & review →</button></form></section>{% endblock %}

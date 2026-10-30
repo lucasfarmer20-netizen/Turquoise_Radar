@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Literal
@@ -16,21 +16,74 @@ class Shipping(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
-class FeeProfile(BaseModel):
-    """Editable profile, never a statement of current marketplace rates."""
+class ValueStatus(StrEnum):
+    CONFIRMED = "CONFIRMED"
+    ESTIMATED = "ESTIMATED"
+    UNKNOWN = "UNKNOWN"
 
-    commission: Rate = Decimal("0.10")
+
+class FeeProfile(BaseModel):
+    """Dated owner assumptions; no claim that a category/tier is universally applicable."""
+
+    commission: Rate = Decimal("0.08")
     processing: Rate = Decimal("0.029")
     processing_fixed: Money = Decimal("0.30")
-    packaging: Money = Decimal("1")
-    outbound_shipping: Money = Decimal("0")
+    packaging: Money | None = None
+    outbound_shipping: Money | None = None
+    commission_tiers: dict[str, Rate] = Field(default_factory=dict)
+    source: str = "Task 002 owner-provided US standard assumption; verify current eligibility"
+    as_of: date | None = date(2026, 10, 29)
+    verification_status: ValueStatus = ValueStatus.ESTIMATED
+    # Named, explicit scenario assumptions may substitute for otherwise unknown buyer inputs.
+    scenario_name: str | None = None
+    buyer_shipping_assumption: Money | None = None
+    buyer_tax_assumption: Money | None = None
+
+    @model_validator(mode="after")
+    def named_assumptions(self):
+        if self.verification_status == ValueStatus.CONFIRMED and (
+            not self.as_of or not self.source
+        ):
+            raise ValueError("Confirmed resale profile requires dated source evidence")
+        if (
+            self.buyer_shipping_assumption is not None or self.buyer_tax_assumption is not None
+        ) and not self.scenario_name:
+            raise ValueError("Buyer-paid shipping/tax assumptions require a scenario name")
+        return self
+
+
+FeeBase = Literal["item", "item_shipping", "item_premium_service", "invoice"]
 
 
 class BuyerProfile(BaseModel):
     premium_rate: Rate = Decimal("0")
+    premium_base: FeeBase = "item"
     service_rate: Rate = Decimal("0")
+    service_base: FeeBase = "item"
     tax_rate: Rate = Decimal("0")
+    tax_base: FeeBase = "item_premium_service"
+    fixed_marketplace_fee: Money = Decimal("0")
     per_lot_fee: Money = Decimal("0")
+    per_invoice_fee: Money | None = None
+    shipping: Money | None = None
+    handling: Money | None = None
+    source: str = "Owner-configured profile; not independently verified"
+    as_of: date | None = None
+    verification_status: ValueStatus = ValueStatus.ESTIMATED
+
+    @model_validator(mode="after")
+    def acyclic_bases(self):
+        if self.premium_base not in ("item", "item_shipping"):
+            raise ValueError("Premium base must be item or item_shipping")
+        if self.service_base not in ("item", "item_shipping"):
+            raise ValueError("Service base must be item or item_shipping")
+        if self.per_invoice_fee is not None and self.verification_status != ValueStatus.CONFIRMED:
+            raise ValueError("Per-invoice fees require independent confirmation")
+        if self.verification_status == ValueStatus.CONFIRMED and (
+            not self.as_of or not self.source
+        ):
+            raise ValueError("Confirmed profile requires dated source evidence")
+        return self
 
 
 class Preferences(BaseModel):
@@ -51,6 +104,24 @@ class Preferences(BaseModel):
     refiner_payout: Rate = Decimal("0.80")
     require_verified_material: bool = True
     melt_max_ratio: Annotated[Decimal, Field(gt=0, le=1)] = Decimal("0.85")
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_metadata(cls, value):
+        if isinstance(value, dict) and "resale_profiles" in value:
+            value = dict(value)
+            profiles = {}
+            for name, profile in value["resale_profiles"].items():
+                if isinstance(profile, dict) and "source" not in profile:
+                    profile = {
+                        **profile,
+                        "source": "Legacy Phase 001 assumptions; recalibration required",
+                        "as_of": None,
+                        "verification_status": "ESTIMATED",
+                    }
+                profiles[name] = profile
+            value["resale_profiles"] = profiles
+        return value
 
     @model_validator(mode="after")
     def coherent(self):
@@ -111,9 +182,29 @@ class ListingInput(BaseModel):
     collector_evidence: str | None = None
     combined_shipping_available: bool | None = None
     synthetic: bool = False
+    pasted_text: (
+        Annotated[str, StringConstraints(strip_whitespace=False, max_length=30000)] | None
+    ) = None
+    ring_size: str | None = None
+    material_terms: list[str] = Field(default_factory=list)
+    cost_status: dict[str, ValueStatus] = Field(default_factory=dict)
+    resale_buyer_shipping: Money | None = None
+    resale_buyer_tax: Money | None = None
+    resale_shipping_status: ValueStatus = ValueStatus.UNKNOWN
+    resale_tax_status: ValueStatus = ValueStatus.UNKNOWN
+    selling_category: str = "jewelry"
+    commission_tier: str = "standard"
+    resale_confirmed: bool = False
+    resale_comparable_ids: list[int] = Field(default_factory=list)
+    capture_confirmed: bool = False
+    invoice_fee_allocation: Money | None = None
+    invoice_allocation_confirmed: bool = False
+    invoice_allocation_evidence: str | None = None
 
     @model_validator(mode="after")
     def evidence(self):
+        if self.invoice_allocation_confirmed and not self.invoice_allocation_evidence:
+            raise ValueError("Invoice allocation confirmation requires evidence")
         if (self.resale_low is None) != (self.resale_high is None):
             raise ValueError("Provide both resale bounds or neither")
         if self.resale_low is not None:
@@ -124,6 +215,22 @@ class ListingInput(BaseModel):
         if self.weight_verified and not self.weight_evidence:
             raise ValueError("Verified weight requires evidence")
         return self
+
+
+class ComparableInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    category: str = Field(min_length=1, max_length=100)
+    ring_size: str | None = None
+    materials: str = Field(min_length=1, max_length=500)
+    weight_g: Annotated[Decimal, Field(gt=0)] | None = None
+    condition: str = Field(min_length=1, max_length=1000)
+    sale_price: Money
+    selling_fees: Money | None = None
+    sale_date: date
+    evidence: str = Field(min_length=1, max_length=3000)
+    notes: str = Field(default="", max_length=3000)
+    listing_id: int | None = Field(default=None, gt=0)
+    synthetic: bool = False
 
 
 class FeedbackInput(BaseModel):

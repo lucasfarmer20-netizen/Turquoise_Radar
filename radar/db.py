@@ -17,6 +17,7 @@ class Listing(Base):
     dedup_key: Mapped[str] = mapped_column(String, unique=True)
     data: Mapped[dict] = mapped_column(JSON)
     original_data: Mapped[dict] = mapped_column(JSON)
+    review_state: Mapped[str] = mapped_column(String, default="NEW")
     first_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -53,10 +54,29 @@ class Setting(Base):
     data: Mapped[dict] = mapped_column(JSON)
 
 
+class ComparableSale(Base):
+    __tablename__ = "comparable_sales"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    data: Mapped[dict] = mapped_column(JSON)
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ListingEdit(Base):
+    __tablename__ = "listing_edits"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"))
+    before_data: Mapped[dict] = mapped_column(JSON)
+    after_data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 def database(url=None):
     url = url or os.environ.get("RADAR_DATABASE_URL", "sqlite:///./data/radar.db")
     if url.startswith("sqlite:///") and url != "sqlite:///:memory:":
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(url, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine)
+    from radar.migrations import migrate
+
+    migrate(engine)
     return engine, sessionmaker(engine, expire_on_commit=False)

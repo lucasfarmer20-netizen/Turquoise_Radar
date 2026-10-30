@@ -18,9 +18,11 @@ from radar.anomalies import (
     learned_priority,
     seed_patterns,
 )
-from radar.db import Feedback, Listing, SearchPattern, Setting, database
+from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
+from radar.owner_routes import owner_routes
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
 from radar.sources import import_rows, upsert_listing
+from radar.workflow import attributed_patterns, queue_state
 
 ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "templates"))
@@ -37,10 +39,12 @@ def preferences(session):
 
 def view(row, prefs, patterns):
     item = ListingInput.model_validate(row.data)
+    analysis = analyze(item, prefs)
     return {
+        "state": queue_state(row, analysis),
         "row": row,
         "item": item,
-        "a": analyze(item, prefs),
+        "a": analysis,
         "pattern": patterns.get(item.search_pattern_id),
     }
 
@@ -98,7 +102,7 @@ def create_app(database_url=None):
             raise HTTPException(422, "Invalid cost filter") from e
         with app.state.sessions() as s:
             prefs = preferences(s)
-            patterns = {p.id: p for p in s.scalars(select(SearchPattern))}
+            patterns = {p.id: p for p in attributed_patterns(s)}
             all_views = [view(row, prefs, patterns) for row in s.scalars(select(Listing))]
             sources = sorted({v["item"].source for v in all_views})
             results = []
@@ -158,7 +162,7 @@ def create_app(database_url=None):
             row = s.get(Listing, listing_id)
             if not row:
                 raise HTTPException(404, "Listing not found")
-            patterns = {p.id: p for p in s.scalars(select(SearchPattern))}
+            patterns = {p.id: p for p in attributed_patterns(s)}
             feedback = list(
                 s.scalars(
                     select(Feedback)
@@ -180,6 +184,9 @@ def create_app(database_url=None):
                 "detail.html",
                 v=view(row, preferences(s), patterns),
                 feedback=feedback,
+                outcomes=list(
+                    s.scalars(select(ComparableSale).where(ComparableSale.listing_id == listing_id))
+                ),
                 related=related,
                 actions=ACTIONS,
                 raw=json.dumps(row.original_data, indent=2),
@@ -248,7 +255,7 @@ def create_app(database_url=None):
             prior = list(s.scalars(select(Feedback).where(Feedback.listing_id == listing_id)))
             # Milestone counters apply once per listing. A repeated Sold edits profit by delta.
             pattern = s.get(SearchPattern, listing.data.get("search_pattern_id") or "")
-            if pattern:
+            if pattern and listing.data.get("raw_search_phrase") == pattern.phrase:
                 if data.action == "Interested" and not any(f.action == "Interested" for f in prior):
                     pattern.useful_matches += 1
                 if data.action == "Purchased" and not any(f.action == "Purchased" for f in prior):
@@ -265,6 +272,12 @@ def create_app(database_url=None):
                     pattern.realized_profit = str(
                         Decimal(pattern.realized_profit) + data.realized_profit - previous
                     )
+            if data.action in ("Purchased", "Sold"):
+                listing.review_state = "PURCHASED"
+            elif data.action in ("Passed", "False positive"):
+                listing.review_state = "PASSED"
+            elif data.action == "Interested":
+                listing.review_state = "WATCH"
             s.add(
                 Feedback(
                     listing_id=listing_id,
@@ -282,7 +295,7 @@ def create_app(database_url=None):
     @app.get("/patterns", response_class=HTMLResponse)
     def patterns_route(request: Request):
         with app.state.sessions() as s:
-            rows = sorted(s.scalars(select(SearchPattern)), key=learned_priority, reverse=True)
+            rows = sorted(attributed_patterns(s), key=learned_priority, reverse=True)
             return render(
                 request,
                 "patterns.html",
@@ -337,6 +350,7 @@ def create_app(database_url=None):
                 row.data = prefs.model_dump(mode="json")
         return RedirectResponse("/settings", status_code=303)
 
+    owner_routes(app, render, preferences, view)
     return app
 
 

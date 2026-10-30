@@ -9,17 +9,25 @@
 - Evidence-gated melt, Alaska shipping gates, five opportunity classes.
 - 25 synthetic listings, complete local pipeline tests, pinned dependencies and docs.
 
-## 002 — Owner calibration (recommended next)
+## 002 — Owner calibration (implemented; official research verification pending access)
 
-Validate current source and resale fees, tax bases, Alaska shipping/handling and
-minimum margins with owner-provided examples. Improve evidence entry ergonomics,
-resale basis and condition workflows. Add database migrations before schema changes.
-Evaluate source terms/access methods and pick one approved integration. Add real
-records only with explicit evidence; demo figures never count as market research.
+- Corrected item-only commission and total-buyer-transaction processing bases,
+  dated configurable category/tier fees, shipping/tax scenarios and max bids.
+- Acquisition fee bases, confirmed vs estimated costs, Alaska gates and manual
+  invoice allocation without invented combined-shipping savings.
+- Quick Capture, editable suggestions, original paste evidence, focused review
+  queue, partial evidence edits and persistent audit history.
+- Manually recorded comparable sales, selected evidence confirmation, linked
+  purchased-item outcomes, and source-separated actual/inferred query performance.
+- Transactional SQLite v2 migrations with backups and preservation/rollback tests.
+- Current eBay/Whatnot official documentation is blocked by the running cloud
+  policy. Required documentation domains are saved in the draft; verify current
+  authorization, rates and quota terms after access is applied.
 
 ## 003 — One authorized ingestion source
 
-Implement an approved API/feed/notification/export adapter. Verify scope, current
+First candidate: the official eBay Browse API, conditional on current Buy API
+production eligibility and application approval. Implement one approved adapter. Verify scope, current
 terms, effective query behavior and exact-match capability. Enforce independent
 schedule, rate limit, bounded retry and disable controls. No CAPTCHA evasion,
 proxy rotation, session theft or anti-bot bypass. Keep integration tests offline.

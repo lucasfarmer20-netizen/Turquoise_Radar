@@ -117,10 +117,13 @@ def upsert_listing(session, item, original):
     if row is None:
         row = Listing(dedup_key=key, original_data=original, data=item.model_dump(mode="json"))
         session.add(row)
-        if matched:
+        if matched and item.raw_search_phrase == matched.phrase:
             matched.appearances += 1
     else:
-        row.data = item.model_dump(mode="json")
+        merged = {**row.data, **original}
+        # The supplied observed fields update; omitted owner evidence stays intact.
+        merged["search_pattern_id"] = item.search_pattern_id or row.data.get("search_pattern_id")
+        row.data = ListingInput.model_validate(merged).model_dump(mode="json")
         row.last_seen = utcnow()
     session.flush()
     return row, is_new

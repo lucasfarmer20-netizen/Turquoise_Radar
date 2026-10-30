@@ -7,14 +7,24 @@ from radar.finance import landed_cost, max_buy_price, scenario
 from radar.schemas import BuyerProfile, FeeProfile
 
 
+def _synthetic_fees():
+    return FeeProfile(
+        packaging="1",
+        outbound_shipping="0",
+        scenario_name="SYNTHETIC regression",
+        buyer_shipping_assumption="0",
+        buyer_tax_assumption="0",
+    )
+
+
 def test_financial_breakdown(item, prefs):
     a = analyze(item, prefs)
     assert a.landed == D("20.00")
-    assert a.low.commission == D("4.50")
+    assert a.low.commission == D("3.60")
     assert a.low.processing == D("1.61")
-    assert a.low.net_resale == D("37.89")
-    assert a.low.profit == D("17.89")
-    assert a.low.roi == D("17.89") / 20
+    assert a.low.net_resale == D("38.79")
+    assert a.low.profit == D("18.79")
+    assert a.low.roi == D("18.79") / 20
     assert a.tier == "BUY CANDIDATE"
     assert a.high.profit > a.low.profit
 
@@ -101,7 +111,7 @@ def test_observed_fees_override_profile(item, prefs):
 )
 def test_maximum_bid_is_highest_cent(premium, lot, tax, profit, roi):
     buyer = BuyerProfile(premium_rate=premium, per_lot_fee=lot, tax_rate=tax)
-    result = max_buy_price(D("60"), FeeProfile(), D("7"), D("2"), D(profit), D(roi), buyer)
+    result = max_buy_price(D("60"), _synthetic_fees(), D("7"), D("2"), D(profit), D(roi), buyer)
     assert result.maximum_item_price is not None
     assert result.profit >= D(profit)
     assert result.roi >= D(roi)
@@ -111,18 +121,18 @@ def test_maximum_bid_is_highest_cent(premium, lot, tax, profit, roi):
     taxable = price + premium_fee + D(lot)
     tax_fee = (taxable * D(tax)).quantize(D(".01"), rounding="ROUND_HALF_UP")
     landed = price + premium_fee + D(lot) + tax_fee + D("9")
-    net = scenario(D("60"), FeeProfile(), None).net_resale
+    net = scenario(D("60"), _synthetic_fees(), None).net_resale
     assert net - landed < D(profit) or (net - landed) / landed < D(roi)
 
 
 def test_maximum_missing_shipping():
-    result = max_buy_price(D("60"), FeeProfile(), None, D(0), D(15), D(".6"), BuyerProfile())
+    result = max_buy_price(D("60"), _synthetic_fees(), None, D(0), D(15), D(".6"), BuyerProfile())
     assert result.maximum_item_price is None
     assert "UNKNOWN" in result.limiting_constraint
 
 
 def test_impossible_maximum():
-    result = max_buy_price(D("20"), FeeProfile(), D(50), D(0), D(15), D(".6"), BuyerProfile())
+    result = max_buy_price(D("20"), _synthetic_fees(), D(50), D(0), D(15), D(".6"), BuyerProfile())
     assert result.maximum_item_price is None
 
 

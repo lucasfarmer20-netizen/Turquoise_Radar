@@ -1,9 +1,11 @@
 # Turquoise Radar
 
 A private, local-first jewelry sourcing workbench for Soldotna, Alaska **99669**.
-Phase 001 connects local CSV/JSON and manual entry to exact search anomalies,
+Phase 002 connects local CSV/JSON and manual entry to exact search anomalies,
 Decimal financial analysis, evidence-gated sterling melt analysis, deterministic
-ranking, a responsive dark dashboard, and owner feedback. No live marketplaces,
+ranking, a responsive dark dashboard, and owner feedback. Quick Capture, evidence
+editing, a review queue, comparable sales and source-separated anomaly metrics
+support real owner-operated sourcing. No live marketplaces,
 paid AI, purchasing automation, accounts, or background monitoring.
 
 ## Run
@@ -37,8 +39,9 @@ export RADAR_DATABASE_URL=sqlite:///./data/private.db
 
 `.env.example` documents shell configuration; the app does not automatically load
 `.env`. SQLite files live in ignored `data/`; retain/back up that directory to
-preserve listings, preferences, and feedback. `create_all` initializes this first
-schema; a migration tool is deferred until the schema changes.
+preserve listings, preferences, and feedback. Ordered SQLite migrations initialize
+or upgrade the schema; existing populated databases are backed up before v2.
+See [migration and calibration details](docs/CALIBRATION.md).
 
 ## Demo walkthrough
 
@@ -50,8 +53,9 @@ schema; a migration tool is deferred until the schema changes.
    sent phrase remains `nature america`. No cultural attribution is inferred.
 3. The first ring costs $16 + $5 shipping = **$21 landed**. Its manually supplied
    synthetic conservative resale of $45, with demo planning fees, yields
-   **$16.89 projected profit** and roughly **80.4% ROI**. Maximum item price is
-   **$17.89** under both $15 profit and 60% ROI requirements.
+   **$17.79 projected profit** and roughly **84.7% ROI** under the corrected 8%
+   synthetic fee scenario with explicitly supplied zero buyer shipping/tax. Maximum item price is
+   **$18.79** under both $15 profit and 60% ROI requirements.
 4. Use Affordable rings, Melt opportunities, Highest projected margin, or Needs
    review; filter by source, opportunity, cost, confidence, anomaly, and shipping.
 5. Open a detail page for each cost component, lower/higher resale scenarios,
@@ -61,10 +65,31 @@ schema; a migration tool is deferred until the schema changes.
    Record Interested, Purchased, Passed, False positive, or Sold. Realized profit
    is entered manually with Sold; projected profit is never treated as realized.
 
+Restored Phase 001 records keep their original rates and lack the new confirmed
+transaction inputs; they appropriately show unknown/unconfirmed economics until
+reviewed. Use a separate new demo database for the updated synthetic examples.
+
 Re-seeding is idempotent by identity, but **updates existing demo listing values**.
 It preserves first observations, feedback, and existing preferences. Keep demo and
 real inventory in separate databases. The seed initializes synthetic spot/auction
 settings only when no saved preferences exist.
+
+## Owner workflow (Task 002)
+
+Use **Quick Capture** to paste copied listing text and review editable suggestions.
+Only title, price, shipping and exact query need immediate attention; optional
+source/weight/fee details expand on demand. Extraction never fetches a URL or
+confirms material/weight independently. Use **Edit evidence & recalculate** to
+supply missing acquisition costs, supported resale bounds and buyer transaction
+inputs. **Preferences → Calibrate resale fees with a form** configures the dated
+resale assumptions without JSON. Review queue states distinguish NEW, RESEARCH,
+WATCH, calculated BUY CANDIDATE, PURCHASED and PASSED.
+
+Use **Comparable sales** to record actual manually observed resale evidence and
+review category ranges with sample counts and uncertainty. Applying selected
+comparables to a listing requires explicit owner confirmation. **Anomaly
+intelligence** compares actual source queries and inferred matches separately.
+See [the detailed guide](docs/CALIBRATION.md) for confirmation gates and examples.
 
 ## Input and import contract
 
@@ -97,7 +122,8 @@ last-seen. Import is atomic after validation; limited to 1,000 rows / 2 MB.
   solved on integer cents and must satisfy **both** profit and ROI limits.
 - Landed = item + premium + service fee + tax + inbound shipping + handling.
   Net resale subtracts selling commission, processing (rate + fixed fee), packaging,
-  and seller-paid outbound shipping. Profit = net resale − landed; ROI = profit /
+  and seller-paid outbound shipping. Processing applies to item + buyer-paid shipping
+  + buyer tax, with the fixed fee charged once per transaction. Profit = net resale − landed; ROI = profit /
   landed. Zero landed cost has undefined ROI.
 - **Preferences** edits validated JSON for resale-channel fee profiles,
   marketplace buyer profiles, targets, spot price, refiner payout and evidence
@@ -107,10 +133,10 @@ last-seen. Import is atomic after validation; limited to 1,000 rows / 2 MB.
   null, and confirm the profile. Explicit absolute fee values override profiles
   and are treated as fixed at every proposed bid. Do not enter a percentage
   auction's current premium as a fixed fee when calculating a maximum bid.
-  Profiles compute premium on price, service rate on price plus a per-lot fee,
-  and tax on price + premium + service. Shipping/handling taxability varies;
-  enter confirmed absolute tax when this simple base is unsuitable. More complex
-  tiered/tax structures are a future extension, not silently approximated.
+  Buyer profiles support item or item-plus-shipping premium/service bases, fixed
+  marketplace fees, per-lot fees, and configurable tax bases including invoice.
+  Per-invoice fees require independently confirmed allocation. Configure dated
+  source evidence and verification status; unknown fee structures are not guessed.
 - Only USD comparisons are supported. Non-USD records remain visible but cannot
   receive calculated USD profit, maximum bid, or BUY CANDIDATE status.
 - Unknown Alaska availability blocks BUY CANDIDATE; unavailable shipping is PASS.
@@ -151,6 +177,9 @@ its delta. The feedback audit trail retains all actions. Profit and useful/purch
 feedback add bounded priority adjustments. Passed/False positive are retained for
 review; a learned suppression model is deferred. No historical 11-piece purchase
 records are fabricated. Disabled queries remain attached to historical listings.
+The new effectiveness view separates actual source-query attribution from inferred
+title matches, with unique feedback/outcome counts per source. Legacy counters are
+preserved on disk but do not boost live query ranking.
 
 ## Validate
 
@@ -160,7 +189,7 @@ records are fabricated. Disabled queries remain attached to historical listings.
 .venv/bin/ruff format --check .
 ```
 
-55 tests cover financial breakdowns, highest feasible auction bids, fees and
+91 tests (including all 55 retained Phase 001 cases, with corrected fee expectations) cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests
@@ -176,9 +205,14 @@ no CDN or paid APIs. Its SHA-256 is
 normalization/import/dedup; `anomalies`: curated patterns and query plans;
 `finance` / `melt`: independent Decimal engines; `analysis`: classification;
 `main` / templates / static: dashboard and feedback; `vision`: interface only.
+`capture` / `owner_routes` / `workflow`: capture, evidence editing and queue;
+`comparables`: manual resale evidence; `migrations`: ordered transactional upgrades.
 
 See [master specification](docs/SPEC.md), [source capabilities](docs/SOURCES.md),
 [roadmap](docs/ROADMAP.md), and [development rules](AGENTS.md).
-The recommended next task is to validate fee/tax structures and manually observed
-resale/evidence inputs against real owner examples before selecting one authorized
-source integration. No production scrapers or third-party APIs are implemented.
+See [Task 002 usage and financial conventions](docs/CALIBRATION.md) and the
+[Task 002 specification](docs/SPEC-002.md). The recommended Phase 003 source is
+the official eBay Browse API, conditional on verified current documentation and
+production approval. Official source documentation is currently blocked by the
+cloud network policy; saved access additions require environment review/save and
+publication. No live connector or production scraper is implemented.
