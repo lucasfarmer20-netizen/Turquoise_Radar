@@ -5,8 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-PROMPT_VERSION = "jewelry-2"
-SCHEMA_VERSION = "1"
+from radar.jewelry.validation import reference_error, rule_error
+
+PROMPT_VERSION = "jewelry-3"
+SCHEMA_VERSION = "2"
 OWNER = "local-owner"
 Role = Literal["FRONT", "BACK_HALLMARK", "STONE", "SIDE_DETAIL"]
 Stage = Literal["QUICK", "DEEP"]
@@ -40,27 +42,68 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", revalidate_instances="always")
 
 
-def guarded_text(value):
-    # Deliberately conservative: these claims cannot enter even AI research evidence.
-    # Literal hallmark transcriptions are separately bounded and never authenticate a piece.
-    forbidden = (
-        r"\d+(?:\.\d+)?\s*(?:grams?\b|g\b|dwt\b|ounces?\b|oz\b)",
-        r"\$\s*\d|\bUSD\s*\d",
-        r"\b\d+(?:\.\d+)?\s*(?:dollars?|USD)\b",
-        r"\b(?:Navajo|Hopi|Zuni|tribal|Indigenous|Native American)\b",
-        r"\b(?:natural|untreated|stabilized)\s+turquoise\b",
-        r"\b(?:mine origin|mined at|authentic vintage|verified sterling|confirmed purity)\b",
-        r"\b(?:definitely|certainly|authenticated|guaranteed)\b",
-        r"\b(?:is|confirmed|verified|solid|pure|genuine)\s+(?:925\s+)?sterling\b",
-        (
-            "\\b(?:Kingman|Sleeping Beauty|Bisbee|Royston|Cerrillos|Carico Lake"
-            "|Lander Blue)\\s+(?:turquoise|mine)\\b"
-        ),
-        r"\bmade by\b",
+# Full-clause exceptions, not a general "contains not" exemption. No names, values,
+# weights or arbitrary suffixes can enter through these fixed caution templates.
+_SUBJECT = r"(?:(?:this|the) (?:piece|item|jewelry|metal|cuff|ring|bracelet|pendant)|this|it)"
+_PHOTO_BASIS = r"(?: from (?:this|the|a) (?:photo|photograph|image)| from appearance alone)?"
+_SAFE_CAUTION = tuple(
+    re.compile(pattern, re.I)
+    for pattern in (
+        rf"(?:{_SUBJECT} is )?not authenticated{_PHOTO_BASIS}",
+        rf"{_SUBJECT} (?:cannot|can not|can't) be authenticated{_PHOTO_BASIS}",
+        rf"(?:cannot|can not|can't) (?:determine|confirm|verify) whether {_SUBJECT} is "
+        rf"(?:solid |genuine |pure )?(?:925 )?sterling(?: silver)?{_PHOTO_BASIS}",
+        rf"whether {_SUBJECT} is (?:solid |genuine |pure )?(?:925 )?sterling(?: silver)? "
+        rf"cannot be (?:determined|confirmed|verified){_PHOTO_BASIS}",
+        rf"no (?:tribal|cultural) attribution (?:can be|is) "
+        rf"(?:established|verified|supported|determined){_PHOTO_BASIS}",
+        rf"(?:tribal|cultural) attribution cannot be "
+        rf"(?:established|verified|supported|determined){_PHOTO_BASIS}",
+        rf"(?:cannot|can not|can't) determine who {_SUBJECT} was made by{_PHOTO_BASIS}",
+        rf"who {_SUBJECT} was made by cannot be determined{_PHOTO_BASIS}",
     )
-    if any(re.search(pattern, value, re.I) for pattern in forbidden):
-        raise ValueError("Unsupported authentication, weight or valuation claim")
-    return value
+)
+
+
+def guarded_text(value):
+    forbidden = (
+        ("vision_weight", r"\d+(?:\.\d+)?\s*(?:grams?\b|g\b|dwt\b|ounces?\b|oz\b)"),
+        ("vision_value", r"\$\s*\d|\bUSD\s*\d|\b\d+(?:\.\d+)?\s*(?:dollars?|USD)\b"),
+        ("vision_culture", r"\b(?:Navajo|Hopi|Zuni|tribal|Indigenous|Native American)\b"),
+        ("vision_treatment", r"\b(?:natural|untreated|stabilized)\s+turquoise\b"),
+        (
+            "vision_authentication",
+            r"\b(?:authentic vintage|confirmed purity|definitely|certainly|"
+            r"authenticated|guaranteed)\b",
+        ),
+        (
+            "vision_material",
+            r"\b(?:is|confirmed|verified|solid|pure|genuine)\s+(?:925\s+)?sterling\b",
+        ),
+        (
+            "vision_mine",
+            r"\b(?:mine origin|mined at)\b|\b(?:Kingman|Sleeping Beauty|Bisbee|Royston|"
+            r"Cerrillos|Carico Lake|Lander Blue)\s+(?:turquoise|mine)\b",
+        ),
+        ("vision_maker_claim", r"\bmade by\b"),
+    )
+    # Identify whole caution clauses, then scan the ORIGINAL string. In particular,
+    # decimals and assertions spanning newlines must not evade the original bans.
+    safe_spans = []
+    start = 0
+    separators = list(
+        re.finditer(r"[.;!?,\n]|\b(?:but|however|yet|although|and|because)\b", value, re.I)
+    )
+    boundaries = [(m.start(), m.end()) for m in separators] + [(len(value), len(value))]
+    for end, next_start in boundaries:
+        if any(pattern.fullmatch(value[start:end].strip()) for pattern in _SAFE_CAUTION):
+            safe_spans.append((start, end))
+        start = next_start
+    for code, pattern in forbidden:
+        for match in re.finditer(pattern, value, re.I):
+            if not any(a <= match.start() and match.end() <= b for a, b in safe_spans):
+                raise rule_error(code)
+    return value  # Never rewrite accepted findings.
 
 
 class Finding(Strict):
@@ -86,19 +129,19 @@ class Finding(Strict):
     @model_validator(mode="after")
     def evidence_limits(self):
         if self.evidence_kind == "INFERRED" and self.confidence == "HIGH":
-            raise ValueError("Inferred findings cannot have high confidence")
+            raise rule_error("vision_inferred_confidence")
         if self.hallmark_transcription and (
             self.legibility != "LEGIBLE"
             or self.evidence_kind != "DIRECT"
             or self.category != "METAL"
         ):
-            raise ValueError("Only directly legible metal marks can be transcribed")
+            raise rule_error("vision_hallmark_evidence")
         if self.hallmark_transcription and not re.fullmatch(
             r"[A-Za-z0-9 .&+/'-]{1,40}", self.hallmark_transcription
         ):
-            raise ValueError("Unsupported hallmark text")
-        if any(not re.fullmatch(r"[A-Za-z0-9? .-]{1,10}", f) for f in self.visible_fragments):
-            raise ValueError("Fragments must be short visible characters, not completed marks")
+            raise rule_error("vision_hallmark_text")
+        if any(not re.fullmatch(r"[A-Za-z0-9? .&+/'-]{1,10}", f) for f in self.visible_fragments):
+            raise rule_error("vision_fragment_text")
         return self
 
 
@@ -151,27 +194,50 @@ class VisionResult(Strict):
         if len(keys) != len(self.findings) or len({s.key for s in self.sub_items}) != len(
             self.sub_items
         ):
-            raise ValueError("Duplicate finding/sub-item keys")
+            raise rule_error("vision_duplicate_keys")
         if any(set(s.finding_keys) - keys for s in self.sub_items):
-            raise ValueError("Sub-item references an unknown finding")
+            raise rule_error("vision_unknown_finding")
         if self.possible_maker_identity:
             key = self.possible_maker_identity.supporting_finding_key
             f = next((f for f in self.findings if f.key == key), None)
             if not f or not f.hallmark_transcription:
-                raise ValueError("Maker research requires a directly legible supporting mark")
-            text = re.sub(r"STERLING|SILVER|925|\W|\d", "", f.hallmark_transcription, flags=re.I)
-            if not text:
-                raise ValueError("A generic purity stamp does not support a maker research name")
+                raise rule_error("vision_maker_mark")
+            tokens = re.findall(r"[A-Z]+", f.hallmark_transcription.upper())
+            generic = {
+                "STERLING",
+                "SILVER",
+                "GOLD",
+                "FILLED",
+                "PLATED",
+                "PLATE",
+                "GF",
+                "GP",
+                "GEP",
+                "HGE",
+                "RGP",
+                "EPNS",
+                "EP",
+                "K",
+                "KT",
+                "KARAT",
+                "KARATS",
+            }
+            if not set(tokens) - generic or (
+                tokens == ["S"] and re.search(r"\d{3}", f.hallmark_transcription)
+            ):
+                raise rule_error("vision_generic_mark")
         return self
 
     def validate_images(self, ids):
-        if any(f.image_id not in ids for f in [*self.findings, *self.sub_items]):
-            raise ValueError("Finding references a photo outside this analysis")
-        for item in self.sub_items:
+        for field in ("findings", "sub_items"):
+            for index, item in enumerate(getattr(self, field)):
+                if item.image_id not in ids:
+                    raise reference_error("vision_unknown_image", (field, index, "image_id"))
+        for index, item in enumerate(self.sub_items):
             if not any(
                 f.key in item.finding_keys and f.image_id == item.image_id for f in self.findings
             ):
-                raise ValueError("Sub-item must reference evidence in its photograph")
+                raise reference_error("vision_subitem_image", ("sub_items", index, "finding_keys"))
 
 
 class PriceProfile(Strict):

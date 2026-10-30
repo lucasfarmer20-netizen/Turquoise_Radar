@@ -7,6 +7,8 @@ import anthropic
 import httpx2
 from pydantic import ValidationError
 
+from radar.jewelry.validation import validation_diagnostics
+
 ERROR_TYPES = frozenset(
     {
         "invalid_request_error",
@@ -59,6 +61,7 @@ EXCEPTION_CLASSES = frozenset(
         "DeadlineExceededError",
         "RetryableError",
         "ValidationError",
+        "PydanticCustomError",
         "JSONDecodeError",
         "ValueError",
         "TypeError",
@@ -159,7 +162,7 @@ def classify_failure(error, *, stage="PROVIDER_EXECUTION", status=None, request_
     if isinstance(error, (anthropic.APIConnectionError, httpx2.TransportError)):
         stage = "TRANSPORT"
     name = type(error).__name__
-    return {
+    diagnostics = {
         "exception_class": name if name in EXCEPTION_CLASSES else "UnknownException",
         "http_status": status,
         "provider_error_type": provider_type,
@@ -167,16 +170,68 @@ def classify_failure(error, *, stage="PROVIDER_EXECUTION", status=None, request_
         "failure_stage": stage,
         "category": category,
     }
+    validation_error = error
+    if isinstance(error, anthropic.APIResponseValidationError) and isinstance(
+        error.__cause__, ValidationError
+    ):
+        validation_error = error.__cause__
+    details = validation_diagnostics(validation_error)
+    if details:
+        diagnostics["validation_errors"] = details
+    return diagnostics
+
+
+STOP_REASONS = frozenset(
+    {
+        "end_turn",
+        "max_tokens",
+        "stop_sequence",
+        "tool_use",
+        "pause_turn",
+        "refusal",
+        "model_context_window_exceeded",
+    }
+)
+
+
+def numeric_usage(raw):
+    """Usage is untrusted metadata, not permission to release a failed reservation."""
+    if not isinstance(raw, dict):
+        return {}
+    result = {}
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+    ):
+        value = raw.get(key)
+        if type(value) is int and 0 <= value <= 2**53 - 1:
+            result[key] = value
+    for key, fields in {
+        "cache_creation": ("ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens"),
+        "output_tokens_details": ("thinking_tokens",),
+        "server_tool_use": ("web_search_requests", "web_fetch_requests"),
+    }.items():
+        nested = raw.get(key)
+        if isinstance(nested, dict):
+            result[key] = {
+                name: nested[name]
+                for name in fields
+                if type(nested.get(name)) is int and 0 <= nested[name] <= 2**53 - 1
+            }
+    return result
 
 
 class FailureTrace:
-    """Hooks observe boundaries only: no request/response body or credential access."""
+    """Hooks retain only boundary metadata; successful envelopes are read in memory."""
 
     def __init__(self, secret):
         self.secret = secret
         self.stage = "LOCAL_CONFIGURATION"
         self.status = None
         self.request_id = None
+        self.response_metadata = {}
 
     async def request(self, request):
         # Handoff to transport is not proof of remote receipt or billing.
@@ -186,6 +241,27 @@ class FailureTrace:
         self.status = response.status_code
         self.request_id = safe_request_id(response.headers.get("request-id"), self.secret)
         self.stage = "RESPONSE_PARSING" if response.is_success else "HTTP_RESPONSE"
+        self.response_metadata = {
+            "http_status": self.status,
+            "request_id": self.request_id,
+            "usage": {},
+            "stop_reason": None,
+        }
+        if not response.is_success:
+            return
+        # HTTPX response hooks run before SDK post-parsers. Buffer through the public
+        # API so the SDK can read the SAME response afterwards, never another request.
+        # The body is inspected in memory only; no body/text/content is retained here.
+        await response.aread()
+        try:
+            envelope = response.json()
+        except (ValueError, UnicodeError):
+            return  # Let the SDK reject malformed JSON through its normal path.
+        if isinstance(envelope, dict):
+            self.response_metadata["usage"] = numeric_usage(envelope.get("usage"))
+            reason = envelope.get("stop_reason")
+            if isinstance(reason, str) and reason in STOP_REASONS:
+                self.response_metadata["stop_reason"] = reason
 
     def classify(self, error):
         return classify_failure(

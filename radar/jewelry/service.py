@@ -405,6 +405,7 @@ async def analyze(
                 "usage": response.usage,
                 "request_id": response.request_id,
                 "reported_model": response.reported_model,
+                "response_metadata": getattr(adapter, "response_metadata", {}),
             }
             run.status = "SUCCESS"
             run.active_key = None
@@ -446,6 +447,9 @@ async def analyze(
                 **run.data,
                 "error_code": diagnostics["category"],
                 "failure_diagnostics": diagnostics,
+                "response_metadata": getattr(adapter, "response_metadata", {}),
+                "usage": getattr(adapter, "response_metadata", {}).get("usage", {}),
+                "request_id": diagnostics["provider_request_id"],
             }
         if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
             raise
