@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import re
 import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -124,7 +125,16 @@ class EbayAdapter(SourceAdapter):
         if isinstance(value, str):
             for secret in secrets:
                 if secret:
-                    value = value.replace(secret, "[REDACTED]")
+                    if len(secret) < 8:
+                        # A tiny mock/opaque token is a secret as a standalone value,
+                        # not every occurrence of its letters in schema keys/words.
+                        value = re.sub(
+                            r"(?<![A-Za-z0-9])" + re.escape(secret) + r"(?![A-Za-z0-9])",
+                            "[REDACTED]",
+                            value,
+                        )
+                    else:
+                        value = value.replace(secret, "[REDACTED]")
         return value
 
     async def _request(self, method, path, **kwargs):
