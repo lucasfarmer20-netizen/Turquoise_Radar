@@ -49,14 +49,18 @@ Next: permitted actual format validation, especially Personal Shopper / HiBid da
 digests, and independently supported invoice allocations/auction economics. A full
 multi-lot optimizer remains deferred; no shipping discount is assumed.
 
-## 005 — Optional vision and alerts
+## 005 — Owner-operated jewelry vision (implemented)
 
-Use full-resolution individual images, evidence-backed observations, uncertainty
-and human review. Never infer tribal authenticity, mine origin or numeric weight
-from appearance. Paid calls, live spot provider, notifications and persistent
-monitoring require separate scope and explicit configuration.
+Private validated photos, deterministic synthetic provider, gated Anthropic Haiku
+screening and explicitly confirmed Sonnet investigation, strict evidence schema,
+visual research scores, mixed-lot leads, owner corrections, caching and atomic
+spending reservations. SQLite v5 preserves previous records. Live calls remain
+blocked until secure configuration, model/pricing verification and explicit owner
+authorization. No credits were consumed during implementation.
 
-## Deferred until separately requested
+## Later work
 
-Production scrapers, automated checkout, Telegram/Discord alerts, paid vision,
-24/7 monitoring, accounts, subscriptions and deployment infrastructure.
+Validate real authorized visual workflows and email digest templates; evaluate
+independently documented source access and later multi-lot auction economics.
+No automatic monitoring, buying, authentication, public deployment, paid background
+analysis or alerts are included in this task.

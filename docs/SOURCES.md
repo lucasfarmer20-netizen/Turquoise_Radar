@@ -1,3 +1,20 @@
+# Anthropic vision source status — Task 005
+
+Official Anthropic Python SDK 2.3.0 and Pillow 13.0.0 are pinned with lockfile
+hashes. The official tagged SDK source verifies AsyncAnthropic Messages parsing,
+Pydantic helper translation to output_config.format, Bearer authentication,
+recognized requested model identifiers and API-version defaults. SDK recognition
+is not account/model availability, credit balance or pricing verification.
+
+Official pricing/model/structured-output web pages were blocked by the current
+proxy. No current prices, quotas or account permissions are invented. Live vision
+is disabled by default and also requires dated owner-verified rate/context/access
+profiles and explicit requests. All provider tests use mocked transports; no API
+credits were consumed. See [official references and limits](VISION-SETUP.md).
+Owner-uploaded photographs only; no marketplace or email-image fetching is added.
+
+---
+
 # Source register — Task 004
 
 Local owner-provided alert, CSV/JSON and copied-text paths now operate independently

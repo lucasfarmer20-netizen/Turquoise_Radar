@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 
 from radar.db import DiscoveredItem, IntakeSource, database
-from radar.migrations import VERSION_1, VERSION_2, VERSION_3
+from radar.migrations import CURRENT_VERSION, VERSION_1, VERSION_2, VERSION_3
 
 
 def phase3(path):
@@ -165,11 +165,11 @@ def test_v4_preserves_all_populated_phase3_tables(tmp_path):
         assert not list(s.scalars(select(IntakeSource)))
     engine.dispose()
     with sqlite3.connect(path) as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert c.execute("PRAGMA user_version").fetchone()[0] == CURRENT_VERSION
         for t in before:
             names = ",".join(columns[t])
             assert c.execute(f"SELECT {names} FROM {t}").fetchall() == before[t]
-    assert Path(str(path) + ".pre-v4.bak").exists()
+    assert Path(str(path) + f".pre-v{CURRENT_VERSION}.bak").exists()
     engine, _ = database(f"sqlite:///{path}")
     engine.dispose()
 
