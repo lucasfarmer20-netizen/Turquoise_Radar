@@ -36,7 +36,36 @@ VERSION_2 = [
         id INTEGER PRIMARY KEY, listing_id INTEGER NOT NULL REFERENCES listings(id),
         before_data JSON NOT NULL, after_data JSON NOT NULL, created_at DATETIME NOT NULL)""",
 ]
-CURRENT_VERSION = 2
+VERSION_3 = [
+    "CREATE TABLE discovery_groups (id VARCHAR PRIMARY KEY, data JSON NOT NULL)",
+    """CREATE TABLE discovery_runs (
+        id INTEGER PRIMARY KEY, mode VARCHAR NOT NULL, status VARCHAR NOT NULL,
+        options JSON NOT NULL, started_at DATETIME NOT NULL, completed_at DATETIME,
+        new_count INTEGER NOT NULL, duplicate_count INTEGER NOT NULL,
+        invalid_count INTEGER NOT NULL, errors JSON NOT NULL)""",
+    """CREATE TABLE search_executions (
+        id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL REFERENCES discovery_runs(id),
+        source VARCHAR NOT NULL, mode VARCHAR NOT NULL, group_ids JSON NOT NULL,
+        pattern_id VARCHAR REFERENCES search_patterns(id), original_query VARCHAR NOT NULL,
+        transmitted_query VARCHAR NOT NULL, corrected_queries JSON NOT NULL,
+        correction_state VARCHAR NOT NULL, parameters JSON NOT NULL,
+        results_returned INTEGER NOT NULL, unique_listings INTEGER NOT NULL,
+        new_count INTEGER NOT NULL, duplicate_count INTEGER NOT NULL, errors JSON NOT NULL,
+        status VARCHAR NOT NULL, executed_at DATETIME NOT NULL)""",
+    """CREATE TABLE discovered_items (
+        id INTEGER PRIMARY KEY, identity VARCHAR NOT NULL UNIQUE, source VARCHAR NOT NULL,
+        ebay_item_id VARCHAR NOT NULL, normalized JSON NOT NULL, original_data JSON NOT NULL,
+        listing_id INTEGER REFERENCES listings(id), first_seen DATETIME NOT NULL,
+        last_seen DATETIME NOT NULL)""",
+    """CREATE TABLE discovery_observations (
+        id INTEGER PRIMARY KEY, execution_id INTEGER NOT NULL REFERENCES search_executions(id),
+        item_id INTEGER NOT NULL REFERENCES discovered_items(id), raw_data JSON NOT NULL,
+        corrected_query VARCHAR, correction_state VARCHAR NOT NULL,
+        observed_at DATETIME NOT NULL)""",
+    "CREATE INDEX ix_discovery_obs_item ON discovery_observations(item_id)",
+    "CREATE INDEX ix_search_execution_run ON search_executions(run_id)",
+]
+CURRENT_VERSION = 3
 
 
 def migrate(engine):
@@ -63,6 +92,9 @@ def migrate(engine):
                     conn.exec_driver_sql(statement)
             if version < 2:
                 for statement in VERSION_2:
+                    conn.exec_driver_sql(statement)
+            if version < 3:
+                for statement in VERSION_3:
                     conn.exec_driver_sql(statement)
             conn.exec_driver_sql(f"PRAGMA user_version={CURRENT_VERSION}")
             conn.commit()

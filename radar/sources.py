@@ -1,4 +1,4 @@
-"""Only manual and local fixture acquisition is implemented."""
+"""Shared source contracts and local ingestion. Official eBay adapter is in radar.discovery."""
 
 import csv
 import hashlib

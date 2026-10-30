@@ -24,13 +24,17 @@
   policy. Required documentation domains are saved in the draft; verify current
   authorization, rates and quota terms after access is applied.
 
-## 003 — One authorized ingestion source
+## 003 — eBay discovery engine (implemented; API access validation pending)
 
-First candidate: the official eBay Browse API, conditional on current Buy API
-production eligibility and application approval. Implement one approved adapter. Verify scope, current
-terms, effective query behavior and exact-match capability. Enforce independent
-schedule, rate limit, bounded retry and disable controls. No CAPTCHA evasion,
-proxy rotation, session theft or anti-bot bypass. Keep integration tests offline.
+Official Browse/OAuth adapter, safe fixture default, explicit sandbox/production
+gates, curated query groups, bounded manual runs, correction experiments, page /
+result budgets, retry handling, independent query histories and deduplication.
+Discovery UI hands selected items to Phase 002 review without fabricated shipping,
+resale or authentication claims. SQLite v3 preserves all older tables and records.
+
+Next: verify current official documentation, sandbox keyset/permission and account
+quotas; run one authorized small sandbox test. Production remains disabled until
+final approval and explicit owner authorization. No recurring monitoring is added.
 
 ## 004 — Seller/auction optimization
 
