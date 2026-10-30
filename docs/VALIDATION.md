@@ -439,3 +439,44 @@ six owner workflow pages responded with expected content.
   deployment, additional Anthropic call, credential change, retry or Task 006 work.
 - See [diagnosis and evidence limits](HAIKU-FAILURE-DIAGNOSIS.md). No definite root
   cause or billing match is established; end-to-end confirmation remains untested.
+
+## Task 005 real-photo structured-validation repair — October 30, 2026
+
+- Based on merged PR #6 (`8dceffb3beec051e9dcc8143df19c93f419c6951`). Baseline:
+  342 tests. Complete repaired suite: **425 passed**, including 83 new synthetic
+  regressions. Ruff, formatting and whitespace checks pass; only the existing
+  Starlette/AnyIO deprecation warning remains.
+- Reproduced cautious-wording false positives, partial-mark punctuation mismatch,
+  prompt/enum conflict and insufficient filtering of generic maker-support marks.
+  Narrow repairs preserve strict evidence, reference, field and length checks.
+  Prompt/schema versions advance to `jewelry-3` / `2` without rewriting old rows.
+- Validation errors now retain bounded, allowlisted paths/types and fixed rule
+  identifiers, never model text. Successful HTTP envelopes are inspected in memory
+  before parsing to capture only safe numeric usage, stop reason and request
+  metadata. Mocked HTTP-200 failures remain rejected with the full reservation held.
+- Desktop fixture workflows and nine Android-sized routes passed with no errors
+  or external browser requests. All browser mutations used a new temporary database
+  and synthetic photos on a loopback-only, paid-disabled server.
+- All 26 original tables and hashes of 14 private evidence/image files match the
+  pre-repair snapshot. Four historical runs remain; both failed $0.505120 holds,
+  original authorization histories and photographs are untouched. Budget $5/month,
+  daily limit 10, Sonnet restrictions and fixture/live-disabled defaults remain.
+- No Anthropic request, billing reconciliation, paid retry, authorization reset,
+  new pilot preparation, public deployment or Task 006 work occurred. The historical
+  rejected field and exact root cause remain unknown because those details were
+  not retained. See [repair and evidence limits](VISION-VALIDATION-REPAIR.md).
+
+### PR #7 final response-buffer safety check — October 30, 2026
+
+- Found that response buffering had no size cap. Added a 2 MiB decoded-body limit
+  for successful and error responses, with streamed counting independent of length
+  headers, early rejection of advertised oversize and immediate stream closure.
+  The SDK's fixed local size failure is classified as `RESPONSE_TOO_LARGE`, not a
+  transport failure. No retry or reservation release follows this failure.
+- **441 tests pass**, including 16 additional buffer regressions: exact boundary,
+  overflow, prebuffered bodies, absent/invalid/lying length headers, gzip expansion,
+  error responses, SDK wrapping and retained spending controls. Ruff, formatting
+  and whitespace checks pass; the existing Starlette/AnyIO warning remains.
+- Original database rows and private-file hashes still match the preservation
+  snapshot. No Anthropic API request, jewelry retry, billing modification or new
+  development phase was performed. No merge was performed.

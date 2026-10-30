@@ -129,11 +129,28 @@ with an outer bounded request lifetime. SDK retries and redirects are disabled.
 SDK content telemetry is explicitly disabled; SDK/HTTP debug payload logging is
 suppressed. Provider errors use fixed categories and a six-field allowlisted
 `failure_diagnostics` record: exception class, HTTP status, provider error type,
-request ID, failure stage and category. No response bodies, exception messages,
-headers, credentials or image bytes enter diagnostics. Request/response hooks
-observe transport handoff and response headers without reading bodies. A response
-status alone does not identify Anthropic versus the proxy. See
-[diagnosis details and limitations](HAIKU-FAILURE-DIAGNOSIS.md).
+request ID, failure stage and category. Validation failures additionally retain up
+to 32 allowlisted field paths, validation types, fixed rule IDs and rule categories.
+Unknown names/types become fixed placeholders. Inputs, contexts, URLs and raw
+messages are excluded; no model-generated text enters these diagnostics.
+
+Before SDK output parsing, the HTTP response hook buffers at most **2 MiB of decoded
+response bytes**, including error responses. It checks actual streamed bytes even
+when Content-Length is missing, invalid or misleading; an advertised oversize is
+rejected before reading. Compressed responses are limited after decoding. Oversize
+closes the stream and produces `RESPONSE_TOO_LARGE`, with no retry or release of
+the reservation. This caps response buffering, not total process memory; decoding
+chunks, bounded copies and JSON objects have additional overhead.
+
+For successful responses, the hook extracts only bounded numeric token counters, an allowlisted
+stop reason, HTTP status and sanitized request ID. The SDK then parses that same
+response normally: there is no second request and no validation bypass. No response
+body, content, stop sequence, arbitrary headers, credentials or image bytes are
+saved in diagnostics. If the envelope cannot be decoded, usage remains unknown.
+Failures keep their full reservation even when usage counters are available.
+A response status alone does not identify Anthropic versus the proxy. See
+[diagnosis details and limitations](HAIKU-FAILURE-DIAGNOSIS.md) and the
+[structured-validation repair](VISION-VALIDATION-REPAIR.md).
 
 SDK 2.3.0 uses `Authorization: Bearer <API key>` internally and defaults to API
 version `2026-10-21`; this was checked in the pinned official source and mocked wire

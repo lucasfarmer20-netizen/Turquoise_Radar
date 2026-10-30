@@ -1651,13 +1651,18 @@ def test_service_post_validation_keeps_response_metadata_and_reservation(client)
     )
     with client.app.state.sessions() as s:
         r = s.scalar(select(VisionRun))
-        assert r.data["failure_diagnostics"] == {
+        diagnostic = r.data["failure_diagnostics"]
+        assert {k: v for k, v in diagnostic.items() if k != "validation_errors"} == {
             "category": "INVALID_RESULT",
             "exception_class": "ValidationError",
             "http_status": 200,
             "provider_error_type": None,
             "provider_request_id": "req_SYNTHETIC123",
             "failure_stage": "POST_RESPONSE_VALIDATION",
+        }
+        assert {e["rule_id"] for e in diagnostic["validation_errors"]} == {
+            "REQUIRED_FIELD",
+            "STRICT_FIELDS",
         }
         assert r.cost_status == "HELD_UNKNOWN" and r.accounted_usd == r.reserved_usd
         assert "PRIVATE_SELLER" not in json.dumps(r.data)
