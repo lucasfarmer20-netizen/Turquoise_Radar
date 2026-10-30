@@ -1,0 +1,197 @@
+"""Allowlisted failure metadata only; never stringify SDK errors or retain bodies."""
+
+import asyncio
+import re
+
+import anthropic
+import httpx2
+from pydantic import ValidationError
+
+ERROR_TYPES = frozenset(
+    {
+        "invalid_request_error",
+        "authentication_error",
+        "permission_error",
+        "not_found_error",
+        "rate_limit_error",
+        "timeout_error",
+        "overloaded_error",
+        "api_error",
+        "billing_error",
+        "spend_limit_error",
+        "credit_balance_error",
+    }
+)
+STAGES = frozenset(
+    {
+        "LOCAL_CONFIGURATION",
+        "REQUEST_PREPARATION",
+        "TRANSPORT",
+        "HTTP_RESPONSE",
+        "RESPONSE_PARSING",
+        "POST_RESPONSE_VALIDATION",
+        "RESULT_PERSISTENCE",
+        "CLIENT_CLEANUP",
+        "PROVIDER_EXECUTION",
+    }
+)
+EXCEPTION_CLASSES = frozenset(
+    {
+        "AnthropicError",
+        "APIError",
+        "APIStatusError",
+        "APIResponseValidationError",
+        "APIConnectionError",
+        "APITimeoutError",
+        "CredentialsError",
+        "IdentityTokenFileError",
+        "BadRequestError",
+        "AuthenticationError",
+        "PermissionDeniedError",
+        "NotFoundError",
+        "ConflictError",
+        "RequestTooLargeError",
+        "UnprocessableEntityError",
+        "RateLimitError",
+        "InternalServerError",
+        "ServiceUnavailableError",
+        "OverloadedError",
+        "DeadlineExceededError",
+        "RetryableError",
+        "ValidationError",
+        "JSONDecodeError",
+        "ValueError",
+        "TypeError",
+        "AttributeError",
+        "RuntimeError",
+        "ImportError",
+        "ModuleNotFoundError",
+        "OSError",
+        "TimeoutError",
+        "CancelledError",
+        "KeyboardInterrupt",
+        "SystemExit",
+        "ConnectError",
+        "ReadError",
+        "WriteError",
+        "ProxyError",
+        "RemoteProtocolError",
+        "LocalProtocolError",
+        "ConnectTimeout",
+        "ReadTimeout",
+        "WriteTimeout",
+        "PoolTimeout",
+        "UnsupportedProtocol",
+    }
+)
+
+
+def safe_request_id(value, secret=""):
+    if (
+        isinstance(value, str)
+        and re.fullmatch(r"req_[A-Za-z0-9_-]{1,120}", value)
+        and not (secret and secret in value)
+    ):
+        return value
+    return None
+
+
+def classify_failure(error, *, stage="PROVIDER_EXECUTION", status=None, request_id=None, secret=""):
+    """HTTP status identifies a response, not whether Anthropic or a proxy generated it.
+
+    Unknown provider types and request IDs are discarded. Billing classification requires
+    status 402 or a typed billing/spend signal, never guesses from arbitrary message text.
+    """
+    stage = stage if stage in STAGES else "PROVIDER_EXECUTION"
+    provider_type = None
+    if isinstance(error, (anthropic.APIStatusError, anthropic.APIResponseValidationError)):
+        status = error.status_code
+        request_id = error.response.headers.get("request-id")
+        candidate = getattr(error, "type", None)
+        provider_type = (
+            candidate if isinstance(candidate, str) and candidate in ERROR_TYPES else None
+        )
+        stage = (
+            "RESPONSE_PARSING"
+            if isinstance(error, anthropic.APIResponseValidationError)
+            else "HTTP_RESPONSE"
+        )
+    if type(status) is not int or not 100 <= status <= 599:
+        status = None
+    if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
+        category = "INTERRUPTED"
+    elif isinstance(error, (anthropic.APITimeoutError, httpx2.TimeoutException, TimeoutError)) or (
+        status in {408, 504}
+    ):
+        category = "TIMEOUT"
+    elif isinstance(error, anthropic.AuthenticationError) or status == 401:
+        category = "AUTHENTICATION_ERROR"
+    elif isinstance(error, anthropic.PermissionDeniedError) or status == 403:
+        category = "PERMISSION_ERROR"
+    elif status == 402 or provider_type in {
+        "billing_error",
+        "spend_limit_error",
+        "credit_balance_error",
+    }:
+        category = "BILLING_OR_SPEND_LIMIT"
+    elif isinstance(error, anthropic.RateLimitError) or status == 429:
+        category = "RATE_LIMIT"
+    elif isinstance(error, anthropic.BadRequestError) or status in {400, 413, 422}:
+        category = "INVALID_REQUEST"
+    elif isinstance(error, (anthropic.APIConnectionError, httpx2.TransportError)):
+        category = "TRANSPORT_FAILURE"
+    elif isinstance(error, (anthropic.APIResponseValidationError, ValidationError)) or (
+        isinstance(error, (ValueError, TypeError, AttributeError))
+        and stage in {"RESPONSE_PARSING", "POST_RESPONSE_VALIDATION"}
+    ):
+        category = "INVALID_RESULT"
+    elif (
+        stage == "LOCAL_CONFIGURATION"
+        or isinstance(error, anthropic.CredentialsError)
+        or (
+            isinstance(error, (TypeError, ValueError, ImportError))
+            and stage == "REQUEST_PREPARATION"
+        )
+    ):
+        category = "LOCAL_CONFIGURATION_ERROR"
+    else:
+        category = "PROVIDER_FAILURE"
+    if isinstance(error, (anthropic.APIConnectionError, httpx2.TransportError)):
+        stage = "TRANSPORT"
+    name = type(error).__name__
+    return {
+        "exception_class": name if name in EXCEPTION_CLASSES else "UnknownException",
+        "http_status": status,
+        "provider_error_type": provider_type,
+        "provider_request_id": safe_request_id(request_id, secret),
+        "failure_stage": stage,
+        "category": category,
+    }
+
+
+class FailureTrace:
+    """Hooks observe boundaries only: no request/response body or credential access."""
+
+    def __init__(self, secret):
+        self.secret = secret
+        self.stage = "LOCAL_CONFIGURATION"
+        self.status = None
+        self.request_id = None
+
+    async def request(self, request):
+        # Handoff to transport is not proof of remote receipt or billing.
+        self.stage = "TRANSPORT"
+
+    async def response(self, response):
+        self.status = response.status_code
+        self.request_id = safe_request_id(response.headers.get("request-id"), self.secret)
+        self.stage = "RESPONSE_PARSING" if response.is_success else "HTTP_RESPONSE"
+
+    def classify(self, error):
+        return classify_failure(
+            error,
+            stage=self.stage,
+            status=self.status,
+            request_id=self.request_id,
+            secret=self.secret,
+        )

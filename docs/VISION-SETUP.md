@@ -80,8 +80,9 @@ For later, separately authorized live use:
    `VISION_LIVE_ENABLED=true`. Restart the private app to pick up environment changes.
    A key by itself never enables a request.
 3. Authorize HTTPS access to **api.anthropic.com** through the managed environment's
-   supported network settings, preserving other destinations. The current instance
-   does not allow it. This task did not authorize a paid test or add that grant.
+   supported network settings, preserving other destinations. The 2026-10-30
+   verification confirmed permitted Models API access in the current instance;
+   public pricing documentation remains blocked. No paid test was authorized.
 4. Open **Vision settings & spending** and append a dated price/access profile for
    each desired model after checking official documentation and account conditions.
    No actual rates are prefilled or invented. A profile requires an official source
@@ -99,6 +100,14 @@ button that might accidentally consume credits.
 
 ## Current SDK and structured outputs
 
+For the separately requested first pilot, see [HAIKU-PILOT.md](HAIKU-PILOT.md).
+`VISION_PILOT_ONE_SHOT=true` is an opt-in exception for one explicitly confirmed
+Haiku QUICK attempt while provider stays fixture and general live stays false.
+It is off by default. The first reserved Anthropic run consumes the allowance
+across all cases/dates, including failures; Sonnet and subsequent attempts are
+blocked. Ordinary live mode continues to require the original configuration gates.
+The pilot does not enable calls on upload, page view or configuration alone.
+
 Dependencies are pinned with hashes in `uv.lock`: official `anthropic==2.3.0` and
 `pillow==13.0.0`. The existing `uv sync --frozen` installation handles them; no new
 service, installer, database system or cloud startup command is required.
@@ -112,12 +121,19 @@ including photo IDs, strict field sets and evidence restrictions, before saving.
 
 The endpoint is fixed to `https://api.anthropic.com/v1/messages`. Four photos remain
 up to four separate base64 `image/png` blocks, each paired with its photo ID/role;
-no composite image, remote URL source or marketplace fetch is used. Standard speed
-and `standard_only` service tier are requested. Explicit HTTP timeout is 45 seconds,
+no composite image, remote URL source or marketplace fetch is used. The optional
+`speed` parameter is omitted, preserving default standard inference; `standard_only`
+capacity is requested. The pinned SDK warns some models need a beta flag for any
+explicit speed value. No fast-mode beta is enabled. Explicit HTTP timeout is 45 seconds,
 with an outer bounded request lifetime. SDK retries and redirects are disabled.
 SDK content telemetry is explicitly disabled; SDK/HTTP debug payload logging is
-suppressed. Provider errors are stored/displayed as fixed codes, not response
-bodies, exception text, credentials or image bytes.
+suppressed. Provider errors use fixed categories and a six-field allowlisted
+`failure_diagnostics` record: exception class, HTTP status, provider error type,
+request ID, failure stage and category. No response bodies, exception messages,
+headers, credentials or image bytes enter diagnostics. Request/response hooks
+observe transport handoff and response headers without reading bodies. A response
+status alone does not identify Anthropic versus the proxy. See
+[diagnosis details and limitations](HAIKU-FAILURE-DIAGNOSIS.md).
 
 SDK 2.3.0 uses `Authorization: Bearer <API key>` internally and defaults to API
 version `2026-10-21`; this was checked in the pinned official source and mocked wire
@@ -219,6 +235,14 @@ the original case; no fake individual lots, costs or weights are generated.
 
 ## Official references and verification status
 
+The [2026-10-30 verification follow-up](ANTHROPIC-VERIFICATION.md) supersedes the
+original Task 005 access findings below. Complete pricing/cache/modifier terms are
+now recorded from owner-supplied official references dated 2026-10-30; this runtime
+did not independently access those documents. Both dated profiles are stored in the
+local default database. Haiku uses the higher tier across its full 1M input ceiling
+and is ready for a separately authorized pilot. Sonnet remains access-unverified by
+owner instruction while the original 401 cause is unresolved. Live mode stays off.
+
 Successfully read the pinned official SDK source and package metadata:
 
 - [Official SDK README](https://github.com/anthropics/anthropic-sdk-python/tree/v2.3.0)
@@ -234,10 +258,12 @@ Official pages attempted but blocked by the current environment proxy:
 - [Pricing](https://platform.claude.com/docs/en/about-claude/pricing)
 Additional unverified reference: [Vision documentation](https://platform.claude.com/docs/en/build-with-claude/vision).
 
-No actual price schedule, account quota, credit balance or model permission was
-verified. No live Anthropic request was made; all API tests use SDK mocks and spend
-no credits. Tests and demo artwork are generated synthetic examples, not customer
-photographs. New owner email/AI sample collection is not part of this task.
+During the original Task 005 implementation, no actual price schedule, account
+quota, credit balance or model permission was verified. Subsequent read-only Models
+checks and the owner's supplied references now support Haiku pilot readiness as
+described above. Account credit balance is not independently confirmed. All API
+tests use SDK mocks and spend no credits; no paid inference request has been made.
+Tests and demo artwork are generated synthetic examples, not customer photographs.
 
 ## Cloud environment impact
 

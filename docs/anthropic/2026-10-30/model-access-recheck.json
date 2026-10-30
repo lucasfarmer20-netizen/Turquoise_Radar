@@ -1,0 +1,196 @@
+[
+  {
+    "checked_at": "2026-10-30T17:38:53.082617+00:00",
+    "method": "GET",
+    "url": "https://api.anthropic.com/v1/models/claude-haiku-5-5",
+    "sdk": "anthropic==2.3.0",
+    "authentication_method": "SDK Bearer from configured ANTHROPIC_API_KEY binding",
+    "api_version": "2026-10-21",
+    "max_retries": 0,
+    "http_status": 200,
+    "anthropic_request_id_present": true,
+    "model": {
+      "id": "claude-haiku-5-5",
+      "display_name": "Claude Haiku 5.5",
+      "created_at": "2026-10-07T18:00:00Z",
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "capabilities": {
+        "batch": {
+          "supported": true
+        },
+        "citations": {
+          "supported": true
+        },
+        "code_execution": {
+          "supported": true
+        },
+        "context_management": {
+          "clear_thinking_20251015": {
+            "supported": true
+          },
+          "clear_tool_uses_20250919": {
+            "supported": true
+          },
+          "compact_20260112": {
+            "supported": true
+          },
+          "supported": true
+        },
+        "effort": {
+          "high": {
+            "supported": true
+          },
+          "low": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "supported": true,
+          "xhigh": {
+            "supported": true
+          }
+        },
+        "image_input": {
+          "supported": true
+        },
+        "pdf_input": {
+          "supported": true
+        },
+        "server_tools": {
+          "code_execution": {
+            "supported": true
+          },
+          "supported": true,
+          "web_search": {
+            "supported": true
+          }
+        },
+        "structured_outputs": {
+          "supported": true
+        },
+        "thinking": {
+          "supported": true,
+          "types": {
+            "adaptive": {
+              "supported": true
+            },
+            "between_tools": {
+              "supported": false
+            },
+            "disabled": {
+              "supported": true
+            },
+            "enabled": {
+              "supported": false
+            }
+          }
+        }
+      },
+      "lifecycle": "active",
+      "deprecated_at": null,
+      "retires_at": null
+    }
+  },
+  {
+    "checked_at": "2026-10-30T17:38:53.394342+00:00",
+    "method": "GET",
+    "url": "https://api.anthropic.com/v1/models/claude-sonnet-5-5",
+    "sdk": "anthropic==2.3.0",
+    "authentication_method": "SDK Bearer from configured ANTHROPIC_API_KEY binding",
+    "api_version": "2026-10-21",
+    "max_retries": 0,
+    "http_status": 200,
+    "anthropic_request_id_present": true,
+    "model": {
+      "id": "claude-sonnet-5-5",
+      "display_name": "Claude Sonnet 5.5",
+      "created_at": "2026-09-28T00:00:00Z",
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "capabilities": {
+        "batch": {
+          "supported": true
+        },
+        "citations": {
+          "supported": true
+        },
+        "code_execution": {
+          "supported": true
+        },
+        "context_management": {
+          "clear_thinking_20251015": {
+            "supported": true
+          },
+          "clear_tool_uses_20250919": {
+            "supported": true
+          },
+          "compact_20260112": {
+            "supported": true
+          },
+          "supported": true
+        },
+        "effort": {
+          "high": {
+            "supported": true
+          },
+          "low": {
+            "supported": true
+          },
+          "max": {
+            "supported": true
+          },
+          "medium": {
+            "supported": true
+          },
+          "supported": true,
+          "xhigh": {
+            "supported": true
+          }
+        },
+        "image_input": {
+          "supported": true
+        },
+        "pdf_input": {
+          "supported": true
+        },
+        "server_tools": {
+          "code_execution": {
+            "supported": true
+          },
+          "supported": true,
+          "web_search": {
+            "supported": true
+          }
+        },
+        "structured_outputs": {
+          "supported": true
+        },
+        "thinking": {
+          "supported": true,
+          "types": {
+            "adaptive": {
+              "supported": true
+            },
+            "between_tools": {
+              "supported": true
+            },
+            "disabled": {
+              "supported": false
+            },
+            "enabled": {
+              "supported": false
+            }
+          }
+        }
+      },
+      "lifecycle": "active",
+      "deprecated_at": null,
+      "retires_at": null
+    }
+  }
+]

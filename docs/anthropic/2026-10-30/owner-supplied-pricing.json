@@ -1,0 +1,78 @@
+{
+  "reference_date": "2026-10-30",
+  "provenance": "Owner-supplied official Anthropic references obtained by the owner through ChatGPT web research",
+  "independently_retrieved_by_this_runtime": false,
+  "sources": [
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+    "https://platform.claude.com/docs/en/models/sonnet-5-5/overview",
+    "https://platform.claude.com/docs/en/api/service-tiers"
+  ],
+  "currency": "USD",
+  "rate_unit": "per_1000000_tokens",
+  "models": {
+    "claude-haiku-5-5": {
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "tier_basis": "Total prompt input including cached tokens; above 100000, higher rates apply to the entire request",
+      "tiers": [
+        {
+          "min_input_tokens": 0,
+          "max_input_tokens": 100000,
+          "input": "0.10",
+          "output": "0.50",
+          "cache_write_5m": "0.125",
+          "cache_write_1h": "0.20",
+          "cache_read": "0.01"
+        },
+        {
+          "min_input_tokens": 100001,
+          "max_input_tokens": 1000000,
+          "input": "0.50",
+          "output": "2.50",
+          "cache_write_5m": "0.625",
+          "cache_write_1h": "1.00",
+          "cache_read": "0.05"
+        }
+      ]
+    },
+    "claude-sonnet-5-5": {
+      "max_input_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "tiers": [
+        {
+          "min_input_tokens": 0,
+          "max_input_tokens": 1000000,
+          "input": "2.00",
+          "output": "10.00",
+          "cache_write_5m": "2.50",
+          "cache_write_1h": "4.00",
+          "cache_read": "0.10"
+        }
+      ]
+    }
+  },
+  "modifiers": {
+    "global": {
+      "default": true,
+      "multiplier": "1.0"
+    },
+    "us_only": {
+      "inference_geo": "us",
+      "multiplier": "1.1",
+      "applies_to": [
+        "input",
+        "output",
+        "cache_write_5m",
+        "cache_write_1h",
+        "cache_read"
+      ]
+    },
+    "service_tier": "standard_only restricts requests to standard capacity",
+    "batch": {
+      "discount": "0.50",
+      "used_by_workflow": false
+    },
+    "fast_or_priority_used_by_workflow": false
+  }
+}

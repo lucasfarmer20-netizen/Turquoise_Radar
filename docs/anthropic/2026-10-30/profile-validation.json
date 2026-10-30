@@ -1,0 +1,197 @@
+{
+  "checked_on": "2026-10-30",
+  "network_requests": 0,
+  "database": "data/radar.db",
+  "inserted_profiles": [
+    "claude-haiku-5-5",
+    "claude-sonnet-5-5"
+  ],
+  "provider": "fixture",
+  "live_enabled": false,
+  "monthly_budget_usd": "5.00",
+  "monthly_accounted_usd": "0",
+  "remaining_usd": "5.00",
+  "daily_limit": 10,
+  "daily_used": 0,
+  "quick_blockers": [
+    "Paid vision is disabled; select fixture or explicitly configure live mode"
+  ],
+  "deep_blockers": [
+    "Paid vision is disabled; select fixture or explicitly configure live mode",
+    "Current model access/pricing/context ceiling needs dated owner verification"
+  ],
+  "counts_before": {
+    "listings": 0,
+    "photos": 0,
+    "runs": 0
+  },
+  "counts_after": {
+    "listings": 0,
+    "photos": 0,
+    "runs": 0
+  },
+  "haiku_ready_for_future_explicitly_authorized_pilot": true,
+  "sonnet_access_verified": false,
+  "results": [
+    {
+      "profile": "claude-haiku-5-5",
+      "schema": "valid",
+      "reservation_usd": "0.505120",
+      "cases": [
+        {
+          "total_prompt_tokens": 100000,
+          "ordinary": 100000,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.055120",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100001,
+          "ordinary": 100001,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.055121",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100000,
+          "ordinary": 40000,
+          "cache_read": 60000,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.028120",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100001,
+          "ordinary": 40001,
+          "cache_read": 60000,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.028121",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100000,
+          "ordinary": 50000,
+          "cache_read": 0,
+          "cache_write_5m": 50000,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.061370",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100001,
+          "ordinary": 50001,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 50000,
+          "estimate_usd": "0.080121",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 1000000,
+          "ordinary": 0,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 1000000,
+          "estimate_usd": "1.005120",
+          "within_current_uncached_reservation": false
+        },
+        {
+          "total_prompt_tokens": 1000000,
+          "ordinary": 1000000,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.505120",
+          "within_current_uncached_reservation": true
+        }
+      ],
+      "unsupported_modifiers": "held unknown"
+    },
+    {
+      "profile": "claude-sonnet-5-5",
+      "schema": "valid",
+      "reservation_usd": "2.020480",
+      "cases": [
+        {
+          "total_prompt_tokens": 100000,
+          "ordinary": 100000,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.220480",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100001,
+          "ordinary": 100001,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.220482",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100000,
+          "ordinary": 40000,
+          "cache_read": 60000,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.106480",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100001,
+          "ordinary": 40001,
+          "cache_read": 60000,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.106482",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100000,
+          "ordinary": 50000,
+          "cache_read": 0,
+          "cache_write_5m": 50000,
+          "cache_write_1h": 0,
+          "estimate_usd": "0.245480",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 100001,
+          "ordinary": 50001,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 50000,
+          "estimate_usd": "0.320482",
+          "within_current_uncached_reservation": true
+        },
+        {
+          "total_prompt_tokens": 1000000,
+          "ordinary": 0,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 1000000,
+          "estimate_usd": "4.020480",
+          "within_current_uncached_reservation": false
+        },
+        {
+          "total_prompt_tokens": 1000000,
+          "ordinary": 1000000,
+          "cache_read": 0,
+          "cache_write_5m": 0,
+          "cache_write_1h": 0,
+          "estimate_usd": "2.020480",
+          "within_current_uncached_reservation": true
+        }
+      ],
+      "unsupported_modifiers": "held unknown"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ from decimal import Decimal
 import httpx
 import httpx2
 import pytest
-from anthropic import APIStatusError, AsyncAnthropic
+from anthropic import AnthropicError, APIStatusError, AsyncAnthropic
 from PIL import Image
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -46,7 +46,13 @@ from radar.vision import (
 
 @pytest.fixture(autouse=True)
 def no_paid_or_image_network(monkeypatch):
-    for name in ["VISION_PROVIDER", "VISION_LIVE_ENABLED", "ANTHROPIC_API_KEY", "VISION_IMAGE_DIR"]:
+    for name in [
+        "VISION_PROVIDER",
+        "VISION_LIVE_ENABLED",
+        "VISION_PILOT_ONE_SHOT",
+        "ANTHROPIC_API_KEY",
+        "VISION_IMAGE_DIR",
+    ]:
         monkeypatch.delenv(name, raising=False)
 
     def reject(*args, **kwargs):
@@ -1198,3 +1204,559 @@ def test_reflected_credential_cannot_enter_a_run(client):
         run = s.get(VisionRun, 1)
         assert run.status == "FAILED"
         assert cfg.api_key.get_secret_value() not in json.dumps(run.data)
+
+
+def pilot_test_config(client, **changes):
+    base = live_test_config(client)
+    cfg = VisionConfig.model_validate(
+        {
+            **base.model_dump(),
+            "provider": "fixture",
+            "live_enabled": False,
+            "pilot_one_shot": True,
+            **changes,
+        }
+    )
+    client.app.state.vision_config_factory = lambda: cfg
+    return cfg
+
+
+def test_pilot_env_is_opt_in_and_does_not_enable_general_live(monkeypatch):
+    assert not VisionConfig.from_env().pilot_one_shot
+    monkeypatch.setenv("VISION_PILOT_ONE_SHOT", "true")
+    cfg = VisionConfig.from_env()
+    assert cfg.pilot_one_shot and cfg.provider == "fixture" and not cfg.live_enabled
+    assert cfg.daily_limit == 10 and cfg.monthly_budget == Decimal("5.00")
+
+
+def test_pilot_preview_requires_explicit_model_budget_and_photo_confirmation(client):
+    cfg = pilot_test_config(client)
+    case = new_case(client)
+    photos = upload(client, case)
+    fake = FakeProvider()
+    client.app.state.vision_provider_factory = lambda p, c: fake
+    page = client.get(f"/vision/cases/{case}")
+    assert "Authorize ONE Haiku analysis" in page.text
+    assert "I authorize exactly ONE Haiku request" in page.text
+    assert cfg.model in page.text and str(reserve_amount(synthetic_profile())) in page.text
+    for photo in photos:
+        assert f"photo {photo.id[:8]}" in page.text
+    fields = dict(provider="anthropic", approved_model=cfg.model, approved_amount="1")
+    assert submit(client, case, photos, **fields).status_code == 422
+    assert submit(client, case, [], paid_confirm="yes", **fields).status_code == 422
+    for replacement in [{"approved_model": cfg.deep_model}, {"approved_amount": "0.01"}]:
+        assert (
+            submit(
+                client, case, photos, paid_confirm="yes", **{**fields, **replacement}
+            ).status_code
+            == 422
+        )
+    assert fake.calls == 0
+    with client.app.state.sessions() as s:
+        assert s.scalar(select(VisionRun)) is None
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_pilot_consumed_on_success_or_failure_across_cases_reruns_and_days(client, failure):
+    cfg = pilot_test_config(client)
+    first = new_case(client)
+    one = upload(client, first)
+    second = new_case(client, "SYNTHETIC independent pilot piece")
+    two = upload(client, second)
+    fake = FakeProvider(error=TimeoutError("SYNTHETIC timeout") if failure else None)
+    client.app.state.vision_provider_factory = lambda p, c: fake
+    fields = dict(
+        provider="anthropic", paid_confirm="yes", approved_model=cfg.model, approved_amount="1"
+    )
+    assert submit(client, first, one, **fields).status_code == 200
+    assert fake.calls == 1
+    with client.app.state.sessions.begin() as s:
+        run = s.scalar(select(VisionRun))
+        assert run.data["authorization_scope"] == "single_haiku_pilot"
+        assert run.status == ("FAILED" if failure else "SUCCESS")
+        run.created_at = datetime.now(UTC) - timedelta(days=90)
+    # A fresh config object and a later UTC day/month must not re-arm the pilot.
+    client.app.state.vision_config_factory = lambda: VisionConfig.model_validate(cfg.model_dump())
+    for case, photos in [(first, one), (second, two)]:
+        assert (
+            submit(client, case, photos, force="yes", force_confirm="yes", **fields).status_code
+            == 422
+        )
+    assert fake.calls == 1
+    with client.app.state.sessions() as s:
+        assert len(list(s.scalars(select(VisionRun)))) == 1
+
+
+@pytest.mark.parametrize("identical", [False, True])
+def test_pilot_concurrent_requests_reserve_only_one_attempt(client, identical):
+    cfg = pilot_test_config(client)
+    first = new_case(client)
+    one = upload(client, first)
+    second = first if identical else new_case(client, "SYNTHETIC competing pilot")
+    two = one if identical else upload(client, second)
+    fake = FakeProvider()
+
+    async def check():
+        async def call(case, photos):
+            return await analyze(
+                client.app.state.sessions,
+                image_root(client.app.state.engine),
+                case,
+                [p.id for p in photos],
+                cfg,
+                provider="anthropic",
+                initiate=True,
+                paid_confirm=True,
+                approved_amount="1",
+                approved_model=cfg.model,
+                provider_factory=lambda p, c: fake,
+            )
+
+        results = await asyncio.gather(call(first, one), call(second, two), return_exceptions=True)
+        assert sum(isinstance(result, ValueError) for result in results) == (0 if identical else 1)
+        if identical:
+            assert results[0][0] == results[1][0]
+
+    asyncio.run(check())
+    assert fake.calls == 1
+    with client.app.state.sessions() as s:
+        assert len(list(s.scalars(select(VisionRun)))) == 1
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"daily_limit": 0},
+        {"monthly_budget": "0.01"},
+        {"api_key": ""},
+        {"model": "claude-sonnet-5-5"},
+        {"provider": "anthropic", "live_enabled": True},
+    ],
+)
+def test_pilot_preserves_budget_key_model_and_global_mode_gates(client, changes):
+    cfg = pilot_test_config(client, **changes)
+    case = new_case(client)
+    photos = upload(client, case)
+    fake = FakeProvider()
+    client.app.state.vision_provider_factory = lambda p, c: fake
+    assert (
+        submit(
+            client,
+            case,
+            photos,
+            provider="anthropic",
+            paid_confirm="yes",
+            approved_amount="1",
+            approved_model=cfg.model,
+        ).status_code
+        == 422
+    )
+    assert fake.calls == 0
+
+
+def test_pilot_blocks_sonnet_even_with_verified_sonnet_profile(client):
+    cfg = pilot_test_config(client)
+    case = new_case(client)
+    photos = upload(client, case)
+    fake = FakeProvider()
+    client.app.state.vision_provider_factory = lambda p, c: fake
+    assert (
+        submit(
+            client,
+            case,
+            photos,
+            provider="anthropic",
+            stage="DEEP",
+            paid_confirm="yes",
+            deep_confirm="yes",
+            approved_amount="1",
+            approved_model=cfg.deep_model,
+        ).status_code
+        == 422
+    )
+    assert fake.calls == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "provider_type", "category", "exception"),
+    [
+        (400, "invalid_request_error", "INVALID_REQUEST", "BadRequestError"),
+        (401, "authentication_error", "AUTHENTICATION_ERROR", "AuthenticationError"),
+        (403, "permission_error", "PERMISSION_ERROR", "PermissionDeniedError"),
+        (402, "billing_error", "BILLING_OR_SPEND_LIMIT", "APIStatusError"),
+        (400, "billing_error", "BILLING_OR_SPEND_LIMIT", "BadRequestError"),
+        (429, "spend_limit_error", "BILLING_OR_SPEND_LIMIT", "RateLimitError"),
+        (429, "rate_limit_error", "RATE_LIMIT", "RateLimitError"),
+        (413, "invalid_request_error", "INVALID_REQUEST", "RequestTooLargeError"),
+        (500, "api_error", "PROVIDER_FAILURE", "InternalServerError"),
+        (504, "timeout_error", "TIMEOUT", "InternalServerError"),
+        (529, "overloaded_error", "PROVIDER_FAILURE", "OverloadedError"),
+        (400, "unrecognized_PRIVATE_TEXT", "INVALID_REQUEST", "BadRequestError"),
+    ],
+)
+def test_failed_sdk_http_metadata_and_pilot_hold(
+    client, caplog, status, provider_type, category, exception
+):
+    cfg = pilot_test_config(client)
+    case = new_case(client)
+    photos = upload(client, case, count=1)
+    calls = []
+
+    async def handler(request):
+        calls.append(1)
+        body = json.loads(request.content)
+        assert body["model"] == "claude-haiku-5-5"
+        assert body["service_tier"] == "standard_only"
+        assert "speed" not in body and "tools" not in body
+        return httpx2.Response(
+            status,
+            headers={"request-id": "req_SYNTHETIC123"},
+            json={
+                "type": "error",
+                "error": {
+                    "type": provider_type,
+                    "message": "SYNTHETIC_TEST_KEY PRIVATE_SELLER PHOTO_BYTES",
+                },
+            },
+        )
+
+    sdk = AsyncAnthropic(
+        api_key="SYNTHETIC_TEST_KEY",
+        max_retries=0,
+        open_telemetry=False,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)),
+    )
+    adapter = AnthropicVisionProvider("SYNTHETIC_TEST_KEY", client=sdk)
+    client.app.state.vision_provider_factory = lambda *_: adapter
+    fields = dict(
+        provider="anthropic", paid_confirm="yes", approved_model=cfg.model, approved_amount="1"
+    )
+    assert submit(client, case, photos, **fields).status_code == 200
+    with client.app.state.sessions() as s:
+        run = s.scalar(select(VisionRun))
+        diagnostic = run.data["failure_diagnostics"]
+        assert diagnostic == {
+            "category": category,
+            "exception_class": exception,
+            "http_status": status,
+            "provider_error_type": None
+            if provider_type.startswith("unrecognized")
+            else provider_type,
+            "provider_request_id": "req_SYNTHETIC123",
+            "failure_stage": "HTTP_RESPONSE",
+        }
+        assert run.status == "FAILED" and run.data["error_code"] == category
+        assert run.cost_status == "HELD_UNKNOWN"
+        assert run.accounted_usd == run.reserved_usd
+        assert run.estimated_usd is None and run.confirmed_usd is None
+        assert run.data["usage"] == {} and run.data["result"] is None
+        saved = json.dumps(run.data)
+        assert all(x not in saved for x in ["SYNTHETIC_TEST_KEY", "PRIVATE_SELLER", "PHOTO_BYTES"])
+    assert (
+        submit(client, case, photos, force="yes", force_confirm="yes", **fields).status_code == 422
+    )
+    assert len(calls) == 1
+    assert all(
+        x not in caplog.text for x in ["SYNTHETIC_TEST_KEY", "PRIVATE_SELLER", "PHOTO_BYTES"]
+    )
+    assert sdk._client.event_hooks == {"request": [], "response": []}
+    asyncio.run(sdk.close())
+
+
+@pytest.mark.parametrize(
+    "failure,category,stage",
+    [
+        ("connect", "TRANSPORT_FAILURE", "TRANSPORT"),
+        ("proxy", "TRANSPORT_FAILURE", "TRANSPORT"),
+        ("timeout", "TIMEOUT", "TRANSPORT"),
+        ("html403", "PERMISSION_ERROR", "HTTP_RESPONSE"),
+        ("json", "INVALID_RESULT", "RESPONSE_PARSING"),
+        ("pydantic", "INVALID_RESULT", "RESPONSE_PARSING"),
+        ("envelope", "INVALID_RESULT", "RESPONSE_PARSING"),
+        ("wrong_photo", "INVALID_RESULT", "POST_RESPONSE_VALIDATION"),
+        ("truncated", "INVALID_RESULT", "POST_RESPONSE_VALIDATION"),
+    ],
+)
+def test_sdk_failure_boundaries_are_observed_not_guessed(failure, category, stage):
+    async def check():
+        images = [VisionImage("a" * 32, "FRONT", picture())]
+        expected = (
+            await FixtureVisionProvider().inspect(
+                images, {}, model="fixture", stage="QUICK", max_tokens=512
+            )
+        ).result.model_dump(mode="json")
+        if failure == "pydantic":
+            expected["material_verification"] = "PRIVATE_SELLER"
+        if failure == "wrong_photo":
+            expected["findings"][0]["image_id"] = "b" * 32
+        calls = []
+
+        async def handler(request):
+            calls.append(1)
+            if failure in {"connect", "proxy", "timeout"}:
+                cls = {
+                    "connect": httpx2.ConnectError,
+                    "proxy": httpx2.ProxyError,
+                    "timeout": httpx2.ReadTimeout,
+                }[failure]
+                raise cls("SYNTHETIC_TEST_KEY PRIVATE_SELLER", request=request)
+            if failure == "html403":
+                return httpx2.Response(403, text="<html>PRIVATE_SELLER</html>")
+            if failure == "envelope":
+                return httpx2.Response(
+                    200, headers={"request-id": "req_SYNTHETIC123"}, json={"content": 42}
+                )
+            return httpx2.Response(
+                200,
+                headers={"request-id": "req_SYNTHETIC123"},
+                json={
+                    "id": "msg_SYNTHETIC",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": "claude-haiku-5-5",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "PRIVATE_SELLER" if failure == "json" else json.dumps(expected),
+                        }
+                    ],
+                    "stop_reason": "max_tokens" if failure == "truncated" else "end_turn",
+                    "stop_sequence": None,
+                    "usage": {"input_tokens": 100, "output_tokens": 100},
+                },
+            )
+
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handler)) as http:
+            sdk = AsyncAnthropic(
+                api_key="SYNTHETIC_TEST_KEY",
+                http_client=http,
+                max_retries=0,
+                open_telemetry=False,
+                _strict_response_validation=True,
+            )
+            adapter = AnthropicVisionProvider("SYNTHETIC_TEST_KEY", client=sdk)
+            with pytest.raises((AnthropicError, ValueError)):
+                await adapter.inspect(
+                    images, {}, model="claude-haiku-5-5", stage="QUICK", max_tokens=512
+                )
+            diagnostic = adapter.failure_diagnostics
+            assert diagnostic["category"] == category
+            assert diagnostic["failure_stage"] == stage
+            if failure in {"connect", "proxy", "timeout"}:
+                assert diagnostic["http_status"] is None
+                assert diagnostic["provider_request_id"] is None
+            elif failure == "html403":
+                assert diagnostic["http_status"] == 403
+                assert diagnostic["provider_request_id"] is None
+                assert diagnostic["provider_error_type"] is None
+            else:
+                assert diagnostic["http_status"] == 200
+                assert diagnostic["provider_request_id"] == "req_SYNTHETIC123"
+            assert "PRIVATE_SELLER" not in json.dumps(diagnostic)
+            assert "SYNTHETIC_TEST_KEY" not in json.dumps(diagnostic)
+        assert calls == [1]
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("failure", ["constructor", "schema"])
+def test_local_configuration_and_schema_failures_precede_transport(monkeypatch, failure):
+    import anthropic
+    from pydantic import TypeAdapter
+
+    def reject(*args, **kwargs):
+        raise TypeError("SYNTHETIC_TEST_KEY PRIVATE_SELLER")
+
+    async def check():
+        calls = []
+
+        async def handler(request):
+            calls.append(1)
+            raise AssertionError("Transport must not be reached")
+
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handler)) as http:
+            sdk = AsyncAnthropic(
+                api_key="SYNTHETIC_TEST_KEY", http_client=http, max_retries=0, open_telemetry=False
+            )
+            adapter = AnthropicVisionProvider("SYNTHETIC_TEST_KEY", client=sdk)
+            if failure == "constructor":
+                monkeypatch.setattr(anthropic, "AsyncAnthropic", reject)
+                adapter = AnthropicVisionProvider("SYNTHETIC_TEST_KEY")
+            else:
+                monkeypatch.setattr(TypeAdapter, "json_schema", reject)
+            with pytest.raises(TypeError):
+                await adapter.inspect(
+                    [VisionImage("a" * 32, "FRONT", picture())],
+                    {},
+                    model="claude-haiku-5-5",
+                    stage="QUICK",
+                    max_tokens=512,
+                )
+            assert adapter.failure_diagnostics == {
+                "category": "LOCAL_CONFIGURATION_ERROR",
+                "exception_class": "TypeError",
+                "http_status": None,
+                "provider_error_type": None,
+                "provider_request_id": None,
+                "failure_stage": "LOCAL_CONFIGURATION"
+                if failure == "constructor"
+                else "REQUEST_PREPARATION",
+            }
+        assert calls == []
+
+    asyncio.run(check())
+
+
+def test_diagnostics_discard_untrusted_type_id_and_exception_names():
+    from radar.jewelry.errors import classify_failure
+
+    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    response = httpx2.Response(
+        400, request=request, headers={"request-id": "req_SYNTHETIC_TEST_KEY"}
+    )
+    error = APIStatusError(
+        "PRIVATE_SELLER", response=response, body={"error": {"type": "SYNTHETIC_TEST_KEY"}}
+    )
+    diagnostic = classify_failure(error, secret="SYNTHETIC_TEST_KEY")
+    assert diagnostic["provider_request_id"] is None
+    assert diagnostic["provider_error_type"] is None
+    assert "SYNTHETIC_TEST_KEY" not in json.dumps(diagnostic)
+    strange = type("PRIVATE_SELLER", (Exception,), {})("PHOTO_BYTES")
+    assert classify_failure(strange)["exception_class"] == "UnknownException"
+
+
+def test_service_post_validation_keeps_response_metadata_and_reservation(client):
+    cfg = pilot_test_config(client)
+    case = new_case(client)
+    photos = upload(client, case, count=1)
+
+    class InvalidProvider:
+        async def inspect(self, *args, **kwargs):
+            return ProviderResponse(
+                {"PRIVATE_SELLER": True}, {}, "req_SYNTHETIC123", "claude-haiku-5-5", 200
+            )
+
+    client.app.state.vision_provider_factory = lambda *_: InvalidProvider()
+    assert (
+        submit(
+            client,
+            case,
+            photos,
+            provider="anthropic",
+            paid_confirm="yes",
+            approved_model=cfg.model,
+            approved_amount="1",
+        ).status_code
+        == 200
+    )
+    with client.app.state.sessions() as s:
+        r = s.scalar(select(VisionRun))
+        assert r.data["failure_diagnostics"] == {
+            "category": "INVALID_RESULT",
+            "exception_class": "ValidationError",
+            "http_status": 200,
+            "provider_error_type": None,
+            "provider_request_id": "req_SYNTHETIC123",
+            "failure_stage": "POST_RESPONSE_VALIDATION",
+        }
+        assert r.cost_status == "HELD_UNKNOWN" and r.accounted_usd == r.reserved_usd
+        assert "PRIVATE_SELLER" not in json.dumps(r.data)
+
+
+@pytest.mark.parametrize("failure", ["deadline", "cleanup", "credentials"])
+def test_diagnostic_cleanup_cancellation_and_credentials_do_not_erase_failure(failure, monkeypatch):
+    from types import SimpleNamespace
+
+    import anthropic
+
+    images = [VisionImage("a" * 32, "FRONT", picture())]
+
+    class MockSDK:
+        def __init__(self, **kwargs):
+            self.http = kwargs["http_client"]
+            self.messages = self
+            if failure == "credentials":
+                raise anthropic.CredentialsError("SYNTHETIC_TEST_KEY")
+
+        async def parse(self, **kwargs):
+            if failure == "deadline":
+                await asyncio.Event().wait()
+            result = await FixtureVisionProvider().inspect(
+                images, {}, model="fixture", stage="QUICK", max_tokens=512
+            )
+            return SimpleNamespace(
+                stop_reason="end_turn",
+                parsed_output=result.result,
+                usage=SimpleNamespace(model_dump=lambda **_: {}),
+            )
+
+        async def close(self):
+            await self.http.aclose()
+            raise RuntimeError("SYNTHETIC_TEST_KEY PRIVATE_SELLER")
+
+    monkeypatch.setattr(anthropic, "AsyncAnthropic", MockSDK)
+
+    async def check():
+        adapter = AnthropicVisionProvider("SYNTHETIC_TEST_KEY")
+        with pytest.raises((TimeoutError, RuntimeError, anthropic.CredentialsError)):
+            async with asyncio.timeout(0.05 if failure == "deadline" else 5):
+                await adapter.inspect(
+                    images, {}, model="claude-haiku-5-5", stage="QUICK", max_tokens=512
+                )
+        diagnostic = adapter.failure_diagnostics
+        assert (
+            diagnostic["failure_stage"]
+            == {
+                "deadline": "REQUEST_PREPARATION",
+                "cleanup": "CLIENT_CLEANUP",
+                "credentials": "LOCAL_CONFIGURATION",
+            }[failure]
+        )
+        assert (
+            diagnostic["category"]
+            == {
+                "deadline": "INTERRUPTED",
+                "cleanup": "PROVIDER_FAILURE",
+                "credentials": "LOCAL_CONFIGURATION_ERROR",
+            }[failure]
+        )
+        assert "SYNTHETIC_TEST_KEY" not in json.dumps(diagnostic)
+
+    asyncio.run(check())
+
+
+def test_service_outer_deadline_records_timeout_not_interruption(client, monkeypatch):
+    from radar.jewelry.errors import classify_failure
+
+    cfg = pilot_test_config(client)
+    case = new_case(client)
+    photos = upload(client, case, count=1)
+    real_timeout = asyncio.timeout
+    monkeypatch.setattr("radar.jewelry.service.asyncio.timeout", lambda _: real_timeout(0.01))
+
+    class WaitingProvider:
+        failure_diagnostics = None
+
+        async def inspect(self, *args, **kwargs):
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError as error:
+                self.failure_diagnostics = classify_failure(error, stage="TRANSPORT")
+                raise
+
+    client.app.state.vision_provider_factory = lambda *_: WaitingProvider()
+    submit(
+        client,
+        case,
+        photos,
+        provider="anthropic",
+        paid_confirm="yes",
+        approved_model=cfg.model,
+        approved_amount="1",
+    )
+    with client.app.state.sessions() as s:
+        r = s.scalar(select(VisionRun))
+        assert r.data["error_code"] == "TIMEOUT"
+        assert r.data["failure_diagnostics"]["failure_stage"] == "TRANSPORT"
+        assert r.data["failure_diagnostics"]["exception_class"] == "TimeoutError"
+        assert r.cost_status == "HELD_UNKNOWN"

@@ -19,6 +19,7 @@ from radar.db import (
     VisionSubItem,
 )
 from radar.jewelry.budget import budget_state, profile_for, reserve_amount, usage_cost
+from radar.jewelry.errors import classify_failure
 from radar.jewelry.images import private_path, read_photo, write_photo
 from radar.jewelry.schemas import OWNER, PROMPT_VERSION, SCHEMA_VERSION, Correction, VisionResult
 from radar.jewelry.scoring import visual_score
@@ -187,7 +188,25 @@ def plan(session, config, stage, provider):
     reserve = reserve_amount(profile) if profile else Decimal(0)
     reasons = []
     if provider == "anthropic":
-        if config.provider != "anthropic" or not config.live_enabled:
+        if config.pilot_one_shot:
+            # The owner can authorize one Haiku attempt while general live mode stays off.
+            # analyze() checks this under BEGIN IMMEDIATE before reserving the run.
+            if config.provider != "fixture" or config.live_enabled:
+                reasons.append("One-request pilot requires fixture mode and general live disabled")
+            if stage != "QUICK" or model != "claude-haiku-5-5":
+                reasons.append(
+                    "One-request pilot permits only Haiku quick analysis; Sonnet is disabled"
+                )
+            used = session.scalar(
+                select(VisionRun.id)
+                .where(VisionRun.owner_id == OWNER, VisionRun.provider == "anthropic")
+                .limit(1)
+            )
+            if used is not None:
+                reasons.append(
+                    "One-request pilot already consumed; no further paid attempts allowed"
+                )
+        elif config.provider != "anthropic" or not config.live_enabled:
             reasons.append(
                 "Paid vision is disabled; select fixture or explicitly configure live mode"
             )
@@ -208,6 +227,7 @@ def plan(session, config, stage, provider):
         reservation=reserve,
         reasons=reasons,
         output_limit=profile.max_output_tokens if profile else 2048,
+        pilot_one_shot=config.pilot_one_shot,
     )
 
 
@@ -315,6 +335,11 @@ async def analyze(
             cost_status="HELD_UNKNOWN" if provider == "anthropic" else "NOT_APPLICABLE",
             data=dict(
                 prompt_version=PROMPT_VERSION,
+                authorization_scope=(
+                    "single_haiku_pilot"
+                    if provider == "anthropic" and config.pilot_one_shot
+                    else "standard_per_request"
+                ),
                 schema_version=SCHEMA_VERSION,
                 photo_ids=[p.id for p in photos],
                 image_hashes=[p.content_hash for p in photos],
@@ -334,6 +359,9 @@ async def analyze(
         run_id = run.id
     with sessions.begin() as s:
         s.get(VisionRun, run_id).status = "SENT"
+    adapter = None
+    response = None
+    failure_stage = "LOCAL_CONFIGURATION"
     try:
         if provider_factory:
             adapter = provider_factory(provider, config)
@@ -343,10 +371,12 @@ async def analyze(
                 if provider == "fixture"
                 else AnthropicVisionProvider(config.api_key.get_secret_value(), config.timeout)
             )
+        failure_stage = "PROVIDER_EXECUTION"
         async with asyncio.timeout(config.timeout + 5):
             response = await adapter.inspect(
                 images, context, model=quote["model"], stage=stage, max_tokens=quote["output_limit"]
             )
+        failure_stage = "POST_RESPONSE_VALIDATION"
         result = VisionResult.model_validate(response.result)
         result.validate_images({p.id for p in images})
         payload = [
@@ -364,6 +394,7 @@ async def analyze(
             estimated = None
         if response.reported_model and response.reported_model != quote["model"]:
             estimated = None  # A different returned model needs its own pricing verification.
+        failure_stage = "RESULT_PERSISTENCE"
         with sessions() as s:
             locked(s)
             run = s.get(VisionRun, run_id)
@@ -389,24 +420,33 @@ async def analyze(
             s.commit()
     except BaseException as error:
         # A timeout/interruption does not prove no provider charge. Hold the allowance.
-        name = type(error).__name__
-        code = (
-            "INTERRUPTED"
-            if isinstance(error, asyncio.CancelledError)
-            else "TIMEOUT"
-            if "Timeout" in name
-            else "RATE_LIMIT"
-            if "RateLimit" in name
-            else "INVALID_RESULT"
-            if isinstance(error, ValueError)
-            else "PROVIDER_FAILURE"
+        diagnostics = getattr(adapter, "failure_diagnostics", None)
+        # asyncio.timeout transforms the adapter's CancelledError into TimeoutError.
+        if diagnostics and isinstance(error, TimeoutError):
+            diagnostics = classify_failure(
+                error,
+                stage=diagnostics["failure_stage"],
+                status=diagnostics["http_status"],
+                request_id=diagnostics["provider_request_id"],
+                secret=secret,
+            )
+        diagnostics = diagnostics or classify_failure(
+            error,
+            stage=failure_stage,
+            secret=secret,
+            status=getattr(response, "http_status", None),
+            request_id=getattr(response, "request_id", None),
         )
         with sessions.begin() as s:
             run = s.get(VisionRun, run_id)
             run.status = "FAILED"
             run.active_key = None
             run.completed_at = utcnow()
-            run.data = {**run.data, "error_code": code}
+            run.data = {
+                **run.data,
+                "error_code": diagnostics["category"],
+                "failure_diagnostics": diagnostics,
+            }
         if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
             raise
     return run_id, False
