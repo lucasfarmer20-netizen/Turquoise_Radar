@@ -219,3 +219,86 @@ class SavedSourceSearch(Base):
     group_name: Mapped[str] = mapped_column(String)
     selected: Mapped[bool] = mapped_column(default=False)
     configured: Mapped[bool] = mapped_column(default=False)
+
+
+class VisionCase(Base):
+    __tablename__ = "vision_cases"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String, default="local-owner")
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"), unique=True)
+    candidate_id: Mapped[int | None] = mapped_column(ForeignKey("discovered_items.id"), unique=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class VisionPhoto(Base):
+    __tablename__ = "vision_photos"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("vision_cases.id"))
+    role: Mapped[str] = mapped_column(String)
+    original_hash: Mapped[str] = mapped_column(String)
+    content_hash: Mapped[str] = mapped_column(String)
+    data: Mapped[dict] = mapped_column(JSON)
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class VisionRun(Base):
+    __tablename__ = "vision_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("vision_cases.id"))
+    owner_id: Mapped[str] = mapped_column(String, default="local-owner")
+    provider: Mapped[str] = mapped_column(String)
+    model: Mapped[str] = mapped_column(String)
+    stage: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)
+    cache_key: Mapped[str] = mapped_column(String, index=True)
+    active_key: Mapped[str | None] = mapped_column(String, unique=True)
+    reserved_usd: Mapped[str] = mapped_column(String, default="0")
+    accounted_usd: Mapped[str] = mapped_column(String, default="0")
+    estimated_usd: Mapped[str | None] = mapped_column(String)
+    confirmed_usd: Mapped[str | None] = mapped_column(String)
+    cost_status: Mapped[str] = mapped_column(String, default="NOT_APPLICABLE")
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+
+
+class VisionFinding(Base):
+    __tablename__ = "vision_findings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("vision_runs.id"))
+    data: Mapped[dict] = mapped_column(JSON)
+
+
+class VisionSubItem(Base):
+    __tablename__ = "vision_sub_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("vision_runs.id"))
+    data: Mapped[dict] = mapped_column(JSON)
+
+
+class VisionCorrection(Base):
+    __tablename__ = "vision_corrections"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("vision_runs.id"))
+    owner_id: Mapped[str] = mapped_column(String, default="local-owner")
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class VisionPrice(Base):
+    __tablename__ = "vision_prices"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    model: Mapped[str] = mapped_column(String)
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class VisionBilling(Base):
+    __tablename__ = "vision_billing"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("vision_runs.id"))
+    owner_id: Mapped[str] = mapped_column(String, default="local-owner")
+    amount_usd: Mapped[str] = mapped_column(String)
+    evidence: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)

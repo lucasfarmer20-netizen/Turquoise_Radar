@@ -253,3 +253,73 @@ six owner workflow pages responded with expected content.
   requests. Paid receipt and multi-item allocation checks still pass. Only synthetic
   fixtures are committed; owner data, schema, financial logic and eBay gates are
   unchanged. Changes remain on PR #4's branch; no merge or Task 005 work.
+
+## Task 005 — Anthropic jewelry vision
+
+- Branch task/005-jewelry-vision starts from merged main
+  4648ee01a196ecb303fe4bbdb127e7d3184d284e, including all Task 004 compatibility
+  fixes. No force-push or automatic merge. Financial/maximum-buy/Alaska analysis,
+  eBay adapter/gates and multi-source parser/service implementations are unchanged.
+- **301 tests pass**, retaining all 227 previous Task 004 cases and adding 74 image,
+  provider, evidence, score, correction, concurrency, cost, cache and v5 migration
+  cases. Existing migration-target assertions now use CURRENT_VERSION rather than
+  hard-code v4; no cases were removed. Ruff lint, formatting, JavaScript syntax
+  and Git whitespace checks pass. One existing Starlette/AnyIO deprecation remains.
+- Generated synthetic images cover actual JPEG/PNG/WebP detection despite deceptive
+  filenames, corruption, unsupported/animated formats, file/body limits, excessive
+  dimensions/decompression bombs, EXIF orientation/GPS removal, useful processing
+  resolution, trailing-content removal, private paths/integrity and replacement.
+- Tests exercise deterministic free results, independent quick/deep histories,
+  strict Pydantic fields/photo references, directly legible vs partial marks,
+  direct/inferred confidence, maker leads vs generic purity stamps, weight/valuation/
+  cultural/material claim rejection, mixed-lot research candidates and append-only
+  corrections. No listing facts, financial costs, resale estimates, purchases or
+  verified sterling/cultural attribution are automatically changed.
+- Official anthropic==2.3.0 / pillow==13.0.0 are locked with hashes. Official tagged
+  SDK README/client/Message/model/migration source was successfully read. Mocked SDK
+  wire tests verify current Bearer authentication, /v1/messages, separate base64
+  image blocks, Pydantic helper translation to output_config.format and no tools.
+  No deprecated HTTP output_format or beta flags are sent. SDK retries, redirects
+  and content telemetry are disabled; debug payload logging is suppressed.
+- SDK response tests cover malformed/truncated/unsafe structured results, wrong
+  photo references, timeout and 400/429/500 errors without retry chains. Every
+  automated external transport is mocked/forbidden, including the SDK's httpx2
+  transport. No real Anthropic API request or API credit consumption occurred.
+- Spending tests verify key-alone/live/model/pricing/confirmation gates; explicit
+  Sonnet authorization; global atomic daily/monthly reservations; concurrent
+  identical-call coalescing and distinct-call budget exclusion; cached views/reruns;
+  relevant-context invalidation; missing/additional usage; estimated vs confirmed
+  cost; reported-model mismatch; interrupted/failed allowance retention; final
+  provider reconciliation and cross-period unresolved reservations.
+- Known alert-derived private descriptions are withheld from paid context. Only
+  the title and owner-selected processing copies are supplied in those cases;
+  raw receipt/address evidence stays local. Reflected credential content is rejected
+  before it can enter a saved result/usage record. The API key has no browser field
+  and is absent from database/run metadata, fixtures, logs and installation scripts.
+- v5 tests populate every v4 table, including query histories, feedback, invoice
+  components/observations, settings and comparables. All prior rows survive;
+  repeated migration is a no-op, future versions are refused and failed v5 DDL
+  rolls back. A copy of the actual private v4 database also preserved every prior
+  row, followed by the same verified default-database migration with a pre-v5 backup.
+  Startup/GET readiness does not seed vision photos, paid runs, prices or purchases.
+- Synthetic demo was run twice in /tmp/turquoise-v5-demo.db: two illustrated
+  listings, eight independent photos and three fixture runs including separate
+  quick/deep comparisons and a mixed-lot lead. The second invocation reused cache
+  entries. No genuine inventory evidence or transaction history was seeded.
+- scripts/check-vision-browser.cjs passed desktop 1440x1000 and nine Android-sized
+  390x844 views: four-photo upload, zoom, analysis, corrections, cached repeats,
+  separate deeper comparison, replacement/removal, mixed sub-item review, paid
+  controls disabled and financial-return links. No overflow, browser errors or
+  external requests. Retained scripts/check-intake-compat.cjs also passed desktop
+  and twelve mobile views on a separate v5 database, including the 27 paid receipt,
+  catalog identity and multi-item non-allocation safeguards.
+- Existing frozen installation was rerun successfully. No Cloud Environment draft,
+  credential or network changes were made for Task 005; no republication is needed
+  for fixture use. The private default app runs on loopback with vision/eBay fixture
+  modes and paid/production flags false. Future live use genuinely needs secure
+  key/flags, dated model/rate/context verification and permitted api.anthropic.com.
+- Official web pricing/model/structured-output pages were blocked by the proxy.
+  SDK model-name recognition is not account eligibility or price verification;
+  no current rates, assigned quotas, credit balance or live model availability is
+  claimed. Live provider behavior is tested with SDK mocks, not a paid end-to-end
+  request. All committed test artwork is generated synthetically from code.

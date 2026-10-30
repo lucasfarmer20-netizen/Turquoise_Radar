@@ -98,7 +98,38 @@ VERSION_4 = [
     "CREATE INDEX ix_alert_obs_item ON alert_observations(item_id)",
     "CREATE INDEX ix_alert_message_source ON alert_messages(source_id)",
 ]
-CURRENT_VERSION = 4
+VERSION_5 = [
+    """CREATE TABLE vision_cases (id INTEGER PRIMARY KEY, owner_id VARCHAR NOT NULL,
+        listing_id INTEGER UNIQUE REFERENCES listings(id),
+        candidate_id INTEGER UNIQUE REFERENCES discovered_items(id), created_at DATETIME NOT NULL,
+        CHECK (listing_id IS NOT NULL OR candidate_id IS NOT NULL))""",
+    """CREATE TABLE vision_photos (id VARCHAR PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES vision_cases(id), role VARCHAR NOT NULL,
+        original_hash VARCHAR NOT NULL, content_hash VARCHAR NOT NULL, data JSON NOT NULL,
+        active BOOLEAN NOT NULL, created_at DATETIME NOT NULL)""",
+    """CREATE TABLE vision_runs (id INTEGER PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES vision_cases(id), owner_id VARCHAR NOT NULL,
+        provider VARCHAR NOT NULL, model VARCHAR NOT NULL, stage VARCHAR NOT NULL,
+        status VARCHAR NOT NULL, cache_key VARCHAR NOT NULL, active_key VARCHAR UNIQUE,
+        reserved_usd VARCHAR NOT NULL, accounted_usd VARCHAR NOT NULL, estimated_usd VARCHAR,
+        confirmed_usd VARCHAR, cost_status VARCHAR NOT NULL, data JSON NOT NULL,
+        created_at DATETIME NOT NULL, completed_at DATETIME)""",
+    "CREATE INDEX ix_vision_runs_cache_key ON vision_runs(cache_key)",
+    "CREATE INDEX ix_vision_runs_budget ON vision_runs(owner_id, provider, created_at)",
+    """CREATE TABLE vision_findings (id INTEGER PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES vision_runs(id), data JSON NOT NULL)""",
+    """CREATE TABLE vision_sub_items (id INTEGER PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES vision_runs(id), data JSON NOT NULL)""",
+    """CREATE TABLE vision_corrections (id INTEGER PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES vision_runs(id), owner_id VARCHAR NOT NULL,
+        data JSON NOT NULL, created_at DATETIME NOT NULL)""",
+    """CREATE TABLE vision_prices (id INTEGER PRIMARY KEY, model VARCHAR NOT NULL,
+        data JSON NOT NULL, created_at DATETIME NOT NULL)""",
+    """CREATE TABLE vision_billing (id INTEGER PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES vision_runs(id), owner_id VARCHAR NOT NULL,
+        amount_usd VARCHAR NOT NULL, evidence TEXT NOT NULL, created_at DATETIME NOT NULL)""",
+]
+CURRENT_VERSION = 5
 
 
 def migrate(engine):
@@ -131,6 +162,9 @@ def migrate(engine):
                     conn.exec_driver_sql(statement)
             if version < 4:
                 for statement in VERSION_4:
+                    conn.exec_driver_sql(statement)
+            if version < 5:
+                for statement in VERSION_5:
                     conn.exec_driver_sql(statement)
             conn.exec_driver_sql(f"PRAGMA user_version={CURRENT_VERSION}")
             conn.commit()

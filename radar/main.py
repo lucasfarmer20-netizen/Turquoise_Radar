@@ -25,6 +25,7 @@ from radar.intake.limits import AlertBodyLimit
 from radar.intake.registry import seed_sources
 from radar.intake.routes import intake_routes
 from radar.intake.views import alert_history
+from radar.jewelry.routes import VisionBodyLimit, vision_routes
 from radar.owner_routes import owner_routes
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
 from radar.sources import import_rows, upsert_listing
@@ -68,6 +69,7 @@ def create_app(database_url=None):
 
     app = FastAPI(title="Turquoise Radar", lifespan=lifespan)
     app.add_middleware(AlertBodyLimit)
+    app.add_middleware(VisionBodyLimit)
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
     @app.middleware("http")
@@ -368,6 +370,7 @@ def create_app(database_url=None):
     owner_routes(app, render, preferences, view)
     discovery_routes(app, render, preferences)
     intake_routes(app, render, preferences)
+    vision_routes(app, render)
     return app
 
 

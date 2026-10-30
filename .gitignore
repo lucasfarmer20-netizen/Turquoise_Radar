@@ -55,3 +55,10 @@ screenshots/
 !fixtures/alerts/synthetic-*.eml
 *.mbox
 *.msg
+
+# Owner-uploaded vision photographs/processing copies are never source artifacts.
+*.png
+*.jpg
+*.jpeg
+*.webp
+*-vision-images/

@@ -1,14 +1,15 @@
 # Turquoise Radar
 
 A private, local-first jewelry sourcing workbench for Soldotna, Alaska **99669**.
-Phase 004 connects local CSV/JSON and manual entry to exact search anomalies,
+Phase 005 connects local CSV/JSON and manual entry to exact search anomalies,
 Decimal financial analysis, evidence-gated sterling melt analysis, deterministic
 ranking, a responsive dark dashboard, and owner feedback. Quick Capture, evidence
 editing, a review queue, comparable sales and source-separated anomaly metrics
 support real owner-operated sourcing. Official eBay discovery is implemented with
 fixture-first operation, gated sandbox/production configuration and manual-only
 execution. No live API requests were made during implementation. No
-paid AI, purchasing automation, accounts, or background monitoring.
+paid API calls during development, purchasing automation, accounts, or background monitoring.
+Owner-operated jewelry vision now supports private photos, free synthetic reviews and an explicitly gated Anthropic SDK provider.
 
 ## Run
 
@@ -18,7 +19,7 @@ transitive versions are pinned with hashes in `uv.lock`.
 ```bash
 cd /workspace/Turquoise_Radar  # or your local checkout
 UV_CACHE_DIR=/tmp/turquoise-uv-cache uv sync --frozen
-.venv/bin/python -m radar.cli seed
+.venv/bin/python -m radar.cli init
 .venv/bin/uvicorn radar.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -42,7 +43,7 @@ export RADAR_DATABASE_URL=sqlite:///./data/private.db
 `.env.example` documents shell configuration; the app does not automatically load
 `.env`. SQLite files live in ignored `data/`; retain/back up that directory to
 preserve listings, preferences, and feedback. Ordered SQLite migrations initialize
-or upgrade the schema; existing populated databases are backed up before v4.
+or upgrade the schema; existing populated databases are backed up before v5.
 See [migration and calibration details](docs/CALIBRATION.md).
 
 ## Demo walkthrough
@@ -75,6 +76,27 @@ Re-seeding is idempotent by identity, but **updates existing demo listing values
 It preserves first observations, feedback, and existing preferences. Keep demo and
 real inventory in separate databases. The seed initializes synthetic spot/auction
 settings only when no saved preferences exist.
+
+## Jewelry vision (Task 005)
+
+Open a listing or inbox candidate and choose **Review photographs**. Upload up to
+four JPEG/PNG/WebP photos, inspect private zoomable previews and click **Analyze
+Jewelry · free synthetic fixture**. Review evidence-linked findings, uncertainty,
+a deterministic Visual Opportunity Score, mixed-lot research leads and append-only
+owner corrections. A separate explicitly confirmed deeper run can be compared
+side by side; it never replaces earlier observations or financial evidence.
+
+Fixture observations are labelled synthetic and do not analyze real image contents.
+Live Anthropic Haiku (`claude-haiku-5-5`) / Sonnet (`claude-sonnet-5-5`) requests need
+secure credentials, explicit live flags, dated verified pricing/model eligibility,
+per-request owner confirmation and atomic budget allowance. They are off by default;
+a key alone does not enable spending. No real Anthropic request was made.
+
+Read [vision setup, privacy and spending controls](docs/VISION-SETUP.md). For an
+isolated illustrated demonstration, run `.venv/bin/python -m radar.jewelry.demo`
+and start the app with `RADAR_DATABASE_URL=sqlite:///./data/vision-demo.db`. Never
+seed demos into owner inventory. No cloud republication is needed for fixture use;
+the existing frozen installation command installs the new locked dependencies.
 
 ## Multi-source inbox (Task 004)
 
@@ -234,7 +256,7 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-227 tests (including all 165 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
+301 tests (including all 227 retained Task 004 cases) cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
 feedback counters, escaped output and same-origin mutation protection. All tests
@@ -249,7 +271,7 @@ no CDN or paid APIs. Its SHA-256 is
 `schemas` / `db`: validation and SQLite persistence; `sources`: adapter contracts,
 normalization/import/dedup; `anomalies`: curated patterns and query plans;
 `finance` / `melt`: independent Decimal engines; `analysis`: classification;
-`main` / templates / static: dashboard and feedback; `vision`: interface only.
+`main` / templates / static: dashboard and feedback; `vision` / `jewelry`: private images, providers, research evidence, scoring, budget and review.
 `capture` / `owner_routes` / `workflow`: capture, evidence editing and queue;
 `comparables`: manual resale evidence; `migrations`: ordered transactional upgrades;
 `discovery`: eBay/OAuth, fixture adapter, bounded plans, observations and UI routes;
