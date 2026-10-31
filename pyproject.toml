@@ -15,6 +15,12 @@ dependencies = [
     "pillow==13.0.0",
 ]
 
+[project.optional-dependencies]
+similarity = [
+    "torch==2.9.1+cpu ; platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "torchvision==0.24.1+cpu ; platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+
 [dependency-groups]
 dev = ["pytest==8.4.2", "ruff==0.14.2"]
 
@@ -22,8 +28,17 @@ dev = ["pytest==8.4.2", "ruff==0.14.2"]
 testpaths = ["tests"]
 pythonpath = ["."]
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.ruff]
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }

@@ -110,6 +110,13 @@ and start the app with `RADAR_DATABASE_URL=sqlite:///./data/vision-demo.db`. Nev
 seed demos into owner inventory. No cloud republication is needed for fixture use;
 the existing frozen installation command installs the new locked dependencies.
 
+## Local hallmark reference similarity (JRI-003)
+
+Compare a privately supplied hallmark photograph against eligible local mark
+references using an optional CPU embedding model. Results show source attributions
+and cosine similarity, never authentication. No inference API is used. See
+[JRI-003 setup, actual coverage, evaluation and private restore workflow](docs/JRI-003.md).
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
