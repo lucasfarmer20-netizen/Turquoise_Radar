@@ -666,3 +666,31 @@ six owner workflow pages responded with expected content.
   hashes still match after diagnostics and verification.
 - No access bypass, blank database, private GitHub upload, Anthropic/training/paid
   call, financial/Haiku/historical-run change or merge occurred.
+
+## JRI-002 restored targeted batch — October 30, 2026 (Alaska)
+
+Restored all three archive SHA-256 digests and 69 payload hashes before acquisition.
+Verified 20 Cleveland items, 20 unique originals, 40 media files and 45 Met queue
+observations, SQLite integrity/foreign keys and every stored media hash. The active
+private tree was absent; no existing tree or application database was replaced.
+
+The reviewed Art-Amerindien manifest imported 10 images for three paired catalogued
+cuffs and four standalone mark references. Seven queue rows are DONE. Eleven
+requests, zero rejected records/images and zero exact/near duplicate flags. Manual
+review retained three USABLE construction records and four LIMITED mark records;
+six image files have usable hallmark content, two more have limited blurry insets.
+No full-back photo, independently authenticated maker, assay or verified material
+negative was established. All private reviews and originals remain ignored.
+
+A pre-acquisition database backup supports row-for-row preservation checks: original
+20 items, 20 assets, 106 assertions, six streams and 65 queue records are unchanged.
+All 68 original non-database payloads are unchanged. Final SQLite integrity/foreign
+keys and hash/decode verification pass for all 30 assets / 60 media files.
+
+No collection defect was demonstrated; no production-code change or new regression
+test was needed for this batch. Full required offline test/lint results follow.
+
+Validation completed: **559 tests passed** (one existing Starlette/AnyIO
+deprecation warning), Ruff lint passed, all 68 Python files passed formatting,
+and whitespace checks passed. Tests used fixture/live-disabled flags and mocked
+provider transports; no Anthropic or gallery acquisition was performed by tests.
