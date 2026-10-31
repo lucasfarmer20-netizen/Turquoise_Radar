@@ -314,11 +314,14 @@ hallmark search, evidence history, exclusions and local dataset exports.
 
 ```bash
 .venv/bin/python -m radar.references.cli init
-.venv/bin/python -m radar.references.cli collect cma --query jewelry --max-images 400 --live
+.venv/bin/python -m radar.references.cli collect cma --query jewelry --max-items 20 --max-images 10 --page-size 20 --max-pages 1 --live
 .venv/bin/python -m radar.references.cli report
 ```
 
 Collection requires explicit `--live`, eligible source reviews and permitted network
 access. Images, metadata, crops and exports remain under ignored `data/jri/`. This
 does not activate Haiku, train a model, provision hosting or change financial records.
-The initial live batch was proxy-blocked; its actual stored-image count is zero.
+The final Cleveland pilot saved 20 unique real images from 20 discovered records,
+including a bounded 10-image continuation across a controlled interruption. The
+original ten images are unchanged. Other sources retain separate access limits;
+see the guide for actual relevance, diagnostics and scaling limitations.

@@ -164,6 +164,78 @@ def test_pagination_and_bounded_resume_do_not_skip_pending_rows(root):
         assert c.execute("SELECT count(*) FROM duplicates").fetchone()[0] == 6
 
 
+def test_cma_checkpoint_resume_after_committed_image_interrupt(root, monkeypatch):
+    from radar.references import ingest
+
+    rows = [cma(i) for i in range(1, 21)]
+    first, _ = run(root, rows, max_images=10, max_items=20, page_size=20)
+    assert first["discovered"] == 20 and first["images_stored"] == 10
+    with connect(root) as c:
+        original_assets = [dict(r) for r in c.execute("SELECT * FROM assets ORDER BY id")]
+        original_stream = dict(c.execute("SELECT * FROM streams").fetchone())
+        original_queue = [dict(r) for r in c.execute("SELECT * FROM queue ORDER BY id")]
+    original_files = {
+        str(p): p.read_bytes() for p in root.rglob("*") if p.suffix in {".bin", ".png"}
+    }
+    # A real process can stop after an asset commit but before the queue is DONE.
+    save = ingest.save_asset
+
+    def interrupt_after_commit(*args):
+        save(*args)
+        raise KeyboardInterrupt()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ingest, "save_asset", interrupt_after_commit)
+        with pytest.raises(KeyboardInterrupt):
+            run(root, rows, max_images=10, max_items=20, page_size=20)
+    with connect(root) as c:
+        assert c.execute("SELECT count(*) FROM assets").fetchone()[0] == 11
+        assert (
+            c.execute("SELECT state FROM queue WHERE external_id='11'").fetchone()[0] == "PENDING"
+        )
+    resumed, calls = run(root, rows, max_images=9, max_items=20, page_size=20)
+    assert resumed["pages"] == 0 and resumed["discovered"] == 0
+    assert resumed["images_stored"] == 9 and resumed["existing_images"] == 1
+    assert all("/api/artworks/" not in url for url in calls)
+    assert not {f"https://openaccess-cdn.clevelandart.org/{i}.png" for i in range(1, 12)} & set(
+        calls
+    )
+    assert all(Path(path).read_bytes() == content for path, content in original_files.items())
+    with connect(root) as c:
+        assert dict(c.execute("SELECT * FROM streams").fetchone()) == original_stream
+        assert c.execute("SELECT count(*) FROM assets").fetchone()[0] == 20
+        assert c.execute("SELECT count(*) FROM queue WHERE state='DONE'").fetchone()[0] == 20
+        for before in original_assets:
+            assert (
+                dict(c.execute("SELECT * FROM assets WHERE id=?", (before["id"],)).fetchone())
+                == before
+            )
+        after_queue = [dict(r) for r in c.execute("SELECT * FROM queue ORDER BY id")]
+        for before, after in zip(original_queue, after_queue, strict=True):
+            assert all(before[k] == after[k] for k in ("id", "external_id", "payload"))
+
+
+@pytest.mark.parametrize("measurements", [None, "Overall: 4.9 cm (SYNTHETIC catalog summary)"])
+def test_cma_retains_culture_and_full_dimensions_as_attributed_evidence(measurements):
+    raw = cma()
+    raw.update(
+        culture=["SYNTHETIC culture, attribution uncertain"],
+        creators=[],
+        measurements=measurements,
+        dimensions={"overall": {"length": 0.117, "width": 0.049}},
+    )
+    item = CMA().item(None, raw)
+    fields = {a.field: a for a in item.assertions}
+    assert "SYNTHETIC culture, attribution uncertain" in fields["cultural_attribution"].value
+    assert "0.117" in fields["source_dimensions"].value
+    assert "0.049" in fields["source_dimensions"].value
+    assert ("stated_dimensions" in fields) == (measurements is not None)
+    assert all(a.status == "ATTRIBUTED" and not a.observable_from_photo for a in item.assertions)
+    assert all(a.evidence_url == item.page_url for a in item.assertions)
+    assert "stated_weight" not in fields and "maker_attribution" not in fields
+    assert item.artists == []
+
+
 def test_server_error_retains_queue_and_sanitizes_diagnostics(root):
     result, _ = run(root, [cma()], transport_kw={"fail_image": "/1.png"})
     assert result["error"] == "HTTP_ERROR" and result["http_status"] == 503

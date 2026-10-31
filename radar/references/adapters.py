@@ -67,6 +67,8 @@ class CMA:
                     "technique": "construction_or_medium",
                     "creation_date": "attributed_date",
                     "measurements": "stated_dimensions",
+                    "dimensions": "source_dimensions",
+                    "culture": "cultural_attribution",
                     "provenance": "provenance",
                     "inscriptions": "reported_marks",
                     "creators": "maker_attribution",
