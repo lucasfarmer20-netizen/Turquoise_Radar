@@ -18,6 +18,7 @@ COMPONENTS = {"jri", "directory", "evaluation"}
 
 def check(root):
     from radar.references.books import verify as verify_books
+    from radar.references.research import verify as verify_research
 
     root = Path(root)
     evaluation = root / "evaluation" / "package"
@@ -33,6 +34,7 @@ def check(root):
         "library": verify(root / "jri"),
         "directory": stats(root / "directory"),
         "book_evidence": verify_books(root / "directory"),
+        "cross_source_research": verify_research(root / "directory"),
         "evaluation_originals": len(manifest["items"]),
     }
 
