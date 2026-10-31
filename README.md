@@ -129,6 +129,12 @@ source attributions and cosine scores never become authentication. The compariso
 produced two source-supported leads and 14 UNKNOWN results; independent accuracy
 is unmeasured. See [source reviews, commands, limitations and private restore](docs/JRI-004.md).
 
+The [JRI-004C cross-source research workflow](docs/JRI-004C.md) adds private,
+evidence-linked relationship reviews and an HTML research view. The bounded pilot
+reviewed 18 relationships with zero established independent corroborations; four
+text-only factual records bring the directory to 641 while preserving the existing
+book evidence, visual index and owner evaluation photographs.
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,

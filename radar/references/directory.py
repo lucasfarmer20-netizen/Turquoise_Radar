@@ -157,6 +157,8 @@ def current_review(c, source):
 
 def approved_url(url, review):
     p = valid_url(url, review["hosts"])
+    if review.get("selected_urls") and url not in review["selected_urls"]:
+        raise ValueError("URL outside reviewed factual selection")
     decoded = unquote(p.path or "/")
     if "\\" in decoded or any(part in {".", ".."} for part in decoded.split("/")):
         raise ValueError("Noncanonical reviewed URL path")
@@ -333,6 +335,10 @@ def relate(root, left, right, kind, evidence, *, independently_assessed=False):
             and reviews[0]["independence_group"] == reviews[1]["independence_group"]
         ):
             raise ValueError("Same source family cannot supply independent corroboration")
+        if independently_assessed:
+            raise ValueError(
+                "Use the cross-source review with attribution provenance on both sides"
+            )
         for a, b in [(left, right), (right, left)]:
             value = {
                 "related_record": b,

@@ -20,10 +20,21 @@ SOURCES = {
     },
     "kayben": {
         "directory_url": "https://www.kaybentreasures.com/hallmarks",
-        "terms_url": "https://www.kaybentreasures.com/",
+        "terms_url": "https://www.kaybentreasures.com/platform-and-privacy",
     },
     "perry-null": {
         "directory_url": "https://perrynulltrading.com/pages/artists",
         "terms_url": "https://perrynulltrading.com/policies/terms-of-service",
+        "canonical_directory_url": "https://turquoisetraders.com/pages/artists",
+        "canonical_terms_url": "https://turquoisetraders.com/policies/terms-of-service",
     },
+}
+
+# Different URLs and domains can repeat the same attribution. Unknown upstream
+# provenance remains unknown even when two entries have different family labels.
+SOURCE_FAMILIES = {
+    "art-amerindien": "art-amerindien",
+    "library-art-amerindien": "art-amerindien",
+    "perry-null": "perry-null/turquoise-traders",
+    "turquoise-traders": "perry-null/turquoise-traders",
 }
