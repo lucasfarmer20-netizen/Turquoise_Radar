@@ -522,3 +522,80 @@ six owner workflow pages responded with expected content.
   photographs and reservations remain unchanged. No Anthropic request, new pilot,
   billing edit, automatic merge or unrelated development occurred. See the
   [field audit and remaining limits](VISION-NARRATIVE-LIMITS.md).
+
+## JRI-001 private reference aggregation — October 30, 2026
+
+- Based on main `ab2996f7c1a7c8aaf37d4d24a0a5d274ba035852`. Adds a separate
+  private reference database and CLI; no existing application tables, routes,
+  valuation logic, vision schemas or request settings change.
+- **543 tests pass**: all 489 prior cases and 54 reference-pipeline regressions.
+  Ruff lint, formatting and whitespace checks pass. The existing Starlette/AnyIO
+  deprecation warning remains. This is a CLI feature; no browser UI was changed.
+- Offline coverage includes all four API adapters, per-image rights, fair-use
+  manifests without individual licenses, source review history, pagination and
+  mid-item recovery, robots and first-request crawl delays, persisted cooldowns,
+  transport/redirect/size failures, corrupt media, duplicates, provenance,
+  hallmark/crop search, correction histories, exclusions and artist-aware splits.
+  Seven successive batches store 350 **synthetic** item/image references; those
+  counts are not real reference data. Export regression checks preserve an
+  image's original fair-use status after source reclassification.
+- The bounded live batch stopped at the proxy for CMA, Met, AIC and Commons:
+  **0 discovered items, 0 images stored, 0 rejected records, 0 duplicates**.
+  Each source retains a paused checkpoint with `NETWORK_PROXY_BLOCK`; no server
+  HTTP response was received. Actual relevance and live adapter conformance
+  remain unverified. Required source hosts are absent from enforced egress policy.
+  The aggregate report is private at `data/jri/ingestion-report.json`; see the
+  [guide](JRI-001.md) for permitted-access requirements and resume commands.
+- All 26 existing application tables and hashes of all 35 pre-existing private
+  files match the pre-change preservation snapshot. Run #7, owner evidence,
+  historical attempts/authorizations, photographs and holds remain unchanged.
+  Runtime defaults remain fixture/live-disabled, $5/month and 10/day. No Anthropic
+  requests, training upload, paid infrastructure, public deployment or merge.
+
+## JRI-001 final live validation — October 30, 2026, Alaska time
+
+- Continued PR #10 in the existing checkout. This fresh workspace had no prior
+  private checkpoints or application/Run #7 database. A new JRI store was initialized;
+  historical private data was not claimed as restored. Only the separate JRI store
+  was accessed or changed during this validation.
+- Before continuation, a writer-locked SQLite backup and complete media/provenance
+  archive were restored into a separate directory. All 23 payload-file hashes,
+  SQLite integrity, foreign keys and the original ten asset records passed checks.
+  The verified private backup is owner-retrievable outside GitHub.
+- Actual Cleveland counts: **20 discovered records, 20 completed items, 20 unique
+  real original images and 20 normalized derivatives**. The continuation added
+  exactly ten images, with a controlled interruption after three and safe resume
+  for seven more. No initial image was transferred again; original asset records,
+  file hashes, queue payloads and the saved offset are unchanged. No new source
+  page was requested. All 20 queue records are DONE; no record was silently skipped.
+- **Zero** rejected records/images, exact duplicates or automatic near-duplicate
+  flags. Visual review found one related earring pair at difference-hash distance
+  5, beyond threshold 4; it needs manual relationship/split review. All image-level
+  CC0 evidence and attribution remain private. Every file decodes and hashes match.
+- Relevance among 20: zero Southwestern/Native North American examples, one broader
+  Indigenous Americas catalog attribution, zero named makers/trading posts, zero
+  usable maker-hallmark photos or catalog inscription records. One non-maker coin
+  legend is visible. Seventeen have item-specific construction descriptions; three
+  have general disk-making commentary. Sixteen have reported dimensions, none a
+  reported weight. These are museum claims, not assays, authentication or owner
+  observations. One catalog material contradiction remains unresolved.
+- Fixed the reproduced CMA omission of structured dimensions and cultural
+  attribution from item assertions. Appended 36 missing assertions locally from
+  already saved raw metadata, retaining original item/asset rows and source status.
+  Added synthetic regressions for abbreviated/missing measurements and interruption
+  after an asset commit but before queue completion, including no redownloads.
+- Minimal diagnostics with the declared collector user agent: Met robots 404 and
+  one official search result (limit 1); no object/image ingestion. AIC API and web
+  hosts return 403 with Cloudflare challenge evidence. Commons/upload robots now
+  return 200, but Commons rules deny the adapter's API URL, so no search is sent.
+  The earlier Met/Wikimedia 403s did not reproduce. Shared Envoy headers alone do
+  not establish proxy origin. No challenge, robot rule or access control bypassed.
+- **546 tests pass**, including 57 reference regressions and all 489 prior cases.
+  Ruff lint, formatting and whitespace checks pass; the existing Starlette/AnyIO
+  deprecation warning remains. No Anthropic, paid API, LoRA/training, owner-photo,
+  Haiku, Run #7, financial-record, budget-control or application-schema change.
+- Cleveland's bounded resumable implementation is ready for PR review/merge.
+  Further live pagination, targeted source coverage and bulk/training readiness
+  remain separate validation work. Other sources' access limits do not block CMA.
+  No bulk collection or automatic merge was performed. See the
+  [sanitized live guide](JRI-001.md#final-bounded-live-validation--october-30-2026-alaska-time).

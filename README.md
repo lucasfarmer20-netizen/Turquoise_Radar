@@ -268,9 +268,9 @@ preserved on disk but do not boost live query ranking.
 .venv/bin/ruff format --check .
 ```
 
-489 tests (301 Task 005 tests, 12 pilot-safeguard cases, 29 failure-diagnostic cases,
+543 tests (301 Task 005 tests, 12 pilot-safeguard cases, 29 failure-diagnostic cases,
 99 structured-validation/buffer-safety regressions, 8 output-allowance cases
-and 40 long-narrative cases)
+and 40 long-narrative cases, plus 54 private-reference aggregation cases)
 cover financial breakdowns, highest feasible auction bids, fees and
 missing costs, exact query preservation, deduplication, dwt/melt safeguards,
 Alaska gates, mixed lots, atomic CSV/JSON import, settings, filters, manual entry,
@@ -305,3 +305,23 @@ Local multi-source intake works without API approval. Next, validate the provisi
 formats with permitted owner samples and improve auction cost allocations; eBay
 sandbox validation still requires secure credentials, access and current docs. Production approval is pending;
 no live request, public deployment or automated purchasing is authorized by 003.
+
+## Private jewelry reference aggregation (JRI-001)
+
+The [JRI-001 guide](docs/JRI-001.md) covers the separate private source registry,
+bounded/resumable museum and Commons collectors, reviewed fair-use manifest import,
+hallmark search, evidence history, exclusions and local dataset exports.
+
+```bash
+.venv/bin/python -m radar.references.cli init
+.venv/bin/python -m radar.references.cli collect cma --query jewelry --max-items 20 --max-images 10 --page-size 20 --max-pages 1 --live
+.venv/bin/python -m radar.references.cli report
+```
+
+Collection requires explicit `--live`, eligible source reviews and permitted network
+access. Images, metadata, crops and exports remain under ignored `data/jri/`. This
+does not activate Haiku, train a model, provision hosting or change financial records.
+The final Cleveland pilot saved 20 unique real images from 20 discovered records,
+including a bounded 10-image continuation across a controlled interruption. The
+original ten images are unchanged. Other sources retain separate access limits;
+see the guide for actual relevance, diagnostics and scaling limitations.
