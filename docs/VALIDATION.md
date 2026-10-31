@@ -644,3 +644,25 @@ six owner workflow pages responded with expected content.
   records reviewable workflow/code and honest live findings. No Anthropic, paid
   service, model download, training, Haiku, financial/budget or historical-run change,
   public dataset upload or automatic merge occurred. See [JRI-002](JRI-002.md).
+
+### JRI-002 requested backup restore and renewed network verification
+
+- Continued PR #11 at `b3300c9` in its existing branch. Verified the exact SHA-256
+  digests of both final backup volumes and the latest checkpoint, restored them in
+  documented order into private `data/jri/`, and verified all 69 payload hashes.
+- SQLite integrity/foreign keys and every referenced original/normalized image
+  hash pass. Baseline: 20 Cleveland references, 20 unique originals, 40 media files,
+  45 Met observations. Preserved the prior private tree; its logical database rows
+  match the restored backup even though SQLite file bytes differed.
+- One normal robots probe each to Horsekeeping, KayBen, Perry Null, Turquoise
+  Traders, T.Skies, Medicine Man and Art-Amerindien stopped at NETWORK_PROXY_BLOCK
+  without a destination HTTP status. Current runtime policy still omits all seven
+  hosts. Diagnostic rate state was written to a separate private database copy.
+- Zero new images, items, maker references, usable hallmark photographs or reviewed
+  construction views. No new source approval, adapter defect or regression claim.
+  The specialized acquisition goal remains blocked; no larger batch is justified.
+- All 559 existing tests pass, with lint, formatting and whitespace checks passing.
+  The existing Starlette/AnyIO deprecation warning remains. All 69 restored payload
+  hashes still match after diagnostics and verification.
+- No access bypass, blank database, private GitHub upload, Anthropic/training/paid
+  call, financial/Haiku/historical-run change or merge occurred.
