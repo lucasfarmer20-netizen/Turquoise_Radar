@@ -117,6 +117,18 @@ references using an optional CPU embedding model. Results show source attributio
 and cosine similarity, never authentication. No inference API is used. See
 [JRI-003 setup, actual coverage, evaluation and private restore workflow](docs/JRI-003.md).
 
+## Private hallmark directory and hybrid search (JRI-004)
+
+A private SQLite/FTS companion now holds 500 new source-attributed maker/mark entries
+and reuses 17 existing library records,
+with bounded resumable factual ingestion, separate image permissions and searchable
+names, initials, partial inscriptions and pictorial descriptions. The existing
+22-reference visual index and all 16 evaluation photographs remain separate.
+Reviewed text plus visual ranking returns supported research candidates or UNKNOWN;
+source attributions and cosine scores never become authentication. The comparison
+produced two source-supported leads and 14 UNKNOWN results; independent accuracy
+is unmeasured. See [source reviews, commands, limitations and private restore](docs/JRI-004.md).
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
