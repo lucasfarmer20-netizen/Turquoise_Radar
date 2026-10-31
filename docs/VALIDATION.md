@@ -522,3 +522,32 @@ six owner workflow pages responded with expected content.
   photographs and reservations remain unchanged. No Anthropic request, new pilot,
   billing edit, automatic merge or unrelated development occurred. See the
   [field audit and remaining limits](VISION-NARRATIVE-LIMITS.md).
+
+## JRI-001 private reference aggregation — October 30, 2026
+
+- Based on main `ab2996f7c1a7c8aaf37d4d24a0a5d274ba035852`. Adds a separate
+  private reference database and CLI; no existing application tables, routes,
+  valuation logic, vision schemas or request settings change.
+- **543 tests pass**: all 489 prior cases and 54 reference-pipeline regressions.
+  Ruff lint, formatting and whitespace checks pass. The existing Starlette/AnyIO
+  deprecation warning remains. This is a CLI feature; no browser UI was changed.
+- Offline coverage includes all four API adapters, per-image rights, fair-use
+  manifests without individual licenses, source review history, pagination and
+  mid-item recovery, robots and first-request crawl delays, persisted cooldowns,
+  transport/redirect/size failures, corrupt media, duplicates, provenance,
+  hallmark/crop search, correction histories, exclusions and artist-aware splits.
+  Seven successive batches store 350 **synthetic** item/image references; those
+  counts are not real reference data. Export regression checks preserve an
+  image's original fair-use status after source reclassification.
+- The bounded live batch stopped at the proxy for CMA, Met, AIC and Commons:
+  **0 discovered items, 0 images stored, 0 rejected records, 0 duplicates**.
+  Each source retains a paused checkpoint with `NETWORK_PROXY_BLOCK`; no server
+  HTTP response was received. Actual relevance and live adapter conformance
+  remain unverified. Required source hosts are absent from enforced egress policy.
+  The aggregate report is private at `data/jri/ingestion-report.json`; see the
+  [guide](JRI-001.md) for permitted-access requirements and resume commands.
+- All 26 existing application tables and hashes of all 35 pre-existing private
+  files match the pre-change preservation snapshot. Run #7, owner evidence,
+  historical attempts/authorizations, photographs and holds remain unchanged.
+  Runtime defaults remain fixture/live-disabled, $5/month and 10/day. No Anthropic
+  requests, training upload, paid infrastructure, public deployment or merge.
