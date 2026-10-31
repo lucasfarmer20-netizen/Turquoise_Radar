@@ -694,3 +694,48 @@ Validation completed: **559 tests passed** (one existing Starlette/AnyIO
 deprecation warning), Ruff lint passed, all 68 Python files passed formatting,
 and whitespace checks passed. Tests used fixture/live-disabled flags and mocked
 provider transports; no Anthropic or gallery acquisition was performed by tests.
+
+## JRI-003 local similarity and targeted growth
+
+Started from merged main `31c36bc` after PR #11 merged. Verified the 165-payload
+checkpoint, every active non-database payload and logical SQLite table before
+changes. All previous 27 items, 30 assets, 153 assertions, eight marks, seven
+streams, 72 queue rows and ten batches remain unchanged.
+
+A newly reviewed, hash-bound 40-image Art-Amerindien manifest added 17 catalogued
+whole objects in paired views and six isolated shop-mark references. One bounded
+import: 41 requests, 23 completed records, zero failures/duplicate flags. Every
+new image was visually reviewed. The targeted count is 20 whole objects and ten
+isolated references, with 50 images; the earlier Cleveland baseline is separate.
+Final store: 50 records, 70 assets, 12 active mark crops; all 140 referenced
+original/normalized files and active crops pass hash/decode checks, SQLite
+integrity and foreign keys pass. Two bad manual crop selections were detected
+before indexing and retained as removed history.
+
+Local ResNet-18 weights match the full pinned digest. Actual CPU indexing and
+query/HTML generation ran without an inference API: 22 marked images/crops across
+17 records (seven whole objects, ten isolated mark references). Six source-family
+holdouts gave P@1=3/6 and Hit@5=4/6; 23/30 returned top-five slots were different
+families. Eight correlated repeated-inset cases gave 7/8 first and 8/8 top-five;
+17 synthetic perturbations gave 17/17 first. Zero independent owner photographs;
+no independent-capture precision or authentication false-accept rate is claimed.
+Three hard-negative pairs retain source-attribution uncertainty.
+
+**577 tests passed**, including 18 new synthetic persistence/retrieval tests. They
+cover complete multi-volume restoration, existing-tree preservation, missing
+dataset refusal, corrupted/unsafe/extra archive entries, source/rights gates,
+exclusion invalidation, crop-parent removal, tampered reference/model revisions,
+exact-self exclusion, stratified evaluation, report escaping/CSP, database
+overwrite refusal, symlink escape and no implicit model download. Tests do not
+download weights or call inference APIs. Ruff lint, all 72 Python-file formatting
+checks and whitespace checks pass. Existing Starlette/AnyIO warning remains.
+
+The embedding stack is optional CPU-only; no pre-existing locked dependency
+version changed. No Haiku/provider, financial, budget or historical-run code was
+changed. No paid infrastructure, Anthropic call, model training or merge occurred.
+
+The new self-contained private backup has five volumes and 312 hashed payloads.
+A full separate-directory restore using the production persistence CLI verified
+all 312 hashes, SQLite integrity/foreign keys, 70 assets, 12 active crops and all
+140 original/normalized media references. The owner-only private Page receives
+all volumes and the manifest; no private payload is staged or sent to GitHub.
