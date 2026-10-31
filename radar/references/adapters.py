@@ -4,9 +4,16 @@ import html
 import re
 from urllib.parse import urlencode
 
+from radar.references.network import StopCollection
 from radar.references.schema import Assertion, Item, PhotoRef
 
 CC0 = "https://creativecommons.org/publicdomain/zero/1.0/"
+
+
+class RejectRecord(Exception):
+    """A permanently missing catalog record, not a transport/access-policy failure."""
+
+    reason = "SOURCE_OBJECT_NOT_FOUND"
 
 
 def text(value):
@@ -93,9 +100,14 @@ class Met:
         )
 
     def item(self, http, raw):
-        r = http.json(
-            f"https://collectionapi.metmuseum.org/public/collection/v1/objects/{raw['id']}"
-        )
+        try:
+            r = http.json(
+                f"https://collectionapi.metmuseum.org/public/collection/v1/objects/{raw['id']}"
+            )
+        except StopCollection as exc:
+            if exc.category == "HTTP_ERROR" and exc.status == 404:
+                raise RejectRecord() from None
+            raise
         page = r["objectURL"]
         photos = []
         if r.get("isPublicDomain") is True:
@@ -126,6 +138,9 @@ class Met:
                     "medium": "stated_material",
                     "dimensions": "stated_dimensions",
                     "measurements": "source_measurements",
+                    "creditLine": "source_credit",
+                    "objectNumber": "catalog_identity",
+                    "classification": "source_classification",
                     "culture": "cultural_attribution",
                     "country": "attributed_origin",
                 },

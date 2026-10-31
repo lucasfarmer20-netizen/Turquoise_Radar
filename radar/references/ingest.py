@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
-from radar.references.adapters import ADAPTERS, Manifest
+from radar.references.adapters import ADAPTERS, Manifest, RejectRecord
 from radar.references.media import MAX_BYTES, InvalidImage, normalize, write_blob
 from radar.references.network import PoliteHTTP, StopCollection
 from radar.references.store import audit, connect, dump, exclusive, get_source, now
@@ -15,7 +15,7 @@ from radar.references.store import audit, connect, dump, exclusive, get_source, 
 JEWELRY = re.compile(
     r"\b(jewel(?:ry|lery)?|bracelets?|cuffs?|finger[- ]?rings?|rings?|"
     r"earrings?|necklaces?|pendants?|brooch(?:es)?|bolo|concho|silversmith|"
-    r"hallmarks?|bangles?|diadem|ornaments?|belt buckle)\b",
+    r"hallmarks?|bangles?|diadem|ornaments?|belt buckle|conchas?|ketoh|watchbands?|naja)\b",
     re.I,
 )
 NOT_OBJECT = re.compile(
@@ -246,12 +246,15 @@ def collect(
                             )
                         stats["pages"] += 1
                         continue
+                    rejection = None
                     try:
                         item = adapter.item(http, json.loads(queued["payload"]))
+                    except RejectRecord as exc:
+                        item, rejection = None, exc.reason
                     except (ValidationError, KeyError, TypeError):
                         item = None
                     if item is None or not relevant(item) or not item.photos:
-                        reason = (
+                        reason = rejection or (
                             "INVALID_METADATA"
                             if item is None
                             else "NOT_JEWELRY"

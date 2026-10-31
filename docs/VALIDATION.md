@@ -599,3 +599,48 @@ six owner workflow pages responded with expected content.
   remain separate validation work. Other sources' access limits do not block CMA.
   No bulk collection or automatic merge was performed. See the
   [sanitized live guide](JRI-001.md#final-bounded-live-validation--october-30-2026-alaska-time).
+
+## JRI-002 targeted acquisition — October 30, 2026, Alaska time
+
+- Started `feat/jri-002-targeted-acquisition` from merged PR #10/main
+  `0cf143316bab2d7bc2be0b0b006d1b81b8d2ae31` in the existing checkout. All original
+  20 Cleveland item/asset records, original queue/cursor, 106 assertions and 40
+  image hashes match the preservation snapshot. A separate restore of both private
+  backup volumes verified all 48 payload files, 20 assets and database integrity.
+- Five bounded exact Met queries produced 45 durable query observations covering
+  41 distinct catalog IDs: 40 conservative relevance rejections, four no-eligible-
+  image observations and one missing source object. **Zero new real images or
+  image-backed Southwestern references were collected.** Two Zuni necklace records
+  are useful metadata-only leads, with `isPublicDomain=false` and no exposed images.
+  No maker, hallmark, construction/material or genuine-negative image success is
+  claimed. The first 20–50 relevant-image review remains unfulfilled.
+- Reproduced and fixed an object-detail 404 stopping the entire Met queue. It now
+  persists `SOURCE_OBJECT_NOT_FOUND` and continues; the four pending Zuni records
+  resumed with no new search page. Access denials, robots errors, rate limits and
+  server failures still pause. Source credit/catalog identity/classification and
+  Southwestern object terminology are retained without weakening image rights.
+- Registered four search-discovered prospects as disabled REFERENCE_ONLY sources;
+  retained all prior reviews/exclusions. Source-specific priorities, terms leads,
+  normal access requirements and fair-use assessment gaps are documented. No real
+  gallery source was approved or imported via a manifest on incomplete evidence.
+- The owner published four gallery hosts, but the active worker still enforces
+  revision 1 without those hosts. Each normal robots probe stopped at
+  NETWORK_PROXY_BLOCK without a destination HTTP status. No environment restart/
+  rebind tool is exposed. Gallery acquisition requires a fresh configured worker;
+  neither a proxy bypass nor an alternative gallery/image fetch was used.
+- Added offline targeted triage and append-only reference reviews with bound item,
+  photograph/crop and assertion evidence. Catalog claims, photo observations and
+  independent documented evidence remain distinct. Imported origin is separate
+  from imitation; Mexican origin alone creates neither negative classification.
+  Related components retain a shared split key through excluded intermediates.
+  Updated/HOLD reviews, removed images and superseded evidence cannot retain stale
+  success counts. No review becomes an authenticated or automatic training label.
+- **559 tests pass**, including 70 reference cases. New regressions cover the live
+  stale-ID behavior and retained 403/429/503 stops, candidate semantics, source-to-
+  independent evidence rejection, cross-item evidence checks, reversible/idempotent
+  reviews, mark crops, corrected evidence and relationship split leakage. Ruff,
+  formatting and whitespace checks pass; the existing Starlette/AnyIO warning remains.
+- This phase remains acquisition-blocked and is not ready to scale. The draft PR
+  records reviewable workflow/code and honest live findings. No Anthropic, paid
+  service, model download, training, Haiku, financial/budget or historical-run change,
+  public dataset upload or automatic merge occurred. See [JRI-002](JRI-002.md).
