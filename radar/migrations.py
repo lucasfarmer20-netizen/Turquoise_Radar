@@ -129,7 +129,27 @@ VERSION_5 = [
         run_id INTEGER NOT NULL REFERENCES vision_runs(id), owner_id VARCHAR NOT NULL,
         amount_usd VARCHAR NOT NULL, evidence TEXT NOT NULL, created_at DATETIME NOT NULL)""",
 ]
-CURRENT_VERSION = 5
+VERSION_6 = [
+    """CREATE TABLE maker_cases (id INTEGER PRIMARY KEY,
+        listing_id INTEGER REFERENCES listings(id), data JSON NOT NULL,
+        created_at DATETIME NOT NULL)""",
+    """CREATE TABLE maker_photos (id VARCHAR PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES maker_cases(id), role VARCHAR NOT NULL,
+        content_hash VARCHAR NOT NULL, data JSON NOT NULL, created_at DATETIME NOT NULL)""",
+    """CREATE TABLE maker_runs (id INTEGER PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES maker_cases(id), data JSON NOT NULL,
+        created_at DATETIME NOT NULL)""",
+    """CREATE TABLE maker_decisions (id INTEGER PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES maker_cases(id),
+        run_id INTEGER REFERENCES maker_runs(id), candidate_id VARCHAR, action VARCHAR NOT NULL,
+        data JSON NOT NULL, created_at DATETIME NOT NULL)""",
+    """CREATE TABLE maker_scenarios (id INTEGER PRIMARY KEY,
+        case_id INTEGER NOT NULL REFERENCES maker_cases(id), data JSON NOT NULL,
+        created_at DATETIME NOT NULL)""",
+    "CREATE INDEX ix_maker_runs_case ON maker_runs(case_id)",
+    "CREATE INDEX ix_maker_decisions_case ON maker_decisions(case_id)",
+]
+CURRENT_VERSION = 6
 
 
 def migrate(engine):
@@ -165,6 +185,9 @@ def migrate(engine):
                     conn.exec_driver_sql(statement)
             if version < 5:
                 for statement in VERSION_5:
+                    conn.exec_driver_sql(statement)
+            if version < 6:
+                for statement in VERSION_6:
                     conn.exec_driver_sql(statement)
             conn.exec_driver_sql(f"PRAGMA user_version={CURRENT_VERSION}")
             conn.commit()

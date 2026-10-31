@@ -135,6 +135,16 @@ reviewed 18 relationships with zero established independent corroborations; four
 text-only factual records bring the directory to 641 while preserving the existing
 book evidence, visual index and owner evaluation photographs.
 
+## Identify jewelry and review likely makers (JRI-005)
+
+Open **Identify jewelry** to upload private photographs, crop a hallmark and compare
+up to five likely maker/shop candidates. One published reference can support a
+candidate; additional corroboration is optional. Inspect citations and eligible
+images, confirm/reject candidates or correct a reading, then continue in the
+workbench with visibly conditional maker-based comparable scenarios. Owner decisions
+stay separate from source claims and do not train a model or alter listing finances.
+See the [owner workflow, local setup and persistence notes](docs/JRI-005.md).
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
