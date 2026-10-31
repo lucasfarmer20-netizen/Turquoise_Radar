@@ -119,6 +119,9 @@ def crop(root, asset_id, box):
             buf = io.BytesIO()
             im.crop(box).save(buf, format="PNG")
         normalized, info = normalize(buf.getvalue())
+        from radar.references.holdout import assert_reference_allowed
+
+        assert_reference_allowed(root, info["original_hash"], info["normalized_hash"])
         path = write_blob(root, "crops", info["normalized_hash"], normalized)
         id_ = identity(asset_id, box, "jri-pixels-1")
         with c:
@@ -248,6 +251,9 @@ def export_dataset(root, version, *, include_fair_use=False, split_mode="artist"
                     continue
                 if hashlib.sha256(path.read_bytes()).hexdigest() != asset["normalized_hash"]:
                     raise ValueError("Export image integrity failed")
+                from radar.references.holdout import assert_reference_allowed
+
+                assert_reference_allowed(root, asset["original_hash"], asset["normalized_hash"])
                 photos.append(
                     {
                         "id": asset["id"],
@@ -264,6 +270,7 @@ def export_dataset(root, version, *, include_fair_use=False, split_mode="artist"
                     cp = local_file(root, cd["path"])
                     if not cp.exists() or hashlib.sha256(cp.read_bytes()).hexdigest() != cd["hash"]:
                         raise ValueError("Export crop integrity failed")
+                    assert_reference_allowed(root, cd["hash"])
                     photos.append(
                         {
                             "id": cr["id"],

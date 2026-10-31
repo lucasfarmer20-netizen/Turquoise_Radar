@@ -63,6 +63,9 @@ def assertion(c, item_id, value):
 
 def save_asset(c, root, source, item_id, photo, raw):
     normalized, info = normalize(raw)
+    from radar.references.holdout import assert_reference_allowed
+
+    assert_reference_allowed(root, info["original_hash"], info["normalized_hash"])
     id_ = identity(item_id, photo.url)
     original = write_blob(root, "originals", info["original_hash"], raw)
     norm = write_blob(root, "normalized", info["normalized_hash"], normalized)

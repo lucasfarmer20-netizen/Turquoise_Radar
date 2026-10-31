@@ -739,3 +739,31 @@ A full separate-directory restore using the production persistence CLI verified
 all 312 hashes, SQLite integrity/foreign keys, 70 assets, 12 active crops and all
 140 original/normalized media references. The owner-only private Page receives
 all volumes and the manifest; no private payload is staged or sent to GitHub.
+
+## JRI-004 — Factual directory and frozen-photo comparison
+
+- Started from merged PR #12 / main `feb38baf0db9398ea2dc267b676c790e7eb4212b`.
+  The complete prior five-volume backup passed all 312 payload hashes; SQLite,
+  foreign keys, media and crops verified. All 313 historical reference-store
+  files remain byte-identical after this stage.
+- Added 500 active source-attributed factual directory entries across seven
+  Art-Amerindien pages. Two additional entries remain quality-excluded in history;
+  three source-caption conflicts remain explicit. Reused 17 existing eligible
+  library records, grouping repeated object views: 517 active companion records.
+  No new reference image was downloaded, and the original 22-image index was not
+  rebuilt. Other reviewed source restrictions remain in effect.
+- Reran all 16 frozen photographs; original top-five IDs/scores reproduce to eight
+  decimal places. Expanded manual-text/visual comparison returns two source-supported
+  research candidates and 14 UNKNOWN. Evaluation identities remain unverified;
+  no measured accuracy or independent abstention improvement is claimed.
+- **634 offline tests pass**, including 57 new synthetic intake/directory/evidence/
+  persistence cases. Ruff lint, all 83 Python-file formatting checks and whitespace
+  checks pass. The same pre-existing Starlette/AnyIO deprecation warning remains.
+  Full TestClient tests use approved local socket access; no paid/provider requests.
+- The new combined handoff contains **455 payloads across ten bounded ZIP volumes**.
+  A separate restore verifies every payload, both private SQLite stores, media,
+  original evaluation manifest and all 16 original photographs. It refuses to
+  overwrite existing private trees. Private data, source snapshots, reports,
+  database, index and backup files are excluded from GitHub.
+- No Haiku, financial, historical-run or cloud configuration change; no Anthropic
+  requests, provider image upload, paid hosting/training, LoRA or automatic merge.

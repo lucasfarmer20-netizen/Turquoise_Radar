@@ -152,6 +152,9 @@ def references(root, include_fair_use=False):
             raw = local_file(root, path).read_bytes()
             if hash_bytes(raw) != digest:
                 raise ValueError("Reference image integrity failed")
+            from radar.references.holdout import assert_reference_allowed
+
+            assert_reference_allowed(root, digest, asset["original_hash"], asset["normalized_hash"])
             catalog = json.loads(item["data"])
             rows.append(
                 {
