@@ -16,6 +16,26 @@ from radar.references.similarity import Encoder, search
 from radar.references.store import private_root
 
 
+def source_details(record):
+    """Render a book citation without inventing a web URL or embedding its scans."""
+    esc = lambda value: html.escape(str(value))  # noqa: E731
+    if record.get("source_kind") == "MANUAL_BOOK":
+        c = record["citation"]
+        return (
+            f"<p>{esc(c['author'])} — {esc(c['title'])}, {esc(c['edition'])} edition, "
+            f"printed p. {esc(c['printed_page'])}; entry {esc(c['entry_id'])}. "
+            "Private book evidence; published attribution, not authentication.</p>"
+        )
+    return (
+        f'<a rel="noreferrer" href="{esc(record["source_url"])}">Original directory page</a>; '
+        "photographs remain external links, no copying approval: "
+        + " ".join(
+            f'<a rel="noreferrer" href="{esc(u)}">reference mark {n + 1}</a>'
+            for n, u in enumerate(record["image_urls"])
+        )
+    )
+
+
 def evaluate(directory, library, baseline, annotations, output, weights):
     baseline, output = Path(baseline).resolve(), Path(output).resolve()
     library = Path(library).resolve()
@@ -145,11 +165,8 @@ def render(library, baseline, destination, receipt):
             parts += ["<li>No supported directory lead for the reviewed query information.</li>"]
         for c in r["candidates"]:
             parts += [
-                f'<li><strong>{esc(c["maker_name"])}</strong> — {esc(c["evidence"])}; {esc(c["attribution"])}<p>Reported literal mark: {esc(c["transcription"])} ({esc(c["transcription_status"])})</p><p>Description: {esc(c["description"])}</p><p>Contradictions: {esc(c["contradictions"])}</p><a rel="noreferrer" href="{esc(c["source_url"])}">Original directory page</a>; photographs remain external links, no copying approval: '  # noqa: E501
-                + " ".join(
-                    f'<a rel="noreferrer" href="{esc(u)}">reference mark {n + 1}</a>'
-                    for n, u in enumerate(c["image_urls"])
-                )
+                f"<li><strong>{esc(c['maker_name'])}</strong> — {esc(c['evidence'])}; {esc(c['attribution'])}<p>Reported literal mark: {esc(c['transcription'])} ({esc(c['transcription_status'])})</p><p>Description: {esc(c['description'])}</p><p>Contradictions: {esc(c['contradictions'])}</p>"  # noqa: E501
+                + source_details(c)
                 + "</li>"
             ]
         parts += [

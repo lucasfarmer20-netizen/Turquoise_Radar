@@ -17,6 +17,8 @@ COMPONENTS = {"jri", "directory", "evaluation"}
 
 
 def check(root):
+    from radar.references.books import verify as verify_books
+
     root = Path(root)
     evaluation = root / "evaluation" / "package"
     manifest = json.loads((evaluation / "manifest.json").read_text())
@@ -30,6 +32,7 @@ def check(root):
     return {
         "library": verify(root / "jri"),
         "directory": stats(root / "directory"),
+        "book_evidence": verify_books(root / "directory"),
         "evaluation_originals": len(manifest["items"]),
     }
 
@@ -189,13 +192,20 @@ def main():
     q.add_argument("--library", type=Path, default=Path("data/jri"))
     q.add_argument("--directory", type=Path, default=Path("data/jri-directory"))
     q.add_argument("--evaluation", type=Path, default=Path("data/jri004-owner-baseline"))
+    q.add_argument("--volume-mib", type=int, choices=range(1, 31), default=8)
     q = sub.add_parser("restore")
     q.add_argument("backup_root", type=Path)
     q.add_argument("destination", type=Path)
     q.add_argument("--manifest-sha256", required=True)
     a = p.parse_args()
     result = (
-        backup(a.destination, a.library, a.directory, a.evaluation)
+        backup(
+            a.destination,
+            a.library,
+            a.directory,
+            a.evaluation,
+            volume_bytes=a.volume_mib * 1024 * 1024,
+        )
         if a.command == "backup"
         else restore(a.backup_root, a.destination, a.manifest_sha256)
     )

@@ -58,7 +58,7 @@ def connect(root, *, write=False):
     c.execute("PRAGMA foreign_keys=ON")
     c.execute("PRAGMA busy_timeout=5000")
     try:
-        if c.execute("PRAGMA user_version").fetchone()[0] != 1:
+        if c.execute("PRAGMA user_version").fetchone()[0] not in {1, 2}:
             raise ValueError("Unsupported directory schema")
         yield c
         if write:
@@ -86,6 +86,10 @@ def initialize(root, library):
 
 
 def validate_review(data):
+    if data.get("source_kind") == "MANUAL_BOOK":
+        from radar.references.book_source import validate_review as validate_book_review
+
+        return validate_book_review(data)
     required = {
         "source",
         "hosts",
@@ -142,7 +146,11 @@ def current_review(c, source):
     if not r:
         raise ValueError("Missing source review")
     data = validate_review(json.loads(r["data"]))
-    if datetime.now(UTC) - datetime.fromisoformat(data["reviewed_at"]) > timedelta(days=30):
+    # Offline, pinned editions do not acquire new terms/content every 30 days.
+    # Revocation still applies. Each expansion needs its own bounded reviewed packet.
+    if data.get("source_kind") != "MANUAL_BOOK" and (
+        datetime.now(UTC) - datetime.fromisoformat(data["reviewed_at"]) > timedelta(days=30)
+    ):
         raise ValueError("Source review expired; reassessment required")
     return r["id"], data
 
@@ -195,6 +203,8 @@ def validate_record(record):
 def upsert(c, record, review_id, source):
     r = validate_record(record)
     current_id, current = current_review(c, source)
+    if current.get("source_kind") == "MANUAL_BOOK":
+        raise ValueError("Book entries require the offline reviewed-packet importer")
     if current_id != review_id or not current["facts_allowed"]:
         raise ValueError("Current eligible factual source review required")
     approved_url(r["source_url"], current)
@@ -435,6 +445,8 @@ def collect(
 
 
 def search(root, query, limit=20, *, partial=False):
+    from radar.references.books import relationships as book_relationships
+
     terms = normalize_text(query).split()
     if not terms or not 1 <= limit <= 100:
         raise ValueError("Nonempty bounded search required")
@@ -463,7 +475,7 @@ def search(root, query, limit=20, *, partial=False):
                         "SELECT data FROM events WHERE event='RELATIONSHIP_REVIEW' AND subject=?",
                         (row["id"],),
                     )
-                ]
+                ] + book_relationships(c, row["id"])
                 result.append(record)
             if len(result) == limit:
                 break
@@ -477,10 +489,14 @@ def source_registry(root):
         for row in c.execute("SELECT source FROM current_reviews"):
             if row[0] not in entries:
                 _, reviewed = current_review(c, row[0])
-                entries[row[0]] = {
-                    "directory_url": reviewed["terms_urls"][0],
-                    "terms_url": reviewed["terms_urls"][0],
-                }
+                entries[row[0]] = (
+                    {"source_kind": "MANUAL_BOOK", "book": reviewed["book"]}
+                    if reviewed.get("source_kind") == "MANUAL_BOOK"
+                    else {
+                        "directory_url": reviewed["terms_urls"][0],
+                        "terms_url": reviewed["terms_urls"][0],
+                    }
+                )
         for source, links in entries.items():
             try:
                 _, review = current_review(c, source)
@@ -545,10 +561,12 @@ def hybrid(root, transcript="", *, legibility="PARTIAL", description="", visual_
                     leads[r["record_id"]] = r
     candidates = []
     for r in leads.values():
-        literal = distinct_tokens(r.get("transcription"))
+        # A book may report multiple marks for one person. Their union is not one
+        # literal inscription, and unknown/pictorial prose is never a text variant.
+        variants = r.get("transcription_variants", [r.get("transcription")])
         exact = bool(
             distinctive
-            and tokens == literal
+            and any(tokens == distinct_tokens(v) for v in variants)
             and r["transcription_status"] in {"LEGIBLE", "REPORTED"}
             and legibility == "LEGIBLE"
             and not r.get("contradictions")
@@ -585,10 +603,11 @@ def hybrid(root, transcript="", *, legibility="PARTIAL", description="", visual_
     filtered_visual.sort(key=lambda m: (-m["adjusted_similarity"], m["reference_id"]))
     supported = [c for c in candidates if c["textual_support"]]
     identities = {c["entity_id"] for c in supported}
+    unambiguous = len(identities) == 1 and not any(c.get("shared_stamp_claims") for c in supported)
     return {
-        "decision": "CANDIDATE" if len(identities) == 1 else "UNKNOWN",
+        "decision": "CANDIDATE" if unambiguous else "UNKNOWN",
         "reason": "SOURCE_MARK_TEXT_SUPPORT_NOT_AUTHENTICATION"
-        if len(identities) == 1
+        if unambiguous
         else "NO_UNAMBIGUOUS_SUPPORTED_MATCH",
         "candidates": candidates[:10],
         "visual_candidates": filtered_visual,
