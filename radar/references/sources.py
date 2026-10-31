@@ -70,6 +70,39 @@ REFERENCE_ONLY = [
         "Candidate vintage/artist reference; source-specific collection terms not established. "
         "Not eligible for INTERNAL_FAIR_USE until reviewed.",
     ),
+    (
+        "horsekeeping",
+        "Horsekeeping",
+        "https://www.horsekeeping.com/native-american-jewelry-artifacts.htm",
+        "https://www.horsekeeping.com/about-horsekeeping-com.htm",
+        "Search-discovered Bell Trading, Mexican/alpaca and hallmark candidate. "
+        "Copyright/terms and normal technical access require direct review; "
+        "no collection approval.",
+    ),
+    (
+        "kayben",
+        "KayBen Treasures",
+        "https://www.kaybentreasures.com/hallmarks",
+        "https://www.kaybentreasures.com/",
+        "Search-discovered photographic hallmark candidate. Specific terms URL and access "
+        "remain unverified; home page is a review starting point, not a license.",
+    ),
+    (
+        "sw-style",
+        "The Southwestern Style Gallery",
+        "https://theswstyle.com/",
+        "https://theswstyle.com/pages/return-policy",
+        "Vintage/estate candidate. Return policy is not image reuse permission; copyright, "
+        "contractual terms and access require separate review.",
+    ),
+    (
+        "sw-silver-gallery",
+        "Southwest Silver Gallery",
+        "https://www.southwestsilvergallery.com/",
+        "https://www.southwestsilvergallery.com/terms-and-conditions/",
+        "Indexed terms restrict use to personal/noncommercial purposes, reproduction and "
+        "unapproved automated access. Research link only; do not activate collection.",
+    ),
 ]
 
 

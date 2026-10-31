@@ -15,6 +15,7 @@ Origin = Literal[
     "INDEPENDENT_TEST",
     "MODEL_PREDICTION",
     "COMMUNITY_CATALOG",
+    "REFERENCE_REVIEW",
 ]
 
 

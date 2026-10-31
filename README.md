@@ -325,3 +325,10 @@ The final Cleveland pilot saved 20 unique real images from 20 discovered records
 including a bounded 10-image continuation across a controlled interruption. The
 original ten images are unchanged. Other sources retain separate access limits;
 see the guide for actual relevance, diagnostics and scaling limitations.
+
+The [JRI-002 acquisition and review guide](docs/JRI-002.md) adds private targeted
+triage, evidence-separated visual reviews and related-item split protection.
+Its bounded Met test collected zero new images; gallery acquisition awaits a fresh
+environment with the published host policy. The 20 Cleveland references and their
+verified backups remain intact. Candidate tags and gallery attributions are not
+authentication or verified negative examples.

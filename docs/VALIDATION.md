@@ -599,3 +599,98 @@ six owner workflow pages responded with expected content.
   remain separate validation work. Other sources' access limits do not block CMA.
   No bulk collection or automatic merge was performed. See the
   [sanitized live guide](JRI-001.md#final-bounded-live-validation--october-30-2026-alaska-time).
+
+## JRI-002 targeted acquisition — October 30, 2026, Alaska time
+
+- Started `feat/jri-002-targeted-acquisition` from merged PR #10/main
+  `0cf143316bab2d7bc2be0b0b006d1b81b8d2ae31` in the existing checkout. All original
+  20 Cleveland item/asset records, original queue/cursor, 106 assertions and 40
+  image hashes match the preservation snapshot. A separate restore of both private
+  backup volumes verified all 48 payload files, 20 assets and database integrity.
+- Five bounded exact Met queries produced 45 durable query observations covering
+  41 distinct catalog IDs: 40 conservative relevance rejections, four no-eligible-
+  image observations and one missing source object. **Zero new real images or
+  image-backed Southwestern references were collected.** Two Zuni necklace records
+  are useful metadata-only leads, with `isPublicDomain=false` and no exposed images.
+  No maker, hallmark, construction/material or genuine-negative image success is
+  claimed. The first 20–50 relevant-image review remains unfulfilled.
+- Reproduced and fixed an object-detail 404 stopping the entire Met queue. It now
+  persists `SOURCE_OBJECT_NOT_FOUND` and continues; the four pending Zuni records
+  resumed with no new search page. Access denials, robots errors, rate limits and
+  server failures still pause. Source credit/catalog identity/classification and
+  Southwestern object terminology are retained without weakening image rights.
+- Registered four search-discovered prospects as disabled REFERENCE_ONLY sources;
+  retained all prior reviews/exclusions. Source-specific priorities, terms leads,
+  normal access requirements and fair-use assessment gaps are documented. No real
+  gallery source was approved or imported via a manifest on incomplete evidence.
+- The owner published four gallery hosts, but the active worker still enforces
+  revision 1 without those hosts. Each normal robots probe stopped at
+  NETWORK_PROXY_BLOCK without a destination HTTP status. No environment restart/
+  rebind tool is exposed. Gallery acquisition requires a fresh configured worker;
+  neither a proxy bypass nor an alternative gallery/image fetch was used.
+- Added offline targeted triage and append-only reference reviews with bound item,
+  photograph/crop and assertion evidence. Catalog claims, photo observations and
+  independent documented evidence remain distinct. Imported origin is separate
+  from imitation; Mexican origin alone creates neither negative classification.
+  Related components retain a shared split key through excluded intermediates.
+  Updated/HOLD reviews, removed images and superseded evidence cannot retain stale
+  success counts. No review becomes an authenticated or automatic training label.
+- **559 tests pass**, including 70 reference cases. New regressions cover the live
+  stale-ID behavior and retained 403/429/503 stops, candidate semantics, source-to-
+  independent evidence rejection, cross-item evidence checks, reversible/idempotent
+  reviews, mark crops, corrected evidence and relationship split leakage. Ruff,
+  formatting and whitespace checks pass; the existing Starlette/AnyIO warning remains.
+- This phase remains acquisition-blocked and is not ready to scale. The draft PR
+  records reviewable workflow/code and honest live findings. No Anthropic, paid
+  service, model download, training, Haiku, financial/budget or historical-run change,
+  public dataset upload or automatic merge occurred. See [JRI-002](JRI-002.md).
+
+### JRI-002 requested backup restore and renewed network verification
+
+- Continued PR #11 at `b3300c9` in its existing branch. Verified the exact SHA-256
+  digests of both final backup volumes and the latest checkpoint, restored them in
+  documented order into private `data/jri/`, and verified all 69 payload hashes.
+- SQLite integrity/foreign keys and every referenced original/normalized image
+  hash pass. Baseline: 20 Cleveland references, 20 unique originals, 40 media files,
+  45 Met observations. Preserved the prior private tree; its logical database rows
+  match the restored backup even though SQLite file bytes differed.
+- One normal robots probe each to Horsekeeping, KayBen, Perry Null, Turquoise
+  Traders, T.Skies, Medicine Man and Art-Amerindien stopped at NETWORK_PROXY_BLOCK
+  without a destination HTTP status. Current runtime policy still omits all seven
+  hosts. Diagnostic rate state was written to a separate private database copy.
+- Zero new images, items, maker references, usable hallmark photographs or reviewed
+  construction views. No new source approval, adapter defect or regression claim.
+  The specialized acquisition goal remains blocked; no larger batch is justified.
+- All 559 existing tests pass, with lint, formatting and whitespace checks passing.
+  The existing Starlette/AnyIO deprecation warning remains. All 69 restored payload
+  hashes still match after diagnostics and verification.
+- No access bypass, blank database, private GitHub upload, Anthropic/training/paid
+  call, financial/Haiku/historical-run change or merge occurred.
+
+## JRI-002 restored targeted batch — October 30, 2026 (Alaska)
+
+Restored all three archive SHA-256 digests and 69 payload hashes before acquisition.
+Verified 20 Cleveland items, 20 unique originals, 40 media files and 45 Met queue
+observations, SQLite integrity/foreign keys and every stored media hash. The active
+private tree was absent; no existing tree or application database was replaced.
+
+The reviewed Art-Amerindien manifest imported 10 images for three paired catalogued
+cuffs and four standalone mark references. Seven queue rows are DONE. Eleven
+requests, zero rejected records/images and zero exact/near duplicate flags. Manual
+review retained three USABLE construction records and four LIMITED mark records;
+six image files have usable hallmark content, two more have limited blurry insets.
+No full-back photo, independently authenticated maker, assay or verified material
+negative was established. All private reviews and originals remain ignored.
+
+A pre-acquisition database backup supports row-for-row preservation checks: original
+20 items, 20 assets, 106 assertions, six streams and 65 queue records are unchanged.
+All 68 original non-database payloads are unchanged. Final SQLite integrity/foreign
+keys and hash/decode verification pass for all 30 assets / 60 media files.
+
+No collection defect was demonstrated; no production-code change or new regression
+test was needed for this batch. Full required offline test/lint results follow.
+
+Validation completed: **559 tests passed** (one existing Starlette/AnyIO
+deprecation warning), Ruff lint passed, all 68 Python files passed formatting,
+and whitespace checks passed. Tests used fixture/live-disabled flags and mocked
+provider transports; no Anthropic or gallery acquisition was performed by tests.

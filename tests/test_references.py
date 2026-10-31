@@ -30,6 +30,7 @@ from radar.references.network import PoliteHTTP, StopCollection, valid_url
 from radar.references.schema import Assertion, Item, Source
 from radar.references.sources import seed
 from radar.references.store import connect, dump, exclusive, get_source, put_source
+from radar.references.targeted import candidate_topics, review_item, review_report, triage
 
 
 @pytest.fixture(autouse=True)
@@ -936,3 +937,252 @@ def test_private_store_refuses_public_static_location():
     with pytest.raises(ValueError):
         private_root(root)
     assert not root.exists()
+
+
+@pytest.mark.parametrize("status", [404, 403, 429, 503])
+def test_met_missing_object_rejects_only_404_and_keeps_access_stops(root, status):
+    calls = []
+
+    def handler(req):
+        calls.append(req.url.path)
+        if req.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /")
+        if req.url.path.endswith("/search"):
+            return httpx.Response(200, json={"total": 2, "objectIDs": [1, 2]})
+        if req.url.path.endswith("/objects/1"):
+            return httpx.Response(status)
+        if req.url.path.endswith("/objects/2"):
+            return httpx.Response(
+                200,
+                json={
+                    "objectID": 2,
+                    "objectURL": "https://www.metmuseum.org/art/2",
+                    "title": "SYNTHETIC concha belt",
+                    "objectName": "Belt",
+                    "isPublicDomain": True,
+                    "culture": "SYNTHETIC Navajo attribution",
+                    "primaryImage": "https://images.metmuseum.org/2.png",
+                    "additionalImages": [],
+                    "objectNumber": "SYNTHETIC.2",
+                    "creditLine": "SYNTHETIC donor",
+                },
+            )
+        return httpx.Response(200, content=png())
+
+    clock = Clock()
+    result = collect(
+        root,
+        "met",
+        "SYNTHETIC concha",
+        transport=httpx.MockTransport(handler),
+        clock=clock,
+        sleep=clock.sleep,
+    )
+    with connect(root) as c:
+        row = c.execute("SELECT state,reason FROM queue WHERE external_id='1'").fetchone()
+        if status == 404:
+            assert tuple(row) == ("REJECTED", "SOURCE_OBJECT_NOT_FOUND")
+            assert result["images_stored"] == 1 and result["rejected_records"] == 1
+            assert result["status"] == "EXHAUSTED"
+            fields = {json.loads(r[0])["field"] for r in c.execute("SELECT data FROM assertions")}
+            assert {"catalog_identity", "source_credit", "cultural_attribution"} <= fields
+        else:
+            assert row["state"] == "PENDING"
+            assert result["http_status"] == status and result["status"] == "PAUSED"
+            assert "/public/collection/v1/objects/2" not in calls
+
+
+def test_target_candidates_do_not_infer_imports_or_authentication(root):
+    assert candidate_topics({"title": "SYNTHETIC Mexican Taxco silver ring"}) == ["MEXICAN_TAXCO"]
+    assert candidate_topics({"title": "SYNTHETIC imported Taxco silver ring"}) == [
+        "IMPORTED_ORIGIN",
+        "MEXICAN_TAXCO",
+    ]
+    tags = candidate_topics(
+        {
+            "title": "SYNTHETIC Navajo-style Bell Trading turquoise cuff",
+            "description": "Catalog claims nickel silver; not authenticated.",
+        }
+    )
+    assert {"BELL_TRADING", "NATIVE_AMERICAN", "TURQUOISE_CUFF", "BASE_METAL"} <= set(tags)
+    run(root, [cma(title="SYNTHETIC White Buffalo cuff")])
+    with connect(root) as c:
+        rows = triage(c)
+        assert len(rows) == 1 and rows[0]["review_required"] and not rows[0]["authenticated"]
+
+
+def synthetic_review(c, item_id=None):
+    row = (
+        c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+        if item_id
+        else c.execute("SELECT * FROM items ORDER BY external_id LIMIT 1").fetchone()
+    )
+    asset = c.execute("SELECT id FROM assets WHERE item_id=?", (row["id"],)).fetchone()[0]
+    return {
+        "item_id": row["id"],
+        "reviewer": "SYNTHETIC reviewer",
+        "reviewed_on": datetime.now(UTC).date().isoformat(),
+        "decision": "KEEP",
+        "image_quality": "USABLE",
+        "photo_ids": [asset],
+        "rationale": "SYNTHETIC visual review",
+        "findings": [
+            {
+                "topic": "MAKER",
+                "value": "SYNTHETIC catalog attribution",
+                "basis": "SOURCE_CLAIM",
+                "evidence_url": json.loads(row["data"])["page_url"],
+            }
+        ],
+    }
+
+
+def test_reference_reviews_keep_claims_separate_and_latest_decision(root):
+    run(root, [cma()])
+    with connect(root) as c:
+        review = synthetic_review(c)
+        assert review_item(c, review) == {"review_saved": True, "authenticated": False}
+        report = review_report(c)
+        assert report["kept_item_findings"] == {"MAKER": {"SOURCE_CLAIM": 1}}
+        review["decision"] = "HOLD"
+        review_item(c, review)
+        report = review_report(c)
+        assert report["reviewed_items"] == 1 and report["decisions"]["HOLD"] == 1
+        assert not report["kept_item_findings"] and not report["training_ready"]
+        review["decision"] = "KEEP"
+        review_item(c, review)
+        assert review_report(c)["decisions"]["KEEP"] == 1
+        count = c.execute("SELECT count(*) FROM assertions").fetchone()[0]
+        review_item(c, review)
+        assert c.execute("SELECT count(*) FROM assertions").fetchone()[0] == count
+        values = [json.loads(r[0]) for r in c.execute("SELECT data FROM assertions")]
+        assert all(v["status"] == "ATTRIBUTED" for v in values)
+
+
+@pytest.mark.parametrize(
+    "bad", ["foreign_photo", "foreign_assertion", "unretained_url", "gallery_independent"]
+)
+def test_reference_review_rejects_unbound_or_promoted_evidence(root, bad):
+    run(root, [cma(1), cma(2)])
+    with connect(root) as c:
+        review = synthetic_review(c)
+        other = c.execute("SELECT id FROM items WHERE id!=?", (review["item_id"],)).fetchone()[0]
+        if bad == "foreign_photo":
+            review["photo_ids"] = [
+                c.execute("SELECT id FROM assets WHERE item_id=?", (other,)).fetchone()[0]
+            ]
+        elif bad == "foreign_assertion":
+            review["findings"][0]["assertion_ids"] = [
+                c.execute("SELECT id FROM assertions WHERE item_id=?", (other,)).fetchone()[0]
+            ]
+        elif bad == "unretained_url":
+            review["findings"][0]["evidence_url"] = "https://unretained.invalid/evidence"
+        else:
+            add_evidence(
+                c,
+                review["item_id"],
+                {
+                    "field": "maker_attribution",
+                    "value": "SYNTHETIC gallery claim",
+                    "origin": "GALLERY",
+                    "status": "DOCUMENTED",
+                    "document_ref": "SYNTHETIC catalog",
+                },
+            )
+            id_ = c.execute("SELECT max(id) FROM assertions").fetchone()[0]
+            review["findings"][0] = {
+                "topic": "MAKER",
+                "value": "SYNTHETIC attribution",
+                "basis": "INDEPENDENT_EVIDENCE",
+                "assertion_ids": [id_],
+            }
+        before = c.execute("SELECT count(*) FROM assertions").fetchone()[0]
+        with pytest.raises(ValueError):
+            review_item(c, review)
+        assert c.execute("SELECT count(*) FROM assertions").fetchone()[0] == before
+
+
+def test_reviewed_relationships_prevent_leakage_when_intermediate_is_excluded(root):
+    tr, _ = transport([cma(1), cma(2), cma(3)])
+    base = tr.handle_request
+
+    def handler(req):
+        if req.url.host == "openaccess-cdn.clevelandart.org" and req.url.path != "/robots.txt":
+            return httpx.Response(200, content=png(int(req.url.path.split(".")[0].strip("/"))))
+        return base(req)
+
+    clock = Clock()
+    collect(
+        root,
+        "cma",
+        "SYNTHETIC relationships",
+        transport=httpx.MockTransport(handler),
+        clock=clock,
+        sleep=clock.sleep,
+    )
+    with connect(root) as c:
+        ids = [r[0] for r in c.execute("SELECT id FROM items ORDER BY external_id")]
+        first = synthetic_review(c, ids[0])
+        first["related_item_ids"] = [ids[1]]
+        review_item(c, first)
+        third = synthetic_review(c, ids[2])
+        third["related_item_ids"] = [ids[1]]
+        review_item(c, third)
+        exclude(c, item_id=ids[1])
+    export_dataset(root, "synthetic-reviewed-relationships", split_mode="item")
+    output = [
+        json.loads(line)
+        for line in (root / "exports/synthetic-reviewed-relationships/examples.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    assert len(output) == 2 and len({r["split_group"] for r in output}) == 1
+    assert len({r["images"][0]["hash"] for r in output}) == 2
+    assert all(not r["visual_training_targets"] for r in output)
+
+
+def test_reference_review_accepts_item_crops_without_promoting_hallmarks(root):
+    run(root, [cma()])
+    with connect(root) as c:
+        review = synthetic_review(c)
+        asset = review["photo_ids"][0]
+    crop_id = crop(root, asset, [0, 0, 80, 80])
+    review["photo_ids"].append(crop_id)
+    review["findings"].append(
+        {
+            "topic": "HALLMARK",
+            "value": "SYNTHETIC partial visible mark",
+            "basis": "PHOTO_OBSERVATION",
+            "photo_ids": [crop_id],
+        }
+    )
+    with connect(root) as c:
+        review_item(c, review)
+        assert review_report(c)["kept_item_findings"]["HALLMARK"] == {"PHOTO_OBSERVATION": 1}
+        exclude(c, asset_id=asset)
+        assert review_report(c)["reviewed_items"] == 0
+
+
+def test_reference_review_invalidates_superseded_support(root):
+    run(root, [cma()])
+    with connect(root) as c:
+        review = synthetic_review(c)
+        id_ = c.execute(
+            "SELECT id FROM assertions WHERE item_id=? ORDER BY id LIMIT 1", (review["item_id"],)
+        ).fetchone()[0]
+        review["findings"][0]["assertion_ids"] = [id_]
+        review_item(c, review)
+        assert review_report(c)["reviewed_items"] == 1
+        add_evidence(
+            c,
+            review["item_id"],
+            {
+                "field": "construction_or_medium",
+                "value": "SYNTHETIC correction",
+                "origin": "MUSEUM",
+                "supersedes": id_,
+            },
+        )
+        assert review_report(c)["reviewed_items"] == 0
+        with pytest.raises(ValueError, match="superseded"):
+            review_item(c, review)

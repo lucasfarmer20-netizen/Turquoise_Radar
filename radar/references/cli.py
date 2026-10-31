@@ -21,6 +21,7 @@ from radar.references.network import StopCollection
 from radar.references.schema import Source
 from radar.references.sources import seed
 from radar.references.store import connect, dump, exclusive, get_source
+from radar.references.targeted import review_item, review_report, triage
 
 
 def main():
@@ -30,6 +31,12 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     for name in ("init", "sources", "report", "purge"):
         sub.add_parser(name)
+    targeted = sub.add_parser("triage")
+    targeted.add_argument("--source")
+    targeted.add_argument("--limit", type=int, default=50)
+    item_review = sub.add_parser("review-item")
+    item_review.add_argument("file", type=Path)
+    sub.add_parser("review-report")
     review = sub.add_parser("review-source")
     review.add_argument("file", type=Path)
     batch = sub.add_parser("collect")
@@ -128,6 +135,12 @@ def main():
             print(dump({"review_saved": True}))
         elif args.cmd == "sources":
             print(dump([json.loads(r["data"]) for r in c.execute("SELECT data FROM sources")]))
+        elif args.cmd == "triage":
+            print(dump(triage(c, args.source, args.limit)))
+        elif args.cmd == "review-item":
+            print(dump(review_item(c, json.loads(args.file.read_text()))))
+        elif args.cmd == "review-report":
+            print(dump(review_report(c)))
         elif args.cmd == "search":
             print(dump(search(c, args.query, args.source)))
         elif args.cmd == "exclude":
