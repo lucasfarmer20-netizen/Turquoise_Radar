@@ -186,10 +186,14 @@ Fixture, sandbox and production identities are separate. Fixture statistics are
 non-live test counts, not marketplace results. Production is disabled by default
 and requires explicit environment approval/enablement plus individual run consent;
 credentials alone never activate it. No recurring monitoring is implemented.
-For JRI-006, the owner reports the developer application was rejected: production
-access remains unavailable indefinitely until verified approval is supplied. Keep
-both production flags false and use Quick Capture, manual/CSV/JSON or existing alert
-intake. No scraping, unofficial endpoints or third-party-key workaround is authorized.
+For JRI-011 (2026-11-01), the owner reports Developers Program approval.
+Production Browse connectivity remains unverified: this runtime lacks both eBay
+credentials and enforced access to `api.ebay.com`. The four-query pilot is prepared
+through existing Discovery settings, with no production requests sent. Keep fixture
+defaults until configuration is complete and the owner confirms the exact run.
+Quick Capture, manual/CSV/JSON and auction/marketplace intake remain available.
+No scraping, unofficial endpoints or third-party-key workaround is authorized.
+See [JRI-011 readiness, exact plan and blockers](docs/JRI-011.md).
 Read [eBay setup, permissions and limitations](docs/EBAY-SETUP.md) before any API use.
 
 ## Owner workflow (Task 002)
@@ -343,9 +347,9 @@ See [Task 002 usage and financial conventions](docs/CALIBRATION.md),
 Local multi-source intake works without API approval. Next, validate the provisional
 formats with permitted owner samples and improve auction cost allocations; eBay
 sandbox validation still requires secure credentials, access and current docs.
-The latest JRI-007 owner instruction describes approval as pending after the earlier
-JRI-006 rejection report. No verified approval is available and production stays disabled. No live request, public
-deployment or automated purchasing is authorized.
+Developer approval is owner-reported as granted for JRI-011. Successful Production
+Browse access is still unverified. There is no scheduled discovery, automatic
+purchasing or public deployment.
 
 See [JRI-006 manual pilot and pictorial-label correction](docs/JRI-006.md) for the
 bounded UNKNOWN-maker fix and the photographs needed to begin the real pilot.
@@ -381,8 +385,8 @@ authentication or verified negative examples.
 
 Use `/inbox?focus=auction` for ShopGoodwill, HiBid and estate-source leads.
 Existing manual, email and CSV/JSON intake, fee profiles, bid calculations and
-workbench review remain available. The latest owner instruction describes eBay
-approval as pending; production gates remain disabled until verified approval.
+workbench review remain available independently of eBay. Developer approval is
+now owner-reported as granted; JRI-011 separately prepares the gated Browse pilot.
 See [JRI-007 findings and alert setup](docs/JRI-007.md) for real sample results,
 source access limits and the blocked photographic pilot.
 
