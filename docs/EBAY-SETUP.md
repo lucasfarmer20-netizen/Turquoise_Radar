@@ -224,3 +224,10 @@ production request was made. Detail hydration, confirmed shipping quotes, user o
 purchase OAuth, sold-comparable research, scheduled discovery and automatic
 purchases remain outside this bounded pilot. API photo references are not book
 reference images and do not authorize third-party inference or training.
+
+### JRI-011 OAuth response compatibility
+
+The adapter accepts the documented `Application Access Token` type and continues
+using Bearer authorization for Browse. OAuth errors expose only stage, HTTP status
+and an allowlisted error code or `UNKNOWN`; descriptions and raw bodies are never
+retained. See [the correction and one-time execution outcome](JRI-011-OAUTH.md).

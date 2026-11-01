@@ -76,7 +76,8 @@ def test_production_and_source_gates():
     assert "TEST-CLIENT-SECRET" not in repr(connection())
 
 
-def test_oauth_cache_and_expiry_with_mocked_credentials():
+@pytest.mark.parametrize("token_type", ["Bearer", "Application Access Token"])
+def test_oauth_cache_and_expiry_with_mocked_credentials(token_type):
     async def check():
         calls = []
         now = [100.0]
@@ -90,7 +91,11 @@ def test_oauth_cache_and_expiry_with_mocked_credentials():
                 assert b"grant_type=client_credentials" in request.content
                 return httpx.Response(
                     200,
-                    json={"access_token": "TEST-BEARER", "expires_in": 120, "token_type": "Bearer"},
+                    json={
+                        "access_token": "TEST-BEARER",
+                        "expires_in": 120,
+                        "token_type": token_type,
+                    },
                 )
             assert request.headers["Authorization"] == "Bearer TEST-BEARER"
             return httpx.Response(200, json={"total": 0})
@@ -196,6 +201,10 @@ def test_retry_exhaustion_and_network_timeout():
         [],
         {},
         {"access_token": "x", "expires_in": 0},
+        {"access_token": " ", "expires_in": 100},
+        {"access_token": "x", "expires_in": True},
+        {"access_token": "x", "expires_in": "7200"},
+        {"access_token": "x", "expires_in": 100, "token_type": "User Access Token"},
         {"access_token": "x", "expires_in": 100, "token_type": 7},
     ],
 )
@@ -642,7 +651,12 @@ def test_jri011_exact_broad_plan_and_observation_budget_with_mocked_production(c
         if request.url.path.endswith("/token"):
             tokens.append(request)
             return httpx.Response(
-                200, json={"access_token": "SYNTHETIC-BEARER", "expires_in": 3600}
+                200,
+                json={
+                    "access_token": "SYNTHETIC-BEARER",
+                    "expires_in": 3600,
+                    "token_type": "Application Access Token",
+                },
             )
         calls.append(dict(request.url.params))
         assert request.headers["X-EBAY-C-MARKETPLACE-ID"] == "EBAY_US"
@@ -716,3 +730,51 @@ def test_jri011_exact_broad_plan_and_observation_budget_with_mocked_production(c
         assert shared.original_data["currentBidPrice"]["value"] == "5.00"
         assert shared.original_data["price"]["value"] == "25.00"
         assert shared.normalized["buying_options"] == ["AUCTION", "FIXED_PRICE"]
+
+
+@pytest.mark.parametrize("status", [400, 401, 403])
+@pytest.mark.parametrize(
+    "error", ["invalid_client", "invalid_scope", "SECRET-ECHO", ["invalid_client"]]
+)
+def test_mocked_oauth_safe_diagnostics_stop_run(client, status, error):
+    calls = []
+
+    def respond(request):
+        calls.append(request.url.path)
+        return httpx.Response(
+            status,
+            json={
+                "error": error,
+                "error_description": "TEST-CLIENT-SECRET arbitrary description",
+                "access_token": "TOKEN-ECHO",
+                "authorization": "HEADER-ECHO",
+            },
+        )
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as transport:
+            adapter = EbayAdapter(connection(), client=transport, sleep=no_wait)
+            return await run_discovery(
+                client.app.state.sessions, connection(), "sandbox", adapter=adapter
+            )
+
+    run_id = asyncio.run(run())
+    with client.app.state.sessions() as s:
+        run = s.get(DiscoveryRun, run_id)
+        executions = list(
+            s.scalars(select(SearchExecution).where(SearchExecution.run_id == run_id))
+        )
+        code = (
+            error
+            if isinstance(error, str) and error in ("invalid_client", "invalid_scope")
+            else "UNKNOWN"
+        )
+        classification = "PERMISSION" if status in (401, 403) else "HTTP"
+        assert run.errors == [f"{classification}: OAuth HTTP {status}: {code}"]
+        assert all(e.errors == run.errors for e in executions)
+        if status in (401, 403):
+            assert calls == ["/identity/v1/oauth2/token"]
+            assert len(executions) == 1
+        assert all(path.endswith("/token") for path in calls)
+        assert run.new_count == run.duplicate_count == run.invalid_count == 0
+        assert not list(s.scalars(select(DiscoveryObservation)))
