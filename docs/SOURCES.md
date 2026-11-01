@@ -54,11 +54,16 @@ is implemented. Original owner content stays in SQLite, not GitHub.
 
 Assessment date: **2026-10-29**. Task 003 implements an official eBay adapter with
 fixture-first operation; **no real sandbox or production API calls were executed**.
-Production remains disabled pending final approval and explicit authorization.
+JRI-011 now records owner-reported developer approval; Production Browse access
+remains unverified, with credentials and API-host configuration missing.
 See [eBay setup](EBAY-SETUP.md) for exact implemented endpoints, filters, OAuth,
 retry/pagination limits, correction handling and the activation checklist.
 
 ## Evidence status and access limitation
+
+Historical account below: the 2026-10-29 documentation block is superseded by
+successful official eBay documentation reads on 2026-11-01. See [current readiness
+and exact blockers](JRI-011.md). No production API response is claimed.
 
 Direct checks of the official eBay Browse search reference and Whatnot fee help
 page failed with proxy `403 Forbidden`. Their documentation domains are absent

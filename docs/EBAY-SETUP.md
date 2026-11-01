@@ -1,16 +1,17 @@
 # eBay discovery setup — Task 003
 
-The default is **fixture mode**, with production disabled. For JRI-007, the owner
-now describes developer approval as **pending** (JRI-007, after the earlier
-JRI-006 rejection report). No verified approval is available; production API access
-remains unavailable until verified approval is supplied. Keep both
-`EBAY_PRODUCTION_ENABLED=false` and `EBAY_PRODUCTION_APPROVED=false`.
+The default remains **fixture mode**, with production disabled. As of **2026-11-01**,
+the owner reports that the eBay Developers Program application is **approved**.
+This supersedes the earlier pending/rejected status. It does not establish a
+working Production keyset or successful Browse access.
 
-Continue through Quick Capture, manual/CSV/JSON evidence and existing multi-source
-alert intake. Do not scrape eBay, use unofficial endpoints, substitute a third-party
-API key for authorization, or build API-dependent pilot features. The future setup
-instructions below do not authorize activation. Task 003 made **no real sandbox or
-production API calls**; its synthetic MockTransport tests are not current inventory.
+JRI-011 prepares one read-only four-query pilot through existing Discovery controls.
+This runtime has neither `EBAY_CLIENT_ID` nor `EBAY_CLIENT_SECRET` configured, and
+its enforced allowlist lacks `api.ebay.com`. No OAuth or Browse request was attempted.
+See [the exact preview, private persistence and setup actions](JRI-011.md).
+Keep Quick Capture, manual/CSV/JSON and multi-source intake available independently.
+Do not scrape eBay, use unofficial endpoints or substitute a third-party key.
+MockTransport/fixture results are software tests, never current inventory.
 
 ## Fixture walkthrough (no credentials)
 
@@ -51,12 +52,12 @@ images. No backend fetch of arbitrary item or image URLs occurs.
 
 | Variable | Default / requirement |
 |---|---|
-| `EBAY_MODE` | `fixture`; choose `sandbox` only for permitted API testing |
+| `EBAY_MODE` | `fixture`; `sandbox` or `production` only after the corresponding configuration/authorization |
 | `EBAY_SOURCE_ENABLED` | `true`; `false` disables all discovery modes |
 | `EBAY_CLIENT_ID` | Empty; environment-specific eBay application keyset ID |
 | `EBAY_CLIENT_SECRET` | Empty; environment-specific application secret |
 | `EBAY_PRODUCTION_ENABLED` | `false`; explicit enablement required later |
-| `EBAY_PRODUCTION_APPROVED` | `false`; owner assertion of verified eBay approval/authorization |
+| `EBAY_PRODUCTION_APPROVED` | `false`; owner authorization for Production testing; not a connectivity result |
 
 The app does not auto-load `.env`. Use secure environment settings, not committed
 files, copied browser forms, chat, shell tracing or logs. Use the matching sandbox
@@ -99,16 +100,21 @@ The OAuth exchange requests `grant_type=client_credentials` and the general
 or purchasing scope is used. Verify the approved keyset's currently required
 scope and use-case eligibility against official documentation before live testing.
 
-## Production activation checklist — future owner action only
+## Production activation — JRI-011 bounded owner-confirmed pilot
 
-- Obtain final eBay production approval and confirm permitted business model,
-  data retention/use, keyset, scopes, marketplace coverage and assigned quotas.
+- Developers Program approval is owner-reported as granted. Confirm the Production
+  keyset is enabled and check Browse-specific access/scopes and applicable use
+  terms. Checkout/Order, Offer and Feed requirements must not be treated as the
+  same operation as read-only Browse search. Account-specific access/quota is
+  unknown until supported by the account and actual authorized Browse response.
 - Explicitly authorize live **read-only** discovery, review the exact search plan
-  and set a small budget. Do not treat this task as production authorization.
+  and use the JRI-011 bounds: four queries, one page/query, three observations/page,
+  twelve observations total. The owner must confirm that exact preview per run.
 - Configure production credentials securely, `EBAY_MODE=production`,
   `EBAY_PRODUCTION_ENABLED=true` **and** `EBAY_PRODUCTION_APPROVED=true`.
 - Separately permit **api.ebay.com** via environment settings after authorization.
-  Task 003 does not add that production domain or issue production requests.
+  This runtime does not currently permit that host. Publish/apply the environment
+  configuration and verify the effective runtime policy before requesting a run.
 - Restart and review status, then select Production and check the per-run explicit
   authorization box. Both environment flags and the individual run confirmation
   are required by server-side checks. A browser form cannot set environment approval.
@@ -189,24 +195,32 @@ to several queries is non-additive: never sum those groups as inventory/profit t
 
 ## Documentation verification and remaining limitations
 
-Official documentation access was attempted on **2026-10-29 (Alaska)** and rejected
-by the running cloud proxy with 403. The API structure above is the documented
-Browse/OAuth contract targeted by the implementation and mocked fixtures; live
-schema/permission validation is still pending. The owner supplied the explicit
-`auto_correct=KEYWORD` requirement in Task 003. No approval or assigned numerical
-quota has been inferred from API architecture or credentials.
+Official documentation was successfully read on **2026-11-01**. The older
+2026-10-29 proxy failure is historical. The current Browse OpenAPI contract
+(version **v1.20.4**) verifies the production endpoint, Application token general
+scope, supported limit (1–200), correction option `KEYWORD`, and auction versus
+fixed-price behavior. The OAuth guide specifies environment-matched credentials,
+HTTP Basic, `client_credentials` and application scopes.
 
-Official references to verify after supported access is applied:
+The general Buy requirements page describes contractual/use-case eligibility and
+additional access processes for restricted Buy operations. Checkout-specific
+requirements are not a claim that this read-only search pilot performs checkout.
+The Browse reference states all Browse methods use an Application token; a token
+success alone still does not verify this application's search access. No account
+keyset, assigned quota, active restrictions or Browse approval was inspected
+because credentials are absent. The generic API call-limits URL now redirects to
+a Sell guide; no numerical Browse account quota is inferred from that page.
 
-- [Browse search](https://developer.ebay.com/api-docs/buy/browse/resources/item_summary/methods/search)
-- [Application OAuth](https://developer.ebay.com/api-docs/static/oauth-client-credentials-grant.html)
-- [Buy API production requirements](https://developer.ebay.com/api-docs/buy/static/buy-requirements.html)
-- [API call limits](https://developer.ebay.com/develop/get-started/api-call-limits)
+Official sources read (redirects followed only on the documentation host):
 
-Current verified account quota: **UNKNOWN**. Current production approval:
-**owner reports rejection; unavailable until verified approval is supplied**.
-APIs/operations not implemented here: detail
-hydration, shipping quote/eligibility confirmation, user/purchase OAuth, live
-resale/spot prices, recurring discovery and automatic purchases. Credentials and
-permitted access are the remaining prerequisites for authorized sandbox testing,
-not prerequisites for using the complete fixture pipeline.
+- [Browse API](https://developer.ebay.com/develop/api/buy/browse_api)
+- [Browse OpenAPI contract](https://developer.ebay.com/api-docs/master/buy/browse/openapi/3/buy_browse_v1_oas3.json)
+- [OAuth authorization guide — client credentials](https://developer.ebay.com/develop/guides/sell/authorization)
+- [Buy API requirements](https://developer.ebay.com/api-docs/buy/static/buy-requirements.html)
+
+Current developer approval: **owner-reported approved**. Production Browse
+connectivity and assigned account quota: **UNKNOWN / NOT TESTED**. No sandbox or
+production request was made. Detail hydration, confirmed shipping quotes, user or
+purchase OAuth, sold-comparable research, scheduled discovery and automatic
+purchases remain outside this bounded pilot. API photo references are not book
+reference images and do not authorize third-party inference or training.

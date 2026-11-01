@@ -19,12 +19,13 @@ for tests, ordered transactional migrations for schema changes, and keep fixture
 sandbox statistics separate from real marketplace performance. Do not merge task
 branches without review.
 
-JRI-007: the owner now describes eBay approval as pending; no verified approval
-is available. Production API access remains unavailable unless the owner supplies verified
-approval. Keep EBAY_PRODUCTION_ENABLED=false and EBAY_PRODUCTION_APPROVED=false.
-Use Quick Capture, manual/CSV/JSON evidence and existing multi-source alert intake.
-Do not scrape eBay, use unofficial endpoints, or treat third-party API keys as
-authorization. Do not build API-dependent features for the sourcing pilot.
+JRI-011: the owner reports eBay Developers Program approval. Production Browse
+connectivity is not yet verified. Retain fixture defaults and both production
+controls; live read-only discovery requires a usable Production keyset, permitted
+api.ebay.com access, and explicit per-run owner confirmation of the exact preview.
+Do not treat developer approval or a successful token request as Browse access.
+Keep manual/CSV/JSON and multi-source intake available. No scraping, unofficial
+endpoints or third-party-key workaround. PR #20 email corrections remain separate.
 
 Task 004 owner alerts are private data: never commit original emails, addresses,
 tracking links or real purchase history. Only named synthetic fixture .eml files

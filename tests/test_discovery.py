@@ -594,3 +594,125 @@ def test_invalid_json_response_never_exposes_body():
             assert "TEST-CLIENT-SECRET" not in str(error.value)
 
     asyncio.run(check())
+
+
+def test_jri011_exact_broad_plan_and_observation_budget_with_mocked_production(client):
+    """Synthetic transport only: no real credentials, inventory or production requests."""
+    from radar.db import Setting
+    from radar.discovery.config import GroupInput
+    from radar.discovery.service import budgets, save_group
+
+    phrases = [
+        "blue stone ring",
+        "silver ring with blue stone",
+        "sterling jewelry lot",
+        "mixed jewelry lot",
+    ]
+    with client.app.state.sessions.begin() as s:
+        historical = {g.id: g.data for g in s.scalars(select(DiscoveryGroup))}
+        for group in s.scalars(select(DiscoveryGroup)):
+            group.data = {**group.data, "enabled": False}
+        group = GroupInput(
+            name="SYNTHETIC JRI-011 plan",
+            queries=phrases,
+            options=SearchOptions(buying_format="BOTH"),
+        )
+        s.add(DiscoveryGroup(id="jri011-test", data=group.model_dump(mode="json")))
+        s.flush()
+        save_group(s, "jri011-test", group)
+        s.add(
+            Setting(
+                id=3,
+                data=Budgets(
+                    max_queries=4, max_results=12, max_pages_per_query=1, page_size=3
+                ).model_dump(),
+            )
+        )
+    with client.app.state.sessions() as s:
+        entries = plan(s, budgets(s))
+        assert len(entries) == 4 and {e.query for e in entries} == set(phrases)
+        assert all(e.group_ids == ["jri011-test"] for e in entries)
+        for id_, original in historical.items():
+            assert s.get(DiscoveryGroup, id_).data == {**original, "enabled": False}
+    calls = []
+    tokens = []
+
+    def respond(request):
+        assert request.url.host == "api.ebay.com"
+        if request.url.path.endswith("/token"):
+            tokens.append(request)
+            return httpx.Response(
+                200, json={"access_token": "SYNTHETIC-BEARER", "expires_in": 3600}
+            )
+        calls.append(dict(request.url.params))
+        assert request.headers["X-EBAY-C-MARKETPLACE-ID"] == "EBAY_US"
+        assert "zip%3D99669" in request.headers["X-EBAY-C-ENDUSERCTX"]
+        shared = {
+            **raw_item(),
+            "itemId": "SYNTHETIC-SHARED",
+            "title": "SYNTHETIC dual-option ring",
+            "buyingOptions": ["AUCTION", "FIXED_PRICE"],
+            "price": {"value": "25.00", "currency": "USD"},
+            "currentBidPrice": {"value": "5.00", "currency": "USD"},
+        }
+        distinct = {
+            **raw_item("6"),
+            "itemId": "SYNTHETIC-" + str(len(calls)),
+            "title": "SYNTHETIC auction lot",
+        }
+        return httpx.Response(
+            200,
+            json={
+                "itemSummaries": [shared, {}, distinct],
+                "total": 300,
+                "next": "https://invalid.example/do-not-follow",
+                "autoCorrections": {"q": "SYNTHETIC SOURCE CORRECTION"},
+            },
+        )
+
+    async def run():
+        config = Connection(
+            mode="production",
+            client_id="SYNTHETIC-ID",
+            client_secret="SYNTHETIC-SECRET",
+            production_enabled=True,
+            production_approved=True,
+        )
+        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as transport:
+            adapter = EbayAdapter(
+                config, production_run_approved=True, client=transport, sleep=no_wait
+            )
+            return await run_discovery(
+                client.app.state.sessions, config, "production", approved_run=True, adapter=adapter
+            )
+
+    run_id = asyncio.run(run())
+    assert len(tokens) == 1 and len(calls) == 4
+    assert {p["q"] for p in calls} == set(phrases)
+    assert all(
+        p["limit"] == "3"
+        and p["offset"] == "0"
+        and p["filter"] == "buyingOptions:{FIXED_PRICE|AUCTION}"
+        and "auto_correct" not in p
+        for p in calls
+    )
+    with client.app.state.sessions() as s:
+        executions = list(
+            s.scalars(select(SearchExecution).where(SearchExecution.run_id == run_id))
+        )
+        assert all(e.results_returned == 3 and len(e.parameters["pages"]) == 1 for e in executions)
+        assert sum(e.results_returned for e in executions) == 12
+        run = s.get(DiscoveryRun, run_id)
+        assert (run.new_count, run.duplicate_count, run.invalid_count) == (5, 3, 4)
+        assert len(list(s.scalars(select(DiscoveryObservation)))) == 8
+        for e in executions:
+            assert e.transmitted_query in phrases
+            assert e.corrected_queries == ["SYNTHETIC SOURCE CORRECTION"]
+        for item in s.scalars(select(DiscoveredItem)):
+            assert item.normalized["shipping_status"] == "UNKNOWN"
+        shared = s.scalar(
+            select(DiscoveredItem).where(DiscoveredItem.ebay_item_id == "SYNTHETIC-SHARED")
+        )
+        assert shared.original_data["currentBidPrice"]["value"] == "5.00"
+        assert shared.original_data["price"]["value"] == "25.00"
+        assert shared.normalized["buying_options"] == ["AUCTION", "FIXED_PRICE"]
