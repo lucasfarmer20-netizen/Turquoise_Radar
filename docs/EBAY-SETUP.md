@@ -1,9 +1,15 @@
 # eBay discovery setup — Task 003
 
-The default is **fixture mode**, with production disabled. The owner's developer
-application is awaiting final approval. Task 003 made **no real sandbox or
-production API calls**. Tests use handcrafted synthetic Browse-style structures
-and httpx MockTransport; they do not represent current eBay inventory.
+The default is **fixture mode**, with production disabled. For JRI-006, the owner
+reports that the developer application was **rejected**. Production API access is
+unavailable indefinitely unless the owner supplies verified approval. Keep both
+`EBAY_PRODUCTION_ENABLED=false` and `EBAY_PRODUCTION_APPROVED=false`.
+
+Continue through Quick Capture, manual/CSV/JSON evidence and existing multi-source
+alert intake. Do not scrape eBay, use unofficial endpoints, substitute a third-party
+API key for authorization, or build API-dependent pilot features. The future setup
+instructions below do not authorize activation. Task 003 made **no real sandbox or
+production API calls**; its synthetic MockTransport tests are not current inventory.
 
 ## Fixture walkthrough (no credentials)
 
@@ -196,8 +202,9 @@ Official references to verify after supported access is applied:
 - [Buy API production requirements](https://developer.ebay.com/api-docs/buy/static/buy-requirements.html)
 - [API call limits](https://developer.ebay.com/develop/get-started/api-call-limits)
 
-Current verified account quota: **UNKNOWN**. Current production approval: **pending
-owner confirmation; not enabled**. APIs/operations not implemented here: detail
+Current verified account quota: **UNKNOWN**. Current production approval:
+**owner reports rejection; unavailable until verified approval is supplied**.
+APIs/operations not implemented here: detail
 hydration, shipping quote/eligibility confirmation, user/purchase OAuth, live
 resale/spot prices, recurring discovery and automatic purchases. Credentials and
 permitted access are the remaining prerequisites for authorized sandbox testing,

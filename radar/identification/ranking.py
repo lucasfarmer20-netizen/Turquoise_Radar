@@ -1,12 +1,13 @@
 """Explainable likely matches. One permitted source suffices; no authentication gate."""
 
 import re
+from copy import deepcopy
 from difflib import SequenceMatcher
 
 from radar.references.directory import digest, distinct_tokens
 from radar.references.recognition import normalize_text
 
-POLICY = "jri005-owner-likely-maker-v1"
+POLICY = "jri006-owner-likely-maker-v2"
 SYMBOLS = {
     "bell": {"BELL"},
     "bear": {"BEAR"},
@@ -36,6 +37,66 @@ CONSTRUCTION = {
     "HAMMERED",
 }
 FILLER = {"BY", "HANDMADE", "COPYRIGHT"}
+PICTORIAL_WORDS = set().union(*SYMBOLS.values()) | {
+    "ARROWHEAD",
+    "ARROWHEADS",
+    "THUNDERBIRD",
+    "LIGHTNING",
+    "CLOUD",
+    "RAIN",
+    "SUN",
+    "MOON",
+    "STAR",
+    "SNAKE",
+    "TURTLE",
+    "FISH",
+    "FLOWER",
+    "HAND",
+    "FOOT",
+    "PAW",
+    "HUMAN",
+    "PICTOGRAPH",
+    "PICTOGRAM",
+    "PICTO",
+    "PICTORIAL",
+}
+DESCRIPTION_WORDS = PICTORIAL_WORDS | {
+    "A",
+    "AN",
+    "THE",
+    "AND",
+    "WITH",
+    "IN",
+    "ON",
+    "OF",
+    "OVER",
+    "UNDER",
+    "INSIDE",
+    "WITHIN",
+    "HEAD",
+    "HEADS",
+    "MARK",
+    "HALLMARK",
+    "STAMP",
+    "SYMBOL",
+    "DESIGN",
+    "FIGURE",
+    "OUTLINE",
+    "BROKEN",
+    "STYLIZED",
+    "STYLISED",
+    "SMALL",
+    "LARGE",
+    "SHAPED",
+    "CIRCLE",
+    "OVAL",
+    "SQUARE",
+    "BORDER",
+    "DOUBLE",
+    "SINGLE",
+    "TWO",
+    "CROSSED",
+}
 
 
 def letters(text):
@@ -50,6 +111,50 @@ def maker_key(name):
     # Remove only presentation qualifiers, not surnames, initials or Sr/Jr.
     name = re.sub(r"\s*\((?:gallery|source) attribution\)", "", name, flags=re.I)
     return normalize_text(name)
+
+
+def unnamed_reason(name):
+    """Description-only captions are mark evidence, not person/shop names.
+
+    UNRESOLVED is also used for genuine published names with unknown entity type,
+    so it cannot be a blanket exclusion. Match whole description vocabulary, not
+    substrings: 'Bear: Rhoda Jack' and 'Arrowhead Trading Post' remain named leads.
+    """
+    label = maker_key(name)
+    if re.match(r"^(?:UNKNOWN|UNIDENTIFIED|UNATTRIBUTED)(?:\s|$)", label):
+        return "Unidentified source label; maker UNKNOWN."
+    label = re.split(r"\b(?:MARK|STAMP|HALLMARK|SYMBOL) (?:ON|FROM)\b", label)[0]
+    words = set(re.sub(r"\b\d+\b", "", label).split())
+    if words & PICTORIAL_WORDS and words <= DESCRIPTION_WORDS:
+        return "Pictorial mark description, not a named maker or trading post; maker UNKNOWN."
+    return None
+
+
+def display_result(saved):
+    """Correct legacy presentation without rewriting immutable saved searches."""
+    result = deepcopy(saved)
+    unresolved = result.setdefault("unresolved_references", [])
+    seen = {r["id"] for r in unresolved}
+    moved = False
+    for field in ("candidates", "rejected"):
+        named = []
+        for candidate in result.get(field, []):
+            reason = unnamed_reason(candidate["maker"])
+            if reason:
+                if candidate["id"] not in seen:
+                    unresolved.append({**candidate, "unresolved_reason": reason})
+                    seen.add(candidate["id"])
+                moved = True
+            else:
+                named.append(candidate)
+        result[field] = named
+    if moved:
+        result.setdefault("warnings", []).append(
+            "Display correction: unresolved labels are shown as UNKNOWN maker marks. "
+            "The original saved search remains unchanged."
+        )
+        result["status"] = "CANDIDATES" if result["candidates"] else "UNKNOWN"
+    return result
 
 
 def signature(query):
@@ -156,8 +261,8 @@ def rank(records, query, visual=(), feedback=()):
             )
         if r.get("shared_stamp_claims"):
             gaps.extend(x["claim"] for x in r["shared_stamp_claims"])
-        if r.get("identity_kind") == "UNRESOLVED" and r["maker_name"].startswith("UNKNOWN"):
-            gaps.append("The source leaves the maker unidentified.")
+        if reason := unnamed_reason(r["maker_name"]):
+            gaps.append(reason)
         key = digest(maker_key(r["maker_name"]).encode())
         strength = (
             "Strong lettering match"
@@ -214,7 +319,9 @@ def rank(records, query, visual=(), feedback=()):
     for g in groups.values():
         g["order"] += max(-6, min(6, g.pop("prior_adjustment")))
     result = sorted(groups.values(), key=lambda g: (-g["order"], g["id"]))
-    unresolved = [g for g in result if maker_key(g["maker"]).startswith("UNKNOWN ")]
+    unresolved = [g for g in result if unnamed_reason(g["maker"])]
+    for g in unresolved:
+        g["unresolved_reason"] = unnamed_reason(g["maker"])
     result = [g for g in result if g not in unresolved]
     rejected = [g for g in result if g.get("rejected")]
     result = [g for g in result if not g.get("rejected")][:5]

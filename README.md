@@ -186,6 +186,10 @@ Fixture, sandbox and production identities are separate. Fixture statistics are
 non-live test counts, not marketplace results. Production is disabled by default
 and requires explicit environment approval/enablement plus individual run consent;
 credentials alone never activate it. No recurring monitoring is implemented.
+For JRI-006, the owner reports the developer application was rejected: production
+access remains unavailable indefinitely until verified approval is supplied. Keep
+both production flags false and use Quick Capture, manual/CSV/JSON or existing alert
+intake. No scraping, unofficial endpoints or third-party-key workaround is authorized.
 Read [eBay setup, permissions and limitations](docs/EBAY-SETUP.md) before any API use.
 
 ## Owner workflow (Task 002)
@@ -338,8 +342,13 @@ See [Task 002 usage and financial conventions](docs/CALIBRATION.md),
 [Task 003 specification](docs/SPEC-003.md), and [eBay setup](docs/EBAY-SETUP.md).
 Local multi-source intake works without API approval. Next, validate the provisional
 formats with permitted owner samples and improve auction cost allocations; eBay
-sandbox validation still requires secure credentials, access and current docs. Production approval is pending;
-no live request, public deployment or automated purchasing is authorized by 003.
+sandbox validation still requires secure credentials, access and current docs.
+The JRI-006 owner report supersedes the former pending-approval status: the developer
+application was rejected and production stays disabled. No live request, public
+deployment or automated purchasing is authorized.
+
+See [JRI-006 manual pilot and pictorial-label correction](docs/JRI-006.md) for the
+bounded UNKNOWN-maker fix and the photographs needed to begin the real pilot.
 
 ## Private jewelry reference aggregation (JRI-001)
 

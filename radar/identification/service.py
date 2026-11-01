@@ -22,7 +22,14 @@ from radar.db import (
     MakerScenario,
     Setting,
 )
-from radar.identification.ranking import SYMBOLS, maker_key, rank, signature
+from radar.identification.ranking import (
+    SYMBOLS,
+    display_result,
+    maker_key,
+    rank,
+    signature,
+    unnamed_reason,
+)
 from radar.jewelry.images import clean_image, read_photo, write_photo
 from radar.references.directory import connect, current_review, digest
 from radar.references.library import local_file
@@ -89,7 +96,7 @@ def accepted(s, case_id):
     choice = None
     for d in decisions(s, case_id):
         if d.action == "CONFIRM":
-            choice = d
+            choice = None if unnamed_reason(d.data.get("maker", "")) else d
         elif d.action in {"CORRECT_MAKER", "CORRECT_TRANSCRIPTION"} or (
             choice and d.candidate_id == choice.candidate_id and d.action in {"REJECT", "RESEARCH"}
         ):
@@ -315,14 +322,17 @@ def run_search(s, cfg, case_id, query, photo_id=None, encoder=None):
                 ),
                 None,
             )
-            if latest and latest.action == "REJECT":
+            if reason := unnamed_reason(name):
+                result["unresolved_references"].append({**owner, "unresolved_reason": reason})
+            elif latest and latest.action == "REJECT":
                 result["rejected"].append(owner)
             else:
                 result["candidates"] = [owner, *result["candidates"]][:5]
+    result = display_result(result)
     result["status"] = "CANDIDATES" if result["candidates"] else "UNKNOWN"
     result.update(
         query=query,
-        warnings=warnings,
+        warnings=warnings + result.get("warnings", []),
         reference_count=len(records),
         visual_reference_ids=[r["reference_id"] for r in visual],
     )
@@ -347,8 +357,12 @@ def decide(s, case_id, run_id, candidate_id, action, note, value=""):
     )
     if action in {"CONFIRM", "REJECT", "RESEARCH"} and not candidate:
         raise ValueError("Candidate was not part of this search")
+    if candidate and unnamed_reason(candidate["maker"]):
+        raise ValueError("This is an unresolved mark label, not a named maker candidate")
     if action.startswith("CORRECT_") and not value:
         raise ValueError("Supply the corrected reading or maker name")
+    if action == "CORRECT_MAKER" and unnamed_reason(value):
+        raise ValueError("Enter a maker/shop name; put pictorial descriptions in mark observations")
     d = MakerDecision(
         case_id=case_id,
         run_id=run.id,
@@ -410,6 +424,8 @@ def scenario(s, case_id, candidate_id, ids, prefs):
     )
     if not candidate or not case.listing_id:
         raise ValueError("Select a current candidate and link a workbench listing first")
+    if unnamed_reason(candidate["maker"]):
+        raise ValueError("An unresolved mark description cannot support a maker-value scenario")
     listing = s.get(Listing, case.listing_id)
     ids = sorted(set(ids))
     if not ids or len(ids) > 30:
@@ -453,6 +469,8 @@ def scenario(s, case_id, candidate_id, ids, prefs):
 
 
 def scenario_status(s, case, row):
+    if unnamed_reason(row.data["maker"]):
+        return "UNKNOWN — mark description does not identify a maker"
     choice = accepted(s, case.id)
     if not choice or choice.candidate_id != row.data["candidate_id"]:
         return "CONDITIONAL — maker attribution not accepted"
