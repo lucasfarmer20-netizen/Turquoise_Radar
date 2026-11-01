@@ -262,6 +262,11 @@ def link_identity(url, source_id, source):
 
 
 def classify(subject, text):
+    # A real feature announcement mentions saved searches and outbid alerts,
+    # but explicitly identifies itself as promotional. Do not credit it as an
+    # actual saved-search match or transaction based on those incidental words.
+    if re.search(r"^\s*This is a promotional message\.(?:\s|$)", text, re.I | re.M):
+        return MessageType.PROMOTIONAL_NEWSLETTER
     # MIME layouts often begin with blank lines and invisible preheader padding.
     visible_lines = [line.strip() for line in text.splitlines() if re.search(r"\w", line)]
     heading = subject + "\n" + "\n".join(visible_lines[:6])

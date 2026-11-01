@@ -385,3 +385,11 @@ workbench review remain available. The latest owner instruction describes eBay
 approval as pending; production gates remain disabled until verified approval.
 See [JRI-007 findings and alert setup](docs/JRI-007.md) for real sample results,
 source access limits and the blocked photographic pilot.
+
+### Auction evidence completion (JRI-008)
+
+The existing evidence editor now saves individual lot deadlines with an explicit
+UTC offset, separate shipping evidence and carrier. See the [owner walkthrough
+and actual validation status](docs/JRI-008.md). Software verification is complete;
+real Personal Shopper/digest validation and a current buying evaluation still need
+owner evidence.
