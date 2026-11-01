@@ -129,6 +129,9 @@ def test_offset_deadline_roundtrip_shipping_and_original_history(
         "1793836800",
         "2026-13-04T18:00:00Z",
         "2026-11-04T18:00:00+25:00",
+        "2026-11-04T18:00:00+00:60",
+        "2026-11-04T18:00:00+05:99",
+        "2026-11-04T18:00:00-06:60",
     ],
 )
 def test_invalid_or_new_timezone_free_deadline_rolls_back_entire_edit(
@@ -143,6 +146,7 @@ def test_invalid_or_new_timezone_free_deadline_rolls_back_entire_edit(
             "carrier": "must not save",
             "shipping_evidence": "must not save",
             "shipping_cost": "1.00",
+            "shipping_cost_status": "CONFIRMED",
             "shipping_status": "CONFIRMED_TO_ALASKA",
         },
         follow_redirects=False,

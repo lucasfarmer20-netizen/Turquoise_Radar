@@ -225,11 +225,14 @@ def owner_routes(app, render, preferences, view):
                     # Validate only an entered/changed deadline, keeping untouched
                     # legacy timezone-free records editable. Numeric epoch guesses
                     # and natural-language auction notices are not lot deadlines.
-                    deadline = datetime.fromisoformat(updates["item_end_time"].strip())
+                    deadline_text = updates["item_end_time"].strip()
+                    deadline = datetime.fromisoformat(deadline_text)
                     previous = ListingInput.model_validate(before).item_end_time
                     if deadline != previous and deadline.utcoffset() is None:
                         raise ValueError("Lot closing time requires an explicit UTC offset or Z")
-                    updates["item_end_time"] = deadline
+                    # Validate the original text below: fromisoformat normalizes
+                    # malformed offset minutes that ListingInput rejects.
+                    updates["item_end_time"] = deadline_text
                 updated = ListingInput.model_validate(
                     {**before, **updates, "cost_status": statuses}
                 )
