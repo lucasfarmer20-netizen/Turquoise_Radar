@@ -17,6 +17,18 @@ from radar.schemas import ListingInput
 from radar.sources import SourceAdapter, SourceCapabilities
 
 BASE_URLS = {"sandbox": "https://api.sandbox.ebay.com", "production": "https://api.ebay.com"}
+OAUTH_ERROR_CODES = frozenset(
+    {
+        "invalid_request",
+        "invalid_client",
+        "invalid_grant",
+        "unauthorized_client",
+        "unsupported_grant_type",
+        "invalid_scope",
+        "server_error",
+        "temporarily_unavailable",
+    }
+)
 SCOPE = "https://api.ebay.com/oauth/api_scope"
 SOURCE_NAMES = {"fixture": "eBay FIXTURE", "sandbox": "eBay SANDBOX", "production": "eBay"}
 
@@ -159,6 +171,21 @@ class EbayAdapter(SourceAdapter):
                 raise DiscoveryError(
                     "NETWORK", "eBay network request failed; check permitted access"
                 ) from None
+            if (
+                path == "/identity/v1/oauth2/token"
+                and 400 <= response.status_code < 500
+                and response.status_code != 429
+            ):
+                try:
+                    body = response.json()
+                except ValueError:
+                    body = None
+                code = body.get("error") if isinstance(body, dict) else None
+                code = code if isinstance(code, str) and code in OAUTH_ERROR_CODES else "UNKNOWN"
+                raise DiscoveryError(
+                    "PERMISSION" if response.status_code in (401, 403) else "HTTP",
+                    f"OAuth HTTP {response.status_code}: {code}",
+                )
             if response.status_code in (401, 403):
                 raise DiscoveryError(
                     "PERMISSION",
@@ -216,12 +243,13 @@ class EbayAdapter(SourceAdapter):
         token, expires = data.get("access_token"), data.get("expires_in")
         if (
             not isinstance(token, str)
-            or not token
+            or not token.strip()
             or not isinstance(expires, int)
             or isinstance(expires, bool)
             or expires <= 0
             or not isinstance(data.get("token_type", "Bearer"), str)
-            or data.get("token_type", "Bearer").lower() != "bearer"
+            or data.get("token_type", "Bearer").lower()
+            not in ("bearer", "application access token")
         ):
             raise DiscoveryError(
                 "MALFORMED", "OAuth response is missing a valid bearer token or lifetime"
