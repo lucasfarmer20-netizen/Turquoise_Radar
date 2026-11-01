@@ -8,7 +8,7 @@ import base64
 import json
 import re
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
@@ -161,6 +161,16 @@ class Node:
             image for p in self.parts if isinstance(p, Node) for image in p.images()
         ]
 
+    def has_linked_image(self):
+        # Spacing/icon images inside a bid button are not another lot card.
+        linked = (
+            self.tag == "a"
+            and bool(self.images())
+            and self.text().lower() not in CTA
+            and not re.match(r"BID \$", self.text(), re.I)
+        )
+        return linked or any(p.has_linked_image() for p in self.parts if isinstance(p, Node))
+
 
 class EvidenceHTML(HTMLParser):
     """Inert structure only; retain card ancestry to avoid sharing prices across lots."""
@@ -214,6 +224,30 @@ class EvidenceHTML(HTMLParser):
             self.section(value)
 
 
+def card_scope(node, marker):
+    """Bound a linked card by its layout and every neighboring linked block.
+
+    Unresolved anchors participate in the fence. Their structural markers are
+    never platform identities. Repeated image-bearing columns/tables stay separate
+    even when both happen to link to the same item and query.
+    """
+    scope = node
+    while scope.parent and scope.parent.identities == {marker}:
+        if scope.tag in {"td", "div", "table", "article", "li"} and scope.has_linked_image():
+            peers = [
+                child
+                for child in scope.parent.parts
+                if isinstance(child, Node)
+                and child.tag == scope.tag
+                and child.identities
+                and child.has_linked_image()
+            ]
+            if len(peers) > 1:
+                break
+        scope = scope.parent
+    return scope
+
+
 def observed_format(platform, subject, text):
     if platform == "invaluable":
         if re.search(r"you (?:were|have been) just outbid|you were just outbid", subject, re.I):
@@ -243,19 +277,44 @@ def price_evidence(text):
         ("SOLD_RESULT", r"(?:Hammer [Pp]rice|Sold [Ff]or):"),
     ]
     for kind, label in labels:
-        pattern = (
-            r"(?:" + label + r")\s*((?:(?:USD|CAD|AUD|EUR|GBP)\s*)?[$€£]?\s*\d[\d,]*(?:\.\d{1,2})?"
-            r"(?:\s*[-–]\s*[$€£]?\s*\d[\d,]*(?:\.\d{1,2})?)?)"
-        )
+        # Capture the complete token, including unsupported punctuation/letters.
+        # A successful prefix match must never manufacture a smaller valid amount.
+        atom = r"(?:(?:USD|CAD|AUD|EUR|GBP)\s*)?[$€£]?\s*\d[^\s;–-]*"
+        pattern = r"(?:" + label + r")\s*(" + atom + r"(?:\s*[-–]\s*" + atom + r")?)"
         for m in re.finditer(pattern, text):
             quote = m[1].strip()
             currency = next(
                 (c for c in ("USD", "CAD", "AUD", "EUR", "GBP") if quote.startswith(c)), None
             )
             currency = currency or ("EUR" if "€" in quote else "GBP" if "£" in quote else "XXX")
-            numbers = re.findall(r"\d[\d,]*(?:\.\d{1,2})?", quote)
-            values = [str(Decimal(n.replace(",", "")).quantize(Decimal(".01"))) for n in numbers]
-            entry = dict(kind=kind, quote=quote, currency=currency, amounts=values)
+            number = r"(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?"
+            amount = r"(?:(USD|CAD|AUD|EUR|GBP)\s*)?([$€£])?\s*(" + number + r")"
+            match = re.fullmatch(amount + r"(?:\s*[-–]\s*" + amount + r")?\.?", quote)
+            values = []
+            if match:
+                codes = [code for code in (match[1], match[4]) if code]
+                symbols = [symbol for symbol in (match[2], match[5]) if symbol]
+                coherent = all(code == currency for code in codes) and all(
+                    symbol == {"EUR": "€", "GBP": "£"}.get(currency, "$") for symbol in symbols
+                )
+                try:
+                    numbers = [n for n in (match[3], match[6]) if n]
+                    if coherent and all(
+                        len(n.replace(",", "").replace(".", "")) <= 14 for n in numbers
+                    ):
+                        values = [
+                            str(Decimal(n.replace(",", "")).quantize(Decimal(".01")))
+                            for n in numbers
+                        ]
+                except InvalidOperation:
+                    pass
+            entry = dict(
+                kind=kind,
+                quote=quote,
+                currency=currency,
+                amounts=values,
+                parse_status="PARSED" if values else "UNKNOWN",
+            )
             if entry not in quotes:
                 quotes.append(entry)
     return quotes
@@ -281,12 +340,16 @@ def parse_auction_email(
     synthetic = str(message.get("X-Turquoise-Synthetic", "")).lower() == "true"
     source_name = source.name + (" FIXTURE" if synthetic else "")
     links, catalogs, unresolved, recovered = [], {}, 0, 0
-    for node in dom.anchors:
+    for anchor_number, node in enumerate(dom.anchors):
         resolved = explicit_target(
             node.attrs.get("href", ""), node.attrs.get("title", ""), platform
         )
         if not resolved:
             unresolved += 1
+            parent = node
+            while parent:
+                parent.identities.add(("unresolved-block", anchor_number))
+                parent = parent.parent
             continue
         target, method = resolved
         identity = target_identity(target, platform)
@@ -295,9 +358,10 @@ def parse_auction_email(
             continue
         recovered += method != "DIRECT_SOURCE_LINK"
         links.append((identity, target, method, node))
+        marker = (identity[1], node.region, node.query_heading)
         parent = node
         while parent:
-            parent.identities.add(identity[1])
+            parent.identities.add(marker)
             parent = parent.parent
     # The observed Invaluable outbid multipart alternative supplies direct URLs
     # even when its HTML links are opaque. Never decode those opaque qs tokens.
@@ -314,15 +378,13 @@ def parse_auction_email(
             links.append((identity, target, "DIRECT_TEXT_ALTERNATIVE", None))
     grouped = {}
     for identity, target, method, node in links:
-        grouped.setdefault(identity[1], []).append((identity, target, method, node))
+        scope = card_scope(node, (identity[1], node.region, node.query_heading)) if node else None
+        grouped.setdefault((identity[1], scope), []).append((identity, target, method, node))
     if len(grouped) > 100:
         raise ValueError("Too many lot references in one message")
     candidates = []
-    for id_, entries in grouped.items():
+    for occurrence, ((id_, scope), entries) in enumerate(grouped.items(), 1):
         identity, target, method, node = entries[0]
-        scope = node
-        while scope and scope.parent and scope.parent.identities == {id_}:
-            scope = scope.parent
         context = scope.text() if scope else plain if len(plain_targets) == 1 else ""
         region = node.region if node else "PRIMARY"
         title_options = []
@@ -344,8 +406,12 @@ def parse_auction_email(
             "ENDED" if kind == MessageType.AUCTION_ENDED and region == "PRIMARY" else "UNKNOWN"
         )
         quotes = price_evidence(context)
-        current = [q for q in quotes if q["kind"] == "CURRENT_BID" and len(q["amounts"]) == 1]
-        price = current[0]["amounts"][0] if len(current) == 1 and availability != "ENDED" else None
+        current = [q for q in quotes if q["kind"] == "CURRENT_BID"]
+        price = (
+            current[0]["amounts"][0]
+            if len(current) == 1 and len(current[0]["amounts"]) == 1 and availability != "ENDED"
+            else None
+        )
         currency = current[0]["currency"] if price is not None else "XXX"
         query = None
         if kind == MessageType.SEARCH_MATCH and region == "SEARCH_SECTION":
@@ -370,7 +436,7 @@ def parse_auction_email(
             )
             auctioneer = match[1] if match else None
         if platform == "invaluable" and kind == MessageType.OUTBID:
-            match = re.search(r"Question about this auction\? Contact\s+(.+?)\.(?:\s|$)", text)
+            match = re.search(r"Question about this auction\? Contact\s+(.+?)\.(?:\s|$)", context)
             auctioneer = match[1] if match else None
         sale = next(iter(catalogs)) if len(catalogs) == 1 else None
         time_match = re.search(
@@ -399,6 +465,7 @@ def parse_auction_email(
             cost_status={"item_price": "ESTIMATED"} if price is not None else {},
         )
         evidence = dict(
+            occurrence_id=f"card-{occurrence}",
             source_name=source_name,
             platform=platform,
             url=identity[2],

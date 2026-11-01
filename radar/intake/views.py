@@ -12,6 +12,7 @@ from radar.db import (
     Listing,
     SavedSourceSearch,
 )
+from radar.intake.service import observation_occurrences
 from radar.schemas import ListingInput
 from radar.workflow import queue_state
 
@@ -68,15 +69,17 @@ def auction_research(cards):
 
 
 def alert_history(session, listing_id):
-    return list(
-        session.execute(
+    return [
+        (card, message)
+        for observation, message in session.execute(
             select(AlertObservation, AlertMessage)
             .join(AlertMessage, AlertMessage.id == AlertObservation.message_id)
             .join(DiscoveredItem, DiscoveredItem.id == AlertObservation.item_id)
             .where(DiscoveredItem.listing_id == listing_id)
             .order_by(AlertObservation.id)
         )
-    )
+        for card in observation_occurrences(observation)
+    ]
 
 
 def inbox_cards(session, prefs):
@@ -86,7 +89,7 @@ def inbox_cards(session, prefs):
         .join(AlertMessage, AlertMessage.id == AlertObservation.message_id)
         .order_by(AlertObservation.id)
     ):
-        history[o.item_id].append((o, m))
+        history[o.item_id].extend((card, m) for card in observation_occurrences(o))
     api_counts = defaultdict(int)
     for o in session.scalars(select(DiscoveryObservation)):
         api_counts[o.item_id] += 1
@@ -196,9 +199,13 @@ def search_status(session):
             for o, m in observations
             if m.source_id == saved.source_id
             and not m.synthetic
-            and o.attribution_verified
-            and o.query_text == saved.phrase
             and m.message_type == "SEARCH_MATCH"
+            and any(
+                card.attribution_verified
+                and card.query_text == saved.phrase
+                and card.data.get("message_role") != "RECOMMENDED"
+                for card in observation_occurrences(o)
+            )
         }
         statuses.append(dict(saved=saved, real_matches=len(matched)))
     return statuses

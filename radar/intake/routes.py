@@ -26,7 +26,7 @@ from radar.intake.parsers import (
 from radar.intake.registry import (
     STARTER_PHRASES,
     SourceDefinition,
-    auction_email_platform,
+    duplicate_auction_platform,
     seed_searches,
 )
 from radar.intake.service import (
@@ -35,6 +35,7 @@ from radar.intake.service import (
     confirm_query,
     import_alerts,
     import_structured,
+    observation_occurrences,
     promote_candidate,
     source_definition,
 )
@@ -185,9 +186,13 @@ def intake_routes(app, render, preferences):
             message = s.get(AlertMessage, message_id)
             if not message:
                 raise HTTPException(404, "Message not found")
-            observations = list(
-                s.scalars(select(AlertObservation).where(AlertObservation.message_id == message_id))
-            )
+            observations = [
+                card
+                for o in s.scalars(
+                    select(AlertObservation).where(AlertObservation.message_id == message_id)
+                )
+                for card in observation_occurrences(o)
+            ]
             return render(
                 request,
                 "alert_message.html",
@@ -203,7 +208,7 @@ def intake_routes(app, render, preferences):
             raise HTTPException(422, "Explicit source-query evidence confirmation required")
         try:
             with app.state.sessions.begin() as s:
-                confirm_query(s, observation_id)
+                confirm_query(s, observation_id, form.get("occurrence_id") or None)
                 message_id = s.get(AlertObservation, observation_id).message_id
         except ValueError as e:
             raise HTTPException(422, str(e)) from None
@@ -268,10 +273,7 @@ def intake_routes(app, render, preferences):
                 for r in s.scalars(select(IntakeSource))
             ):
                 raise HTTPException(422, "Source identity/name already exists")
-            if (platform := auction_email_platform(data)) and any(
-                auction_email_platform(row.data) == platform
-                for row in s.scalars(select(IntakeSource))
-            ):
+            if duplicate_auction_platform(s, data):
                 raise HTTPException(422, "This platform already has a source; retain its history")
             s.add(IntakeSource(id=id_, data=data.model_dump(mode="json")))
             s.flush()
@@ -294,6 +296,8 @@ def intake_routes(app, render, preferences):
             row = s.get(IntakeSource, source_id)
             if not row:
                 raise HTTPException(404, "Source not found")
+            if duplicate_auction_platform(s, definition, exclude_id=row.id):
+                raise HTTPException(422, "This platform already has a source; retain its history")
             if any(
                 other.id != row.id and other.data["name"].casefold() == definition.name.casefold()
                 for other in s.scalars(select(IntakeSource))

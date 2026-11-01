@@ -21,7 +21,7 @@ from radar.db import (
 from radar.intake.auction_email import explicit_target, target_identity
 from radar.intake.parsers import parse_message
 from radar.intake.registry import SourceDefinition, seed_sources
-from radar.intake.service import confirm_query, import_alerts
+from radar.intake.service import confirm_query, import_alerts, observation_occurrences
 from radar.intake.views import auction_research, inbox_cards
 from radar.main import preferences
 
@@ -406,3 +406,230 @@ def test_source_filters_workbench_and_identify_handoff(client, platform):
         ).status_code
         == 422
     )
+
+
+@pytest.mark.parametrize("opaque_neighbor", [True, False])
+def test_card_boundaries_preserve_opaque_neighbors(opaque_neighbor):
+    other = inv_card("0000000002", "SYNTHETIC adjacent ring", "Current Bid: USD $999.00")
+    if opaque_neighbor:
+        import re
+
+        other = re.sub(r' title="[^"]*"', "", other)
+    raw = search_mail(
+        "<table><tr>" + inv_card("0000000001", "SYNTHETIC unpriced ring") + other + "</tr></table>"
+    )
+    parsed = parse_message(raw, "invaluable", definition("invaluable", [INV_SEARCH]))
+    first = next(c for c in parsed.candidates if c.item.source_listing_id == "0000000001")
+    assert first.item.item_price is None
+    assert first.item.seller_id == "SYNTHETIC Auctioneer 0000000001"
+    assert "$999" not in first.item.raw_description
+    assert "$999" in parsed.text  # Unassociated raw evidence is still reviewable.
+    if not opaque_neighbor:
+        assert str(parsed.candidates[1].item.item_price) == "999.00"
+
+
+def test_one_email_retains_each_query_and_recommended_occurrence(client):
+    body = (
+        "<table><tr>"
+        + inv_card("0000000001", "SYNTHETIC blue ring", "Current Bid: USD $12")
+        + "</tr></table>"
+    )
+    body += (
+        "<h2>New for sterling ring</h2><table><tr>"
+        + inv_card(
+            "0000000001", "SYNTHETIC same ring", "Current Bid: USD $12", term="sterling ring"
+        )
+        + "</tr></table>"
+    )
+    body += (
+        "<h2>Sponsored</h2><table><tr>"
+        + inv_card("0000000001", "SYNTHETIC recommended repeat", term="blue stone ring")
+        + "</tr></table>"
+    )
+    raw = search_mail(body, synthetic=False)  # Clearly labelled simulation of real attribution.
+    with client.app.state.sessions.begin() as s:
+        s.get(IntakeSource, "invaluable").data = definition("invaluable", [INV_SEARCH]).model_dump(
+            mode="json"
+        )
+        batch = import_alerts(s, "invaluable", [raw])
+        assert batch.stats["observations"] == 3
+        assert len(list(s.scalars(select(DiscoveredItem)))) == 1
+        rows = list(s.scalars(select(AlertObservation).order_by(AlertObservation.id)))
+        assert len(rows) == 1
+        obs = observation_occurrences(rows[0])
+        assert [(o.query_text, o.attribution_verified, o.data["message_role"]) for o in obs] == [
+            ("blue stone ring", True, "SEARCH_SECTION"),
+            ("sterling ring", True, "SEARCH_SECTION"),
+            (None, False, "RECOMMENDED"),
+        ]
+        assert len({o.data["occurrence_id"] for o in obs}) == 3
+        assert [o.data["title"] for o in obs] == [
+            "SYNTHETIC blue ring",
+            "SYNTHETIC same ring",
+            "SYNTHETIC recommended repeat",
+        ]
+        from radar.intake.views import search_status
+
+        counts = {
+            v["saved"].phrase: v["real_matches"]
+            for v in search_status(s)
+            if v["saved"].source_id == "invaluable"
+        }
+        assert counts["blue stone ring"] == counts["sterling ring"] == 1
+        assert sum(counts.values()) == 2
+        duplicate = import_alerts(s, "invaluable", [raw])
+        assert duplicate.stats["duplicate_messages"] == 1
+        assert len(list(s.scalars(select(AlertObservation)))) == 1
+        with pytest.raises(ValueError):
+            confirm_query(s, obs[2].id, obs[2].data["occurrence_id"])
+    page = client.get("/inbox/candidates/1").text
+    assert "blue stone ring" in page and "sterling ring" in page and "RECOMMENDED" in page
+
+
+@pytest.mark.parametrize(
+    "quote,currency", [("EUR €1.234,56", "EUR"), ("USD $1,23", "USD"), ("USD $12.345", "USD")]
+)
+def test_invalid_complete_monetary_quotes_remain_unknown(quote, currency):
+    parsed = parse_message(
+        outbid_mail(price=quote), "liveauctioneers", definition("liveauctioneers", [LA_OUTBID])
+    )
+    c = parsed.candidates[0]
+    assert c.item.item_price is None
+    evidence = c.evidence["price_quotes"][0]
+    assert evidence["currency"] == currency
+    assert evidence["quote"].removesuffix(".") == quote
+    assert evidence["amounts"] == []
+    assert evidence["parse_status"] == "UNKNOWN"
+
+
+def test_supported_money_ranges_and_kinds_still_parse_completely():
+    from radar.intake.auction_email import price_evidence
+
+    parsed = price_evidence(
+        "Current Bid: USD $1,234.56; Starting Bid: CAD $12.5; "
+        "Estimate: EUR €100-€200; Sold For: GBP £99.00."
+    )
+    assert [(p["kind"], p["currency"], p["amounts"]) for p in parsed] == [
+        ("CURRENT_BID", "USD", ["1234.56"]),
+        ("STARTING_BID", "CAD", ["12.50"]),
+        ("ESTIMATE", "EUR", ["100.00", "200.00"]),
+        ("SOLD_RESULT", "GBP", ["99.00"]),
+    ]
+
+
+@pytest.mark.parametrize("platform", ["invaluable", "liveauctioneers"])
+def test_source_edits_reject_duplicate_platform_and_allow_self_save(client, platform):
+    assert (
+        client.post(
+            "/sources",
+            data={
+                "source_id": "custom-existing",
+                "name": "SYNTHETIC existing source",
+                "domains": "estate.example.invalid",
+            },
+        ).status_code
+        == 200
+    )
+    with client.app.state.sessions() as s:
+        before = {r.id: r.data for r in s.scalars(select(IntakeSource))}
+        searches = [
+            (r.id, r.source_id, r.phrase, r.selected, r.configured)
+            for r in s.scalars(select(SavedSourceSearch))
+        ]
+    duplicate = {**before["custom-existing"], "domains": [platform + ".com"]}
+    assert (
+        client.post("/sources/custom-existing", data={"payload": json.dumps(duplicate)}).status_code
+        == 422
+    )
+    # A mixed-domain edit must not bypass duplicate protection either.
+    duplicate["domains"] = ["invaluable.com", "liveauctioneers.com"]
+    assert (
+        client.post("/sources/custom-existing", data={"payload": json.dumps(duplicate)}).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/sources/" + platform, data={"payload": json.dumps(before[platform])}
+        ).status_code
+        == 200
+    )
+    with client.app.state.sessions() as s:
+        assert {r.id: r.data for r in s.scalars(select(IntakeSource))} == before
+        assert [
+            (r.id, r.source_id, r.phrase, r.selected, r.configured)
+            for r in s.scalars(select(SavedSourceSearch))
+        ] == searches
+
+
+def test_two_resolved_cards_keep_their_current_bids():
+    raw = search_mail(
+        "<table><tr>"
+        + inv_card("0000000001", "SYNTHETIC first ring", "Current Bid: USD $12.00")
+        + inv_card("0000000002", "SYNTHETIC second ring", "Current Bid: USD $999.00")
+        + "</tr></table>"
+    )
+    p = parse_message(raw, "invaluable", definition("invaluable", [INV_SEARCH]))
+    assert [(c.item.source_listing_id, str(c.item.item_price)) for c in p.candidates] == [
+        ("0000000001", "12.00"),
+        ("0000000002", "999.00"),
+    ]
+
+
+def test_bid_button_spacing_images_do_not_split_one_lot():
+    link = escape(live_link("900010001"), quote=True)
+    raw = message(
+        "You’ve Been Outbid on SYNTHETIC cuff.",
+        "<table><tr><td><table><tr><td>"
+        f'<a href="{link}"><img alt="" width="170"></a></td></tr></table>'
+        "<table><tr><td>The highest bid is now USD $70."
+        f'<a href="{link}"><img width="1" height="13">BID $100 NOW</a>'
+        "</td></tr></table></td></tr></table>",
+    )
+    p = parse_message(raw, "liveauctioneers", definition("liveauctioneers", [LA_OUTBID]))
+    assert len(p.candidates) == 1
+    assert p.candidates[0].item.raw_title == "SYNTHETIC cuff."
+    assert str(p.candidates[0].item.item_price) == "70.00"
+
+
+def test_query_confirmation_is_scoped_to_one_card(client):
+    body = "<table><tr>" + inv_card("0000000001", "SYNTHETIC first") + "</tr></table>"
+    body += (
+        "<h2>New for sterling ring</h2><table><tr>"
+        + inv_card("0000000001", "SYNTHETIC second", term="sterling ring")
+        + "</tr></table>"
+    )
+    body += (
+        "<h2>Sponsored</h2><table><tr>"
+        + inv_card("0000000001", "SYNTHETIC sponsored")
+        + "</tr></table>"
+    )
+    with client.app.state.sessions.begin() as s:
+        import_alerts(s, "invaluable", [search_mail(body, synthetic=False)])
+        row = s.scalar(select(AlertObservation))
+        id_ = row.id
+        assert not any(o.attribution_verified for o in observation_occurrences(row))
+    assert (
+        client.post(
+            f"/inbox/observations/{id_}/confirm-query",
+            data={"confirm": "yes", "occurrence_id": "card-3"},
+        ).status_code
+        == 422
+    )
+    response = client.post(
+        f"/inbox/observations/{id_}/confirm-query",
+        data={"confirm": "yes", "occurrence_id": "card-2"},
+    )
+    assert response.status_code == 200
+    assert 'name="occurrence_id" value="card-1"' in response.text
+    with client.app.state.sessions() as s:
+        cards = observation_occurrences(s.get(AlertObservation, id_))
+        assert [o.attribution_verified for o in cards] == [False, True, False]
+        assert not s.get(AlertObservation, id_).attribution_verified
+        from radar.intake.views import search_status
+
+        counts = {
+            v["saved"].phrase: v["real_matches"]
+            for v in search_status(s)
+            if v["saved"].source_id == "invaluable"
+        }
+        assert counts["blue stone ring"] == 0 and counts["sterling ring"] == 1

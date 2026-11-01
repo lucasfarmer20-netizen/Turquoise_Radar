@@ -240,6 +240,26 @@ def auction_email_platform(source):
     return found[0] if len(found) == 1 else None
 
 
+def duplicate_auction_platform(session, definition, *, exclude_id=None):
+    """Creation and edits share the same domain ownership check, including mixed aliases."""
+
+    def platforms(source):
+        domains = (
+            source.domains if isinstance(source, SourceDefinition) else source.get("domains", [])
+        )
+        return {
+            platform
+            for platform in ("invaluable", "liveauctioneers")
+            if any(d == platform + ".com" or d.endswith("." + platform + ".com") for d in domains)
+        }
+
+    proposed = platforms(definition)
+    return any(
+        row.id != exclude_id and proposed & platforms(row.data)
+        for row in session.scalars(select(IntakeSource))
+    )
+
+
 def seed_searches(session, source_id):
     """Add missing exact phrases; preserve historical groups, IDs and owner choices."""
     existing = set(

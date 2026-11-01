@@ -5,6 +5,7 @@ import json
 from datetime import UTC
 from decimal import Decimal
 from hashlib import sha256
+from types import SimpleNamespace
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -67,6 +68,22 @@ def pattern_for(session, phrase, verified=False):
     return p
 
 
+def observation_occurrences(observation):
+    """Read new per-card evidence or the unchanged legacy single observation."""
+    cards = observation.data.get("card_occurrences")
+    if not cards:
+        return [observation]
+    return [
+        SimpleNamespace(
+            id=observation.id,
+            message_id=observation.message_id,
+            item_id=observation.item_id,
+            **card,
+        )
+        for card in cards
+    ]
+
+
 def add_candidate(session, message, candidate, verified=False):
     item = candidate.item
     verified = bool(verified and candidate.query_supported)
@@ -127,7 +144,8 @@ def add_candidate(session, message, candidate, verified=False):
         found.normalized = {**found.normalized, **updates}
     existing = session.scalar(
         select(AlertObservation).where(
-            AlertObservation.message_id == message.id, AlertObservation.item_id == found.id
+            AlertObservation.message_id == message.id,
+            AlertObservation.item_id == found.id,
         )
     )
     if not existing:
@@ -140,6 +158,23 @@ def add_candidate(session, message, candidate, verified=False):
                 attribution_verified=verified,
             )
         )
+    elif candidate.evidence.get("occurrence_id"):
+        cards = [
+            dict(query_text=o.query_text, attribution_verified=o.attribution_verified, data=o.data)
+            for o in observation_occurrences(existing)
+        ]
+        if not any(
+            c["data"].get("occurrence_id") == candidate.evidence["occurrence_id"] for c in cards
+        ):
+            cards.append(
+                dict(
+                    query_text=candidate.query,
+                    attribution_verified=verified,
+                    data=candidate.evidence,
+                )
+            )
+            # The original first occurrence and columns stay intact. No migration.
+            existing.data = {**existing.data, "card_occurrences": cards}
     return found, is_new
 
 
@@ -351,16 +386,38 @@ def promote_candidate(session, item_id):
     return row
 
 
-def confirm_query(session, observation_id):
-    o = session.get(AlertObservation, observation_id)
+def confirm_query(session, observation_id, occurrence_id=None):
+    row = session.get(AlertObservation, observation_id)
+    cards = observation_occurrences(row) if row else []
+    o = (
+        next((c for c in cards if c.data.get("occurrence_id") == occurrence_id), None)
+        if occurrence_id
+        else (cards[0] if cards else None)
+    )
     if not o or not o.query_text:
         raise ValueError("No explicit saved-search phrase is available to confirm")
     message = session.get(AlertMessage, o.message_id)
     if message.message_type != MessageType.SEARCH_MATCH:
         raise ValueError("Promotional/lifecycle messages cannot receive saved-search attribution")
+    if o.data.get("message_role") == "RECOMMENDED":
+        raise ValueError("Recommendations cannot receive saved-search attribution")
     p = pattern_for(session, o.query_text, True)
     o.attribution_verified = True
     o.data = {**o.data, "attribution_confirmed_at": utcnow().isoformat()}
+    if row.data.get("card_occurrences"):
+        row.data = {
+            **row.data,
+            "card_occurrences": [
+                dict(
+                    query_text=c.query_text,
+                    attribution_verified=c.attribution_verified,
+                    data=c.data,
+                )
+                for c in cards
+            ],
+        }
+        if o is cards[0]:
+            row.attribution_verified = True
     item = session.get(DiscoveredItem, o.item_id)
     if item.normalized.get("raw_search_phrase") == o.query_text:
         item.normalized = {
