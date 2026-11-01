@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "inventory_complete": false,
+  "assets": [
+    {"kind": "sqlite", "path": "/PRIVATE/active/pilot.db"},
+    {"kind": "sqlite", "path": "/PRIVATE/backup/pilot.db"},
+    {"kind": "archive", "path": "/PRIVATE/mixed-backup.tar"},
+    {"kind": "independent", "path": "/PRIVATE/maker-library", "review_evidence": "REPLACE_WITH_ACTUAL_REVIEW"}
+  ],
+  "aliases": {},
+  "photo_reviews": {}
+}

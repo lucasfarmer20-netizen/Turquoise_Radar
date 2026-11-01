@@ -1,0 +1,14 @@
+# Replace the example host only after the owner supplies an owned domain and approves deployment.
+ebay-notify.example.invalid {
+	@notification path /ebay/account-deletion
+	handle @notification {
+		request_body {
+			max_size 32KB
+		}
+		reverse_proxy 127.0.0.1:8091
+	}
+	handle {
+		respond 404
+	}
+	# Do not enable access/body/header logs: challenge query strings are private.
+}
