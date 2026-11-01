@@ -23,7 +23,12 @@ from radar.intake.parsers import (
     MAX_MESSAGES,
     safe_link,
 )
-from radar.intake.registry import STARTER_PHRASES, SourceDefinition, seed_searches
+from radar.intake.registry import (
+    STARTER_PHRASES,
+    SourceDefinition,
+    auction_email_platform,
+    seed_searches,
+)
 from radar.intake.service import (
     PaidCosts,
     confirm_paid_order,
@@ -263,6 +268,11 @@ def intake_routes(app, render, preferences):
                 for r in s.scalars(select(IntakeSource))
             ):
                 raise HTTPException(422, "Source identity/name already exists")
+            if (platform := auction_email_platform(data)) and any(
+                auction_email_platform(row.data) == platform
+                for row in s.scalars(select(IntakeSource))
+            ):
+                raise HTTPException(422, "This platform already has a source; retain its history")
             s.add(IntakeSource(id=id_, data=data.model_dump(mode="json")))
             s.flush()
             seed_searches(s, id_)
@@ -351,12 +361,17 @@ def intake_routes(app, render, preferences):
     @app.get("/estate-groups")
     def groups(request: Request):
         with app.state.sessions() as s:
+            cards = inbox_cards(s, preferences(s))
             return render(
                 request,
                 "estate_groups.html",
-                groups=estate_groups(
-                    inbox_cards(s, preferences(s)), list(s.scalars(select(AlertMessage)))
-                ),
+                groups=estate_groups(cards, list(s.scalars(select(AlertMessage)))),
+                ungrouped=[
+                    c
+                    for c in cards
+                    if not (c.get("owner_item") or c["item"]).seller_id
+                    and not (c.get("owner_item") or c["item"]).sale_auction_id
+                ],
             )
 
     @app.get("/invoices")

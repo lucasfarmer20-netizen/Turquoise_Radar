@@ -118,6 +118,12 @@ def add_candidate(session, message, candidate, verified=False):
             **found.normalized.get("cost_status", {}),
             **item.model_dump(mode="json")["cost_status"],
         }
+        if candidate.evidence.get("platform") in ("invaluable", "liveauctioneers"):
+            if item.item_price is not None:
+                updates["currency"] = item.currency
+            if candidate.evidence.get("availability") == "ENDED":
+                updates["item_price"] = None
+                updates["cost_status"]["item_price"] = "UNKNOWN"
         found.normalized = {**found.normalized, **updates}
     existing = session.scalar(
         select(AlertObservation).where(

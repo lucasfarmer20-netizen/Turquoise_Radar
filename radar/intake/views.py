@@ -21,6 +21,8 @@ AUCTION_PRIORITY = {
     "CTBids": 2,
     "EstateSales.org": 2,
     "EstateSales.net": 2,
+    "Invaluable": 3,
+    "LiveAuctioneers": 4,
 }
 COST_LABELS = {
     "item_price": "Item / bid",
@@ -46,11 +48,18 @@ def targeted_research(card):
 
 def auction_research(cards):
     """Research vocabulary and source priority, never an inferred bargain score."""
-    eligible = [c for c in cards if c["item"].source.removesuffix(" FIXTURE") in AUCTION_PRIORITY]
+
+    def priority(card):
+        source = {"invaluable": "Invaluable", "liveauctioneers": "LiveAuctioneers"}.get(
+            card.get("auction_platform"), card["item"].source.removesuffix(" FIXTURE")
+        )
+        return AUCTION_PRIORITY.get(source)
+
+    eligible = [c for c in cards if priority(c) is not None and c.get("availability") != "ENDED"]
     return sorted(
         eligible,
         key=lambda c: (
-            AUCTION_PRIORITY[c["item"].source.removesuffix(" FIXTURE")],
+            priority(c),
             -targeted_research(c),
             -("jewelry" in c["leads"]),
             -len(c["leads"]),
@@ -127,6 +136,13 @@ def inbox_cards(session, prefs):
                 item=item,
                 a=a,
                 history=history[row.id],
+                auction_platform=next(
+                    (o.data.get("platform") for o, m in history[row.id] if o.data.get("platform")),
+                    None,
+                ),
+                availability="ENDED"
+                if any(o.data.get("availability") == "ENDED" for o, m in history[row.id])
+                else "UNKNOWN",
                 leads=leads,
                 costs=costs,
                 state="IRRELEVANT"

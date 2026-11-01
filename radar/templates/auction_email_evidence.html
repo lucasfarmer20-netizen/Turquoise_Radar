@@ -1,0 +1,10 @@
+{% if e.platform %}
+<div class="auction-email-evidence">
+  <p>Availability: {{ e.availability }} · email section: {{ e.message_role }}. Confirm current availability before acting.</p>
+  <p>Amount observed at {{ e.observed_at or 'UNKNOWN' }}:</p>
+  <ul>{% for quote in e.price_quotes %}<li>{{ quote.kind|replace('_',' ') }}: {{ quote.quote }} · {{ quote.currency if quote.currency!='XXX' else 'currency UNKNOWN' }}</li>{% else %}<li>No numeric amount supplied.</li>{% endfor %}</ul>
+  {% if e.currency_note %}<p>{{ e.currency_note }}. Estimates, starting bids and sold results are not current bids.</p>{% endif %}
+  {% if e.auction_time_raw %}<p>Supplied auction/date wording: {{ e.auction_time_raw }}. This is not a confirmed individual lot deadline.</p>{% endif %}
+  <p>Photographs: remote references only; no images retrieved. Buyer premium, platform-fee inclusion, tax, handling and Alaska delivery need separate evidence.</p>
+</div>
+{% endif %}

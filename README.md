@@ -403,3 +403,18 @@ preserves existing rows and owner choices for built-in and custom sources. Use t
 source/group controls and exact-copy button to configure selected searches manually.
 See [coverage, preservation and validation](docs/JRI-009.md). Real yield is not yet
 measured; actual attributable notifications are still needed.
+
+### Invaluable and LiveAuctioneers email sourcing (JRI-010)
+
+Owner-provided Invaluable saved-search/outbid emails and LiveAuctioneers
+outbid/ended-item recommendations now feed the existing Inbox, Auction research,
+seller/auction groups, review queue and workbench. Only explicit source targets
+are recovered offline; nothing follows opaque redirects or retrieves images.
+Observed formats have separate review gates, and recommendations receive no
+saved-search credit. The JRI-009 starter/full search catalog remains available.
+
+Six actual emails produced 22 distinct lot identities; two ended lots stay
+historical. Five private workbench cases remain **RESEARCH**, with no permitted
+local photos or completed buying evaluations. See [actual source results,
+limitations and verification](docs/JRI-010.md). ShopGoodwill and HiBid await their
+first relevant notifications independently of this delivery.
