@@ -1,6 +1,7 @@
 import base64
 import json
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -22,7 +23,7 @@ from radar.intake.parsers import (
     MAX_MESSAGES,
     safe_link,
 )
-from radar.intake.registry import SourceDefinition
+from radar.intake.registry import STARTER_PHRASES, SourceDefinition, seed_searches
 from radar.intake.service import (
     PaidCosts,
     confirm_paid_order,
@@ -264,11 +265,7 @@ def intake_routes(app, render, preferences):
                 raise HTTPException(422, "Source identity/name already exists")
             s.add(IntakeSource(id=id_, data=data.model_dump(mode="json")))
             s.flush()
-            from radar.intake.registry import SEARCH_GROUPS
-
-            for group, phrases in SEARCH_GROUPS.items():
-                for phrase in phrases:
-                    s.add(SavedSourceSearch(source_id=id_, phrase=phrase, group_name=group))
+            seed_searches(s, id_)
         return RedirectResponse("/sources", status_code=303)
 
     @app.post("/sources/{source_id}")
@@ -303,12 +300,34 @@ def intake_routes(app, render, preferences):
     @app.get("/saved-searches")
     def searches(request: Request):
         with app.state.sessions() as s:
+            sources = list(s.scalars(select(IntakeSource)))
+            source = request.query_params.get("source", "shopgoodwill")
+            if source not in {row.id for row in sources}:
+                raise HTTPException(404, "Source not found")
+            group = request.query_params.get("group", "")
+            catalog = "all" if request.query_params.get("catalog") == "all" else "starter"
+            statuses = [v for v in search_status(s) if v["saved"].source_id == source]
+            total = len(statuses)
+            groups = sorted({v["saved"].group_name for v in statuses})
+            if group not in groups:
+                group = ""
+            if group:
+                statuses = [v for v in statuses if v["saved"].group_name == group]
+            if catalog == "starter":
+                order = {phrase: i for i, phrase in enumerate(STARTER_PHRASES)}
+                statuses = [v for v in statuses if v["saved"].phrase in order]
+                statuses.sort(key=lambda v: order[v["saved"].phrase])
             return render(
                 request,
                 "saved_searches.html",
-                statuses=search_status(s),
-                sources=list(s.scalars(select(IntakeSource))),
-                source_filter=request.query_params.get("source"),
+                statuses=statuses,
+                sources=sources,
+                source_filter=source,
+                group_filter=group,
+                catalog_filter=catalog,
+                groups=groups,
+                total=total,
+                starter_phrases=STARTER_PHRASES,
             )
 
     @app.post("/saved-searches/{search_id}")
@@ -320,7 +339,14 @@ def intake_routes(app, render, preferences):
                 raise HTTPException(404, "Search not found")
             row.selected = form.get("selected") == "true"
             row.configured = form.get("configured") == "true"
-        return RedirectResponse("/saved-searches", status_code=303)
+            context = {
+                "source": row.source_id,
+                "group": form.get("group", ""),
+                "catalog": "starter" if form.get("catalog") == "starter" else "all",
+            }
+        return RedirectResponse(
+            f"/saved-searches?{urlencode(context)}#search-{search_id}", status_code=303
+        )
 
     @app.get("/estate-groups")
     def groups(request: Request):

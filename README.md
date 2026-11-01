@@ -393,3 +393,13 @@ UTC offset, separate shipping evidence and carrier. See the [owner walkthrough
 and actual validation status](docs/JRI-008.md). Software verification is complete;
 real Personal Shopper/digest validation and a current buying evaluation still need
 owner evidence.
+
+### Broader seller-language searches (JRI-009)
+
+The existing saved-search assistant now offers 65 curated phrases per source,
+including `blue stone ring` and `silver ring with blue stone`, plus a 15-phrase
+starter view. Recommendations do not activate searches. Additive startup seeding
+preserves existing rows and owner choices for built-in and custom sources. Use the
+source/group controls and exact-copy button to configure selected searches manually.
+See [coverage, preservation and validation](docs/JRI-009.md). Real yield is not yet
+measured; actual attributable notifications are still needed.

@@ -71,7 +71,83 @@ SEARCH_GROUPS = {
         "silver blue rock",
         "old Indian jewelry",
     ],
+    "Plain descriptions and color": [
+        "blue stone ring",
+        "green stone ring",
+        "blue ring",
+        "silver ring with blue stone",
+        "blue stone bracelet",
+        "blue stone pendant",
+        "blue stone necklace",
+        "blue stone earrings",
+        "blue stone brooch",
+    ],
+    "Material and item type": [
+        "silver ring",
+        "sterling ring",
+        "925 ring",
+        "silver bracelet",
+        "sterling bracelet",
+        "silver cuff",
+        "silver pendant",
+        "silver necklace",
+        "silver earrings",
+        "925 jewelry",
+    ],
+    "Lots and mixed jewelry": [
+        "jewelry lot",
+        "mixed jewelry lot",
+        "silver jewelry lot",
+        "sterling jewelry lot",
+        "925 lot",
+        "estate jewelry lot",
+        "jewelry jar",
+        "jewelry bag",
+        "scrap silver jewelry",
+    ],
+    "Explicit turquoise and regional descriptions": [
+        "turquoise jewelry",
+        "turquoise ring",
+        "turquoise bracelet",
+        "turquoise cuff",
+        "turquoise pendant",
+        "turquoise necklace",
+        "turquoise earrings",
+        "southwestern jewelry",
+        "western jewelry",
+    ],
+    "Spelling variants": ["turqoise", "turquiose", "turqouise", "turquois", "navaho", "navjo"],
+    "Vague or incomplete descriptions": [
+        "stone ring",
+        "stone bracelet",
+        "stone necklace",
+        "stone jewelry",
+        "silver tone jewelry",
+        "costume jewelry lot",
+        "unmarked jewelry",
+        "unidentified jewelry",
+        "blue rock jewelry",
+    ],
 }
+
+# Display recommendations only; never owner selection, configuration or query history.
+STARTER_PHRASES = (
+    "blue stone ring",
+    "silver ring with blue stone",
+    "green stone ring",
+    "silver ring",
+    "sterling ring",
+    "blue stone bracelet",
+    "silver cuff",
+    "blue stone pendant",
+    "blue stone necklace",
+    "blue stone earrings",
+    "sterling jewelry lot",
+    "mixed jewelry lot",
+    "jewelry jar",
+    "turquoise jewelry",
+    "turqoise",
+)
 
 
 class SourceDefinition(BaseModel):
@@ -136,20 +212,34 @@ class SourceDefinition(BaseModel):
         return self
 
 
+def seed_searches(session, source_id):
+    """Add missing exact phrases; preserve historical groups, IDs and owner choices."""
+    existing = set(
+        session.scalars(
+            select(SavedSourceSearch.phrase).where(SavedSourceSearch.source_id == source_id)
+        )
+    )
+    for group, phrases in SEARCH_GROUPS.items():
+        for phrase in phrases:
+            if phrase not in existing:
+                session.add(
+                    SavedSourceSearch(
+                        source_id=source_id,
+                        phrase=phrase,
+                        group_name=group,
+                        selected=False,
+                        configured=False,
+                    )
+                )
+                existing.add(phrase)
+    session.flush()
+
+
 def seed_sources(session):
     for source_id, (name, domains, notifications) in SOURCES.items():
         if not session.get(IntakeSource, source_id):
             definition = SourceDefinition(name=name, domains=domains, notifications=notifications)
             session.add(IntakeSource(id=source_id, data=definition.model_dump(mode="json")))
-        existing = set(
-            session.scalars(
-                select(SavedSourceSearch.phrase).where(SavedSourceSearch.source_id == source_id)
-            )
-        )
-        for group, phrases in SEARCH_GROUPS.items():
-            for phrase in phrases:
-                if phrase not in existing:
-                    session.add(
-                        SavedSourceSearch(source_id=source_id, phrase=phrase, group_name=group)
-                    )
     session.flush()
+    for source_id in session.scalars(select(IntakeSource.id)):
+        seed_searches(session, source_id)
