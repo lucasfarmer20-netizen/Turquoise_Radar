@@ -1,6 +1,7 @@
 """Owner-operated capture, evidence editing, review queue and comparable workflows."""
 
 import json
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, Request
@@ -28,7 +29,9 @@ EDITABLE = ACQUISITION + [
     "seller_id",
     "sale_auction_id",
     "shipping_status",
+    "shipping_evidence",
     "carrier",
+    "item_end_time",
     "combined_shipping_available",
     "combined_shipping_evidence",
     "condition",
@@ -218,6 +221,15 @@ def owner_routes(app, render, preferences, view):
             statuses = dict(before.get("cost_status", {}))
             statuses.update({k: form[k + "_status"] for k in ACQUISITION if k + "_status" in form})
             try:
+                if updates.get("item_end_time") is not None:
+                    # Validate only an entered/changed deadline, keeping untouched
+                    # legacy timezone-free records editable. Numeric epoch guesses
+                    # and natural-language auction notices are not lot deadlines.
+                    deadline = datetime.fromisoformat(updates["item_end_time"].strip())
+                    previous = ListingInput.model_validate(before).item_end_time
+                    if deadline != previous and deadline.utcoffset() is None:
+                        raise ValueError("Lot closing time requires an explicit UTC offset or Z")
+                    updates["item_end_time"] = deadline
                 updated = ListingInput.model_validate(
                     {**before, **updates, "cost_status": statuses}
                 )
