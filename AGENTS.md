@@ -25,7 +25,8 @@ controls; live read-only discovery requires a usable Production keyset, permitte
 api.ebay.com access, and explicit per-run owner confirmation of the exact preview.
 Do not treat developer approval or a successful token request as Browse access.
 Keep manual/CSV/JSON and multi-source intake available. No scraping, unofficial
-endpoints or third-party-key workaround. PR #20 email corrections remain separate.
+endpoints or third-party-key workaround. PR #20 email corrections and PR #21
+readiness work are merged; preserve them during the isolated execution pilot.
 
 Task 004 owner alerts are private data: never commit original emails, addresses,
 tracking links or real purchase history. Only named synthetic fixture .eml files
