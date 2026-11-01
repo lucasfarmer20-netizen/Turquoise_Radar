@@ -19,6 +19,13 @@ for tests, ordered transactional migrations for schema changes, and keep fixture
 sandbox statistics separate from real marketplace performance. Do not merge task
 branches without review.
 
+JRI-006: the owner reports that the eBay developer application was rejected.
+Production API access is unavailable indefinitely unless the owner supplies verified
+approval. Keep EBAY_PRODUCTION_ENABLED=false and EBAY_PRODUCTION_APPROVED=false.
+Use Quick Capture, manual/CSV/JSON evidence and existing multi-source alert intake.
+Do not scrape eBay, use unofficial endpoints, or treat third-party API keys as
+authorization. Do not build API-dependent features for the sourcing pilot.
+
 Task 004 owner alerts are private data: never commit original emails, addresses,
 tracking links or real purchase history. Only named synthetic fixture .eml files
 are permitted. Never log complete bodies, render active email HTML, load email

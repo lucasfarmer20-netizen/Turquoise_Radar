@@ -1,6 +1,7 @@
 """Private local identification UI. Never fetch remote photos or invoke a provider."""
 
 import json
+from types import SimpleNamespace
 
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
@@ -9,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from radar.db import ComparableSale, Listing, MakerCase, MakerPhoto, MakerRun, MakerScenario
 from radar.identification import service as svc
-from radar.identification.ranking import SYMBOLS
+from radar.identification.ranking import SYMBOLS, display_result
 from radar.jewelry.images import MAX_BATCH_BYTES, MAX_FILE_BYTES, clean_image, read_photo
 from radar.references.directory import source_registry, stats
 
@@ -137,6 +138,10 @@ def identification_routes(app, render, preferences):
                 )
             )
             run = svc.latest_run(s, case_id)
+            if run:
+                run = SimpleNamespace(
+                    id=run.id, created_at=run.created_at, data=display_result(run.data)
+                )
             history = svc.decisions(s, case_id)
             query = dict(run.data["query"]) if run else {}
             hallmark_ids = [p.id for p in photos if p.role == "HALLMARK"]

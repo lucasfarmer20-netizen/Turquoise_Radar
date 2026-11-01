@@ -10,7 +10,16 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import select
 
-from radar.db import ComparableSale, Listing, MakerCase, MakerPhoto, MakerScenario, Setting
+from radar.db import (
+    ComparableSale,
+    Listing,
+    MakerCase,
+    MakerDecision,
+    MakerPhoto,
+    MakerRun,
+    MakerScenario,
+    Setting,
+)
 from radar.identification import service as svc
 from radar.identification.ranking import rank
 from radar.main import create_app
@@ -537,3 +546,145 @@ def test_private_book_views_resolve_each_verified_photo_and_fail_on_tampering(
     path.write_bytes(image("yellow"))
     assert owner_client.get(urls[1]).status_code == 404
     assert owner_client.get(urls[0]).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Arrow head",
+        "ARROW-HEAD",
+        "arrowhead",
+        "Broken arrow symbol",
+        "Bird within a circle",
+        "Feather pictograph",
+        "Rain cloud mark on fake jewelry",
+        "UNKNOWN",
+        "Unidentified — mark 2",
+    ],
+)
+def test_pictorial_labels_remain_unknown_even_with_lettering_visual_and_owner_support(label):
+    from radar.identification.ranking import maker_key
+
+    r = record(label, text="ALPHA", identity_kind="UNRESOLVED", local_reference_ids=["photo"])
+    result = rank(
+        [r],
+        query(),
+        [{"reference_id": "photo", "similarity": 0.99}],
+        feedback=[
+            dict(candidate_id=digest(maker_key(label).encode()), action="CONFIRM", same_case=True)
+        ],
+    )
+    assert result["status"] == "UNKNOWN" and not result["candidates"]
+    mark = result["unresolved_references"][0]
+    assert mark["maker"] == label and mark["references"] == [r]
+    assert "UNKNOWN" in mark["unresolved_reason"]
+    assert mark["visual"] == ["photo"] and not mark["authenticated"]
+    assert len(mark["owner_feedback"]) == 1
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Synthetic Feather",
+        "Bear: Synthetic Jane",
+        "Sunburst Handcrafts Inc.",
+        "Arrowhead Trading Post",
+        "Bell Trading Post",
+    ],
+)
+def test_named_people_and_shops_survive_unknown_entity_type_and_pictorial_words(name):
+    result = rank([record(name, identity_kind="UNRESOLVED")], query())
+    assert result["candidates"][0]["maker"] == name
+    assert result["candidates"][0]["strength"] == "Strong lettering match"
+    assert not result["unresolved_references"]
+
+
+def test_description_does_not_consume_a_named_candidate_slot_or_modify_records():
+    from copy import deepcopy
+
+    rows = [
+        record(
+            "Arrow head", text="ALPHA", description="Synthetic arrow", identity_kind="TRADING_POST"
+        )
+    ]
+    rows += [record(f"Synthetic Arrow Shop {i}", text="ALPHA") for i in range(6)]
+    before = deepcopy(rows)
+    result = rank(rows, dict(query(), symbols=["arrow"]))
+    assert len(result["candidates"]) == 5
+    assert all(c["maker"].startswith("Synthetic Arrow Shop") for c in result["candidates"])
+    assert result["unresolved_references"][0]["maker"] == "Arrow head"
+    assert rows == before
+
+
+def test_cached_description_is_not_an_actionable_maker_and_saved_search_stays_intact(owner_client):
+    from copy import deepcopy
+
+    from radar.identification.ranking import display_result
+
+    c = owner_client
+    case = create(c)
+    run, _ = search(c, case)
+    old = deepcopy(run.data)
+    old["policy"] = "jri005-owner-likely-maker-v1"
+    descriptor = deepcopy(old["candidates"][0])
+    descriptor.update(id=digest(b"ARROW HEAD"), maker="Arrow head", strength="Pictorial lead")
+    old["candidates"].append(descriptor)
+    old["rejected"] = [deepcopy(descriptor)]  # Old rejection must not offer reconsider-as-maker.
+    old["warnings"] = ["SYNTHETIC seller-metadata-only fixture; photographs not evaluated"]
+    with c.app.state.sessions.begin() as s:
+        s.get(MakerRun, run.id).data = old
+    presented = display_result(old)
+    assert len(presented["unresolved_references"]) == 1
+    assert presented["candidates"][0]["maker"] == "Synthetic Alpha"
+    assert not presented["rejected"]
+    response = c.get(f"/identify/cases/{case}")
+    assert "Related marks with UNKNOWN maker" in response.text
+    assert "Pictorial mark description, not a named maker or trading post" in response.text
+    assert "original saved search remains unchanged" in response.text
+    assert "seller-metadata-only" in response.text
+    assert "<h3>Arrow head</h3>" not in response.text
+    assert f'name="candidate_id" value="{descriptor["id"]}"' not in response.text
+    assert decision(c, case, run, candidate=descriptor["id"]).status_code == 422
+    assert decision(c, case, run, "CORRECT_MAKER", value="Arrow head").status_code == 422
+    with c.app.state.sessions() as s:
+        assert s.get(MakerRun, run.id).data == old
+        assert not svc.decisions(s, case)
+
+
+def test_legacy_descriptive_owner_feedback_cannot_create_identity_or_value(owner_client, prefs):
+    from copy import deepcopy
+
+    c = owner_client
+    with connect(c.app.state.identification_config.directory, write=True) as directory_db:
+        review = directory_db.execute(
+            "SELECT review_id FROM current_reviews WHERE source='art-amerindien'"
+        ).fetchone()[0]
+        for i in range(4):
+            r = record(f"Synthetic Alpha Workshop {i}", locator=f"synthetic-extra-{i}")
+            upsert(directory_db, r, review, "art-amerindien")
+    case = create(c)
+    c.post(f"/identify/cases/{case}/workbench")
+    run, _ = search(c, case)
+    with c.app.state.sessions.begin() as s:
+        old = deepcopy(run.data)
+        candidate = old["candidates"][0]
+        candidate.update(id=digest(b"ARROW HEAD"), maker="Arrow head")
+        s.get(MakerRun, run.id).data = old
+        d = MakerDecision(
+            case_id=case,
+            run_id=run.id,
+            candidate_id=candidate["id"],
+            action="CONFIRM",
+            data={"maker": "Arrow head", "note": "SYNTHETIC legacy decision"},
+        )
+        s.add(d)
+        s.flush()
+        assert svc.accepted(s, case) is None
+        with pytest.raises(ValueError, match="unresolved mark description"):
+            svc.scenario(s, case, candidate["id"], [1], prefs)
+        d.action = "CORRECT_MAKER"  # Construct a legacy correction fixture, not a UI update.
+    new, response = search(c, case)
+    assert len(new.data["candidates"]) == 5
+    assert all(x["maker"] != "Arrow head" for x in new.data["candidates"])
+    assert new.data["unresolved_references"][0]["maker"] == "Arrow head"
+    assert "<h3>Arrow head</h3>" not in response.text
