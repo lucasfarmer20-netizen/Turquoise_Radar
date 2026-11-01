@@ -193,7 +193,8 @@ through existing Discovery settings, with no production requests sent. Keep fixt
 defaults until configuration is complete and the owner confirms the exact run.
 Quick Capture, manual/CSV/JSON and auction/marketplace intake remain available.
 No scraping, unofficial endpoints or third-party-key workaround is authorized.
-See [JRI-011 readiness, exact plan and blockers](docs/JRI-011.md).
+See [JRI-011 readiness and exact plan](docs/JRI-011.md) and the
+[execution follow-up, private handoff and mobile checks](docs/JRI-011-EXECUTION.md).
 Read [eBay setup, permissions and limitations](docs/EBAY-SETUP.md) before any API use.
 
 ## Owner workflow (Task 002)
