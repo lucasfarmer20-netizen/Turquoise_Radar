@@ -11,6 +11,51 @@ class Base(DeclarativeBase):
     pass
 
 
+class MakerCase(Base):
+    __tablename__ = "maker_cases"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MakerPhoto(Base):
+    __tablename__ = "maker_photos"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("maker_cases.id"))
+    role: Mapped[str] = mapped_column(String)
+    content_hash: Mapped[str] = mapped_column(String)
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MakerRun(Base):
+    __tablename__ = "maker_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("maker_cases.id"))
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MakerDecision(Base):
+    __tablename__ = "maker_decisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("maker_cases.id"))
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("maker_runs.id"))
+    candidate_id: Mapped[str | None] = mapped_column(String)
+    action: Mapped[str] = mapped_column(String)
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MakerScenario(Base):
+    __tablename__ = "maker_scenarios"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("maker_cases.id"))
+    data: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Listing(Base):
     __tablename__ = "listings"
     id: Mapped[int] = mapped_column(primary_key=True)

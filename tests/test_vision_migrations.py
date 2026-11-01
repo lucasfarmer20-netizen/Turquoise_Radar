@@ -7,7 +7,7 @@ from sqlalchemy.exc import OperationalError
 from test_intake_migrations import phase3
 
 from radar.db import database
-from radar.migrations import VERSION_4
+from radar.migrations import CURRENT_VERSION, VERSION_4
 
 
 def populated_v4(path):
@@ -77,7 +77,7 @@ def test_v5_preserves_every_populated_v4_table_and_repeat_is_noop(tmp_path):
     engine, _ = database(f"sqlite:///{path}")
     engine.dispose()
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert db.execute("PRAGMA user_version").fetchone()[0] == CURRENT_VERSION
         for table, rows in before.items():
             assert db.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall() == rows
         tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -97,8 +97,8 @@ def test_v5_preserves_every_populated_v4_table_and_repeat_is_noop(tmp_path):
             for t in tables
             for r in db.execute(f"PRAGMA table_info({t})")
         )
-    assert Path(str(path) + ".pre-v5.bak").exists()
-    with sqlite3.connect(str(path) + ".pre-v5.bak") as db:
+    assert Path(str(path) + f".pre-v{CURRENT_VERSION}.bak").exists()
+    with sqlite3.connect(str(path) + f".pre-v{CURRENT_VERSION}.bak") as db:
         assert db.execute("PRAGMA user_version").fetchone()[0] == 4
     engine, _ = database(f"sqlite:///{path}")
     engine.dispose()
@@ -122,11 +122,11 @@ def test_v5_failure_rolls_back_populated_v4_and_ddl(tmp_path, monkeypatch):
 def test_v5_refuses_future_version_without_mutation(tmp_path):
     path = tmp_path / "future.db"
     with sqlite3.connect(path) as db:
-        db.execute("PRAGMA user_version=6")
+        db.execute(f"PRAGMA user_version={CURRENT_VERSION + 1}")
         db.execute("CREATE TABLE future (data TEXT)")
         db.execute("INSERT INTO future VALUES (?)", (json.dumps({"SYNTHETIC": "preserve"}),))
     with pytest.raises(RuntimeError, match="newer"):
         database(f"sqlite:///{path}")
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert db.execute("PRAGMA user_version").fetchone()[0] == CURRENT_VERSION + 1
         assert db.execute("SELECT data FROM future").fetchone()[0] == '{"SYNTHETIC": "preserve"}'

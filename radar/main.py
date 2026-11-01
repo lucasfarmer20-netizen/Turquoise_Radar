@@ -21,6 +21,8 @@ from radar.anomalies import (
 from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
 from radar.discovery.routes import discovery_routes
 from radar.discovery.service import discovery_history, seed_discovery
+from radar.identification.routes import IdentificationBodyLimit, identification_routes
+from radar.identification.service import workbench_context
 from radar.intake.limits import AlertBodyLimit
 from radar.intake.registry import seed_sources
 from radar.intake.routes import intake_routes
@@ -70,6 +72,7 @@ def create_app(database_url=None):
     app = FastAPI(title="Turquoise Radar", lifespan=lifespan)
     app.add_middleware(AlertBodyLimit)
     app.add_middleware(VisionBodyLimit)
+    app.add_middleware(IdentificationBodyLimit)
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
     @app.middleware("http")
@@ -90,6 +93,11 @@ def create_app(database_url=None):
             "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
             "base-uri 'self'; form-action 'self'"
         )
+        if request.url.path.startswith("/identify"):
+            response.headers["Cache-Control"] = "private, no-store"
+            response.headers["Content-Security-Policy"] = response.headers[
+                "Content-Security-Policy"
+            ].replace("img-src 'self' https:", "img-src 'self'")
         return response
 
     def render(request, name, **context):
@@ -195,6 +203,7 @@ def create_app(database_url=None):
                 "detail.html",
                 v=view(row, preferences(s), patterns),
                 feedback=feedback,
+                maker_cases=workbench_context(s, listing_id),
                 discovery_observations=discovery_history(s, listing_id),
                 alert_observations=alert_history(s, listing_id),
                 outcomes=list(
@@ -371,6 +380,7 @@ def create_app(database_url=None):
     discovery_routes(app, render, preferences)
     intake_routes(app, render, preferences)
     vision_routes(app, render)
+    identification_routes(app, render, preferences)
     return app
 
 

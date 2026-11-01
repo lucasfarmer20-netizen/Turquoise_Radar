@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% block title %}Identify jewelry · Turquoise Radar{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">PRIVATE JEWELRY RESEARCH</p><h1>Who likely made this piece?</h1><p>Compare a hallmark, inspect the references, and make your own identification.</p></div><span class="badge">LOCAL MATCHING · NO INFERENCE API</span></div>
+{% if problem %}<section class="panel risk" role="alert">{{ problem }}</section>{% endif %}
+<div class="detail-grid"><section class="panel"><h2>Start with your photographs</h2><p>A clear match to one published reference can support a likely maker. Additional sources are useful, but optional.</p>
+<form method="post" action="/identify/cases" enctype="multipart/form-data" class="stack">
+{% if listing %}<input type="hidden" name="listing_id" value="{{ listing.id }}"><p>Linked to workbench listing #{{ listing.id }}.</p>{% endif %}
+<label>Piece or listing title<input name="title" maxlength="500" required value="{{ listing.data.raw_title if listing else '' }}" placeholder="Turquoise cuff with a worn stamp"></label>
+<label>Jewelry photographs<input type="file" name="jewelry_photos" accept="image/jpeg,image/png,image/webp" multiple></label>
+<label>Hallmark photographs or crops<input type="file" name="hallmark_photos" accept="image/jpeg,image/png,image/webp" multiple></label>
+<p class="muted">JPEG, PNG or WebP. Up to six photographs per upload, 10 MB each / 40 MB total. You can crop a hallmark in the next step.</p>
+<label>Optional listing URL<input name="listing_url" type="url" value="{{ listing.data.listing_url or '' if listing else '' }}" placeholder="https://…"></label>
+<label>Optional listing details or observations<textarea name="details" maxlength="10000" rows="4">{{ listing.data.raw_description if listing else '' }}</textarea></label>
+<button {% if problem %}disabled{% endif %}>Start identification</button></form></section>
+<div><section class="panel"><h2>Your reference library</h2>{% if coverage %}<p><strong class="large">{{ coverage.records }}</strong> searchable source records</p>{% endif %}<p>Distinctive lettering, pictorial descriptions and local image similarity help rank candidates. Broad style or STERLING alone is not a maker identification.</p><p>Published attributions and your decisions stay separate. You choose the likely maker and whether the piece is worth buying.</p></section>
+<section class="panel"><h2>Recent jewelry research</h2>{% for c in cases %}<p><a href="/identify/cases/{{ c.id }}">{{ c.data.title }}</a><small class="block">{{ c.created_at }}{% if c.listing_id %} · Workbench #{{ c.listing_id }}{% endif %}{% if c.data.synthetic %} · SYNTHETIC DEMO{% endif %}</small></p>{% else %}<p>No identification cases yet. Your uploaded photographs remain private.</p>{% endfor %}</section></div></div>
+<details class="panel"><summary>Published references and research links</summary><p>External links open only when you choose them. Restricted reference images remain on their original sites.</p>{% for source in sources %}<p>{% if source.source_kind=='MANUAL_BOOK' %}{{ source.book.author }} — {{ source.book.title }}, {{ source.book.edition }} edition{% else %}<a href="{{ source.directory_url }}" target="_blank" rel="noopener noreferrer">{{ source.source }}</a>{% endif %} · {{ 'Reviewed local factual reference' if source.review.facts_allowed else 'External research link; collection restricted or review required' }}</p>{% endfor %}</details>
+{% endblock %}

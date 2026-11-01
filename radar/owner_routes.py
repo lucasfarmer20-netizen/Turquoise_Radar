@@ -269,7 +269,12 @@ def owner_routes(app, render, preferences, view):
     def comparable_page(request: Request):
         with app.state.sessions() as s:
             rows = list(s.scalars(select(ComparableSale).order_by(ComparableSale.id.desc())))
-            return render(request, "comparables.html", rows=rows, summaries=summaries(rows))
+            query = request.query_params.get("q", "").strip()[:300]
+            if query:
+                rows = [r for r in rows if query.casefold() in json.dumps(r.data).casefold()]
+            return render(
+                request, "comparables.html", rows=rows, summaries=summaries(rows), query=query
+            )
 
     @app.post("/comparables")
     async def comparable_import(request: Request):
