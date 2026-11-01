@@ -252,6 +252,10 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
                 if is_ebay(current)
                 else "NONE"
             )
+            if known_raw and raw and aggregate == "MATCH" and original_state != "MATCH":
+                # A source-bound original without separable identity must not survive a
+                # claimed removal of its current/historical copy.
+                raise ReviewHold("REVIEW_PROVENANCE")
             contexts[row["id"]] = (current, raw if known_raw else {}, state)
             if state == "MATCH" and is_ebay(current):
                 matched_listings.add(row["id"])

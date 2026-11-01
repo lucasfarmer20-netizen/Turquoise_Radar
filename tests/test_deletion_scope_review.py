@@ -270,3 +270,22 @@ def test_matching_ebay_root_cannot_discard_independent_descendant(tmp_path, inde
         0,
     )
     assert dump(path) == before
+
+
+def test_identity_free_original_copy_holds_instead_of_surviving_sanitized_listing(tmp_path):
+    path = tmp_path / "original-without-seller.db"
+    with TestClient(create_app("sqlite:///" + str(path))) as client:
+        with client.app.state.sessions.begin() as session:
+            session.add(
+                Listing(
+                    dedup_key="synthetic",
+                    data=listing_data(),
+                    original_data={
+                        "provider": "eBay Browse",
+                        "item": {"title": "Copied title " + SELLER},
+                    },
+                )
+            )
+    before = dump(path)
+    assert sanitize_database(path, IDENTIFIERS, SECRET, aliases=ALIASES) == ("REVIEW_PROVENANCE", 0)
+    assert dump(path) == before
