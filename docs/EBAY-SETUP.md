@@ -1,8 +1,9 @@
 # eBay discovery setup — Task 003
 
-The default is **fixture mode**, with production disabled. For JRI-006, the owner
-reports that the developer application was **rejected**. Production API access is
-unavailable indefinitely unless the owner supplies verified approval. Keep both
+The default is **fixture mode**, with production disabled. For JRI-007, the owner
+now describes developer approval as **pending** (JRI-007, after the earlier
+JRI-006 rejection report). No verified approval is available; production API access
+remains unavailable until verified approval is supplied. Keep both
 `EBAY_PRODUCTION_ENABLED=false` and `EBAY_PRODUCTION_APPROVED=false`.
 
 Continue through Quick Capture, manual/CSV/JSON evidence and existing multi-source

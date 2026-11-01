@@ -44,6 +44,11 @@ class SafeEmailHTML(HTMLParser):
         self.skip = 0
 
     def handle_starttag(self, tag, attrs):
+        if tag == "img" and not self.skip and self.anchor:
+            # Read supplied text only. Never retain or fetch the image URL.
+            alt = " ".join((dict(attrs).get("alt") or "").split())[:500]
+            if alt and alt.casefold() not in {"image", "item image", "logo", "bid now"}:
+                self.anchor["image_labels"].append(alt)
         if tag in ("img", "input", "meta", "link", "embed", "source", "wbr"):
             return
         if self.skip:
@@ -71,6 +76,7 @@ class SafeEmailHTML(HTMLParser):
             self.anchor = {
                 "href": dict(attrs).get("href", ""),
                 "text": [],
+                "image_labels": [],
                 "frame": self.frames[-1] if self.frames else None,
             }
 
@@ -256,7 +262,9 @@ def link_identity(url, source_id, source):
 
 
 def classify(subject, text):
-    heading = subject + "\n" + "\n".join(text.splitlines()[:3])
+    # MIME layouts often begin with blank lines and invisible preheader padding.
+    visible_lines = [line.strip() for line in text.splitlines() if re.search(r"\w", line)]
+    heading = subject + "\n" + "\n".join(visible_lines[:6])
     rules = [
         (
             MessageType.PAYMENT_RECEIVED,
@@ -275,7 +283,8 @@ def classify(subject, text):
         ),
         (
             MessageType.PROMOTIONAL_NEWSLETTER,
-            r"newsletter|featured auctions|auction preview|promotional",
+            r"newsletter|featured auctions?\b|auction preview|promotional|"
+            r"top auctions to watch|auction invitation",
         ),
         (MessageType.SEARCH_MATCH, r"personal shopper|saved.search|search match|search results"),
     ]
@@ -379,10 +388,14 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
         text = "".join(extractor.text)
         for anchor in extractor.links[:MAX_LINKS]:
             frame = anchor["frame"]
+            title = " ".join("".join(anchor["text"]).split())
+            labels = set(anchor["image_labels"])
+            if not title and len(labels) == 1:
+                title = next(iter(labels))
             anchors.append(
                 (
                     anchor["href"],
-                    "".join(anchor["text"]).strip(),
+                    title,
                     "".join(frame["text"]) if frame else text,
                 )
             )
@@ -412,6 +425,14 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
     auction = field(text, ["Auction ID", "Estate ID"])
     seller = field(text, ["Auction House", "Seller ID", "Seller"])
     closing_raw = field(text, ["Auction closes", "Closing time", "Auction closing time"])
+    if source_id == "hibid" and not closing_raw:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        quoted = {
+            lines[i + 1][:200]
+            for i, line in enumerate(lines[:-1])
+            if line.casefold() == "bidding begins closing"
+        }
+        closing_raw = next(iter(quoted)) if len(quoted) == 1 else None
     closing = iso_aware(closing_raw)
     identities = []
     identity_methods = {}

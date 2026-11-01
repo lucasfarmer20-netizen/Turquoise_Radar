@@ -343,8 +343,8 @@ See [Task 002 usage and financial conventions](docs/CALIBRATION.md),
 Local multi-source intake works without API approval. Next, validate the provisional
 formats with permitted owner samples and improve auction cost allocations; eBay
 sandbox validation still requires secure credentials, access and current docs.
-The JRI-006 owner report supersedes the former pending-approval status: the developer
-application was rejected and production stays disabled. No live request, public
+The latest JRI-007 owner instruction describes approval as pending after the earlier
+JRI-006 rejection report. No verified approval is available and production stays disabled. No live request, public
 deployment or automated purchasing is authorized.
 
 See [JRI-006 manual pilot and pictorial-label correction](docs/JRI-006.md) for the
@@ -376,3 +376,12 @@ Its bounded Met test collected zero new images; gallery acquisition awaits a fre
 environment with the published host policy. The 20 Cleveland references and their
 verified backups remain intact. Candidate tags and gallery attributions are not
 authentication or verified negative examples.
+
+### Auction-first research (JRI-007)
+
+Use `/inbox?focus=auction` for ShopGoodwill, HiBid and estate-source leads.
+Existing manual, email and CSV/JSON intake, fee profiles, bid calculations and
+workbench review remain available. The latest owner instruction describes eBay
+approval as pending; production gates remain disabled until verified approval.
+See [JRI-007 findings and alert setup](docs/JRI-007.md) for real sample results,
+source access limits and the blocked photographic pilot.
