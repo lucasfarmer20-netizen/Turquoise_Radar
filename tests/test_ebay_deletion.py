@@ -228,7 +228,12 @@ def synthetic_db(tmp_path):
                 s.add(Feedback(listing_id=row.id, action="Interested", note="SYNTHETIC-SELLER"))
                 case = MakerCase(
                     listing_id=row.id,
-                    data={"title": "SYNTHETIC-SELLER", "details": "Seller evidence"},
+                    data={
+                        "source": source,
+                        "seller": {"userId": "SYNTHETIC-ACCOUNT"},
+                        "title": "SYNTHETIC-SELLER",
+                        "details": "Seller evidence",
+                    },
                 )
                 s.add(case)
                 s.flush()
@@ -269,19 +274,15 @@ def test_listing_edit_research_history_and_unrelated_preservation(synthetic_db):
             "SELECT action,note FROM feedback WHERE listing_id=?", (target,)
         ).fetchone() == ("Interested", "")
         case = db.execute("SELECT id FROM maker_cases WHERE listing_id=?", (target,)).fetchone()[0]
-        assert (
-            db.execute("SELECT count(*) FROM maker_scenarios WHERE case_id=?", (case,)).fetchone()[
-                0
-            ]
-            == 0
-        )
-        assert (
-            db.execute("SELECT count(*) FROM maker_runs WHERE case_id=?", (case,)).fetchone()[0]
-            == 0
-        )
+        for table in ("maker_scenarios", "maker_runs", "maker_decisions"):
+            records = db.execute(
+                "SELECT data FROM " + table + " WHERE case_id=?", (case,)
+            ).fetchall()
+            assert len(records) == 1
+            assert all("SYNTHETIC-SELLER" not in r[0] for r in records)
         assert db.execute(
-            "SELECT action,data FROM maker_decisions WHERE case_id=?", (case,)
-        ).fetchone() == ("CONFIRM", "{}")
+            "SELECT action FROM maker_decisions WHERE case_id=?", (case,)
+        ).fetchone() == ("CONFIRM",)
         assert not db.execute("pragma foreign_key_check").fetchall()
     assert sanitize_database(path, ids, SECRET) == ("NO_MATCH", 0)
 
@@ -323,9 +324,17 @@ def test_unmatched_ambiguous_and_artifact_hold(synthetic_db):
         )
 
 
-def test_restore_replays_ledger_even_after_processing_interruption(tmp_path, synthetic_db):
+def test_restore_replays_ledger_even_after_processing_interruption(
+    tmp_path, synthetic_db, monkeypatch
+):
     path, _ = synthetic_db
     queue = Queue(tmp_path / "q.db")
+    queue.bind(SECRET)
+    from radar.ebay_deletion import sync
+
+    monkeypatch.setattr(
+        sync, "_pull_receiver", lambda nonce: sync.receiver_bundle(queue.path, SECRET, nonce)
+    )
     key, ids = event(json.dumps(BODY).encode(), SECRET)
     queue.accept(key, ids)
     # The original remains an old backup. Restored copies cannot skip the durable ledger.
@@ -529,28 +538,30 @@ def test_wrong_worker_hmac_key_cannot_silently_replay(tmp_path):
         queue.bind(b"wrong-worker-key" * 4)
 
 
-def test_ssh_ledger_sync_rejects_rollback_and_requires_freshness(tmp_path):
+def test_ssh_ledger_sync_rejects_rollback_and_requires_freshness(tmp_path, monkeypatch):
+    from radar.ebay_deletion import sync
     from radar.ebay_deletion.store import Conflict
-    from radar.ebay_deletion.sync import require_fresh, sync_ledger
 
     remote, local = tmp_path / "remote.db", tmp_path / "local.db"
     queue = Queue(remote)
     queue.bind(SECRET)
     key, ids = event(json.dumps(BODY).encode(), SECRET)
     queue.accept(key, ids)
+    monkeypatch.setattr(
+        sync, "_pull_receiver", lambda nonce: sync.receiver_bundle(remote, SECRET, nonce)
+    )
     with pytest.raises(ValueError):
-        require_fresh(local)
-    sync_ledger(remote, local, SECRET)
-    require_fresh(local)
+        sync.require_fresh(local, SECRET)
+    assert not local.exists()
+    sync.sync_ledger(remote, local, SECRET)
+    sync.require_fresh(local, SECRET)
     with queue.connect() as db:
         db.execute("DELETE FROM events")
     with pytest.raises(Conflict):
-        sync_ledger(remote, local, SECRET)
-    assert len(Queue(local).events()) == 1
-    with Queue(local).connect() as db:
-        db.execute("UPDATE metadata SET value='0' WHERE key='last_sync'")
+        sync.sync_ledger(remote, local, SECRET)
+    assert len(Queue.existing(local).events()) == 1
     with pytest.raises(ValueError):
-        require_fresh(local)
+        sync.require_fresh(local, SECRET)
 
 
 def test_missing_userid_never_treats_unmapped_username_as_match():
@@ -598,7 +609,16 @@ def test_historical_source_change_does_not_hide_ebay_snapshot(synthetic_db):
     }
     with sqlite3.connect(path) as db:
         current = json.dumps({"source": "owner-research", "raw_title": "Independent owner work"})
-        db.execute("UPDATE listings SET data=?,original_data='{}' WHERE id=?", (current, listing))
+        db.execute(
+            "UPDATE listings SET data=?,original_data=? WHERE id=?",
+            (
+                current,
+                json.dumps(
+                    {"provider": "eBay Browse", "item": {"seller": {"userId": "SYNTHETIC-ACCOUNT"}}}
+                ),
+                listing,
+            ),
+        )
         db.execute(
             "UPDATE listing_edits SET before_data=?,after_data=? WHERE listing_id=?",
             (json.dumps(snapshot), current, listing),

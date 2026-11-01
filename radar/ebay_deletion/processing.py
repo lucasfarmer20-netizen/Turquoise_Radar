@@ -6,25 +6,36 @@ import sqlite3
 from pathlib import Path
 
 from radar.ebay_deletion.protocol import digest
-from radar.ebay_deletion.store import Queue
+from radar.ebay_deletion.sync import maintenance_ledger
 
 SOURCE = {"ebay", "ebay production"}
 REMOVED = "eBay account data removed"
-# Owner financial evidence and decisions survive; seller-derived prose/URLs do not.
-SAFE_FIELDS = {
+# ListingInput financial values are owner records; prose can contain seller data.
+FINANCIAL_AMOUNT_FIELDS = {
     "item_price",
-    "currency",
     "shipping_cost",
     "buyer_premium",
-    "tax",
+    "buyer_service_fee",
+    "sales_tax",
     "handling_fee",
-    "service_fee",
+    "invoice_fee_allocation",
     "resale_low",
     "resale_high",
+    "resale_buyer_shipping",
+    "resale_buyer_tax",
+}
+SAFE_FIELDS = FINANCIAL_AMOUNT_FIELDS | {
+    "currency",
+    "buyer_profile",
+    "selling_category",
+    "commission_tier",
+    "resale_shipping_status",
+    "resale_tax_status",
     "resale_confirmed",
+    "capture_confirmed",
+    "invoice_allocation_confirmed",
     "synthetic",
     "discovery_mode",
-    "cost_status",
 }
 
 
@@ -55,38 +66,135 @@ def identity_state(values, identifiers, secret, aliases):
                     usernames.add(digest(secret, "username", seller["username"]))
             if isinstance(part.get("seller_id"), str):
                 usernames.add(digest(secret, "username", part["seller_id"]))
-    matches = [(kind, value) for kind, value in stable if identifiers.get(kind) == value]
-    conflicts = [
+    # Reviewed aliases are identity evidence, including when they contradict a direct ID.
+    stable |= {("userId", aliases[name]) for name in usernames if name in aliases}
+    matches = {(kind, value) for kind, value in stable if identifiers.get(kind) == value}
+    conflicts = {
         (kind, value)
         for kind, value in stable
         if kind in identifiers and identifiers[kind] != value
-    ]
-    alias_matches = [
-        name
-        for name in usernames
-        if name in aliases and identifiers.get("userId") and aliases[name] == identifiers["userId"]
-    ]
-    if (matches or alias_matches) and not conflicts:
-        return "MATCH"
-    if matches or alias_matches or identifiers.get("username") in usernames:
+    }
+    comparable = {kind for kind, _ in stable if kind in identifiers}
+    if matches and conflicts:
         return "AMBIGUOUS"
-    # A username-only record cannot be excluded by a different immutable event ID.
-    # Only an explicit alias or comparable stable field can establish non-match.
-    if usernames and not stable and any(name not in aliases for name in usernames):
+    if matches:
+        return "UNMAPPED" if any(kind not in identifiers for kind, _ in stable) else "MATCH"
+    if identifiers.get("username") in usernames:
+        return "AMBIGUOUS"
+    if stable and any(kind not in comparable for kind, _ in stable):
+        return "UNMAPPED"
+    if usernames and not comparable and any(name not in aliases for name in usernames):
         return "UNMAPPED"
     return "NONE"
 
 
 def tombstone(data):
-    return {
+    retained = {
         **{k: v for k, v in data.items() if k in SAFE_FIELDS},
         "source": "eBay",
         "raw_title": REMOVED,
         "raw_description": "",
-        "resale_basis": "Owner amounts retained; source evidence removed",
+        "resale_basis": (
+            "Retained owner resale amounts and confirmation; original source prose removed"
+            if data.get("resale_low") is not None
+            else None
+        ),
+        "invoice_allocation_evidence": (
+            "Retained owner-confirmed invoice allocation; original explanatory prose removed"
+            if data.get("invoice_allocation_confirmed")
+            else None
+        ),
         "shipping_status": "UNKNOWN",
         "material_evidence": "unknown",
     }
+    # Do not retain arbitrary keys, or claim confirmation of absent monetary values.
+    retained["cost_status"] = {
+        key: status if data.get(key) is not None else "UNKNOWN"
+        for key, status in data.get("cost_status", {}).items()
+        if key in FINANCIAL_AMOUNT_FIELDS or key == "buyer_profile"
+    }
+    for amount, status in (
+        ("resale_buyer_shipping", "resale_shipping_status"),
+        ("resale_buyer_tax", "resale_tax_status"),
+    ):
+        if data.get(amount) is None:
+            retained[status] = "UNKNOWN"
+    if data.get("invoice_fee_allocation") is None:
+        retained["invoice_allocation_confirmed"] = False
+        retained["invoice_allocation_evidence"] = None
+    if data.get("resale_low") is None or data.get("resale_high") is None:
+        retained["resale_confirmed"] = False
+    return retained
+
+
+class ReviewHold(ValueError):
+    pass
+
+
+def raw_ebay(value):
+    return is_ebay(value) or (
+        isinstance(value, dict)
+        and value.get("provider") == "eBay Browse"
+        and value.get("mode", "production") == "production"
+    )
+
+
+def redact_snapshots(value, identifiers, secret, aliases, context=None):
+    """Change only source-identified nodes. An unseparated dependent copy needs review."""
+    if isinstance(value, list):
+        result = [redact_snapshots(v, identifiers, secret, aliases, context) for v in value]
+        return [r[0] for r in result], any(r[1] for r in result), any(r[2] for r in result)
+    if not isinstance(value, dict):
+        return value, False, False
+    if raw_ebay(value):
+        state = identity_state([value], identifiers, secret, aliases)
+        if state in ("UNMAPPED", "AMBIGUOUS") and context:
+            # A snapshot's exact seller value must agree with the linked listing context.
+            current, raw, parent_state = context
+            if (
+                parent_state == "MATCH"
+                and value.get("seller_id")
+                and value.get("seller_id") == current.get("seller_id")
+            ):
+                state = identity_state([value, raw], identifiers, secret, aliases)
+        if state in ("UNMAPPED", "AMBIGUOUS"):
+            raise ReviewHold("REVIEW_IDENTITY")
+        if state == "MATCH":
+            if any(
+                p is not value and p.get("source") and not is_ebay(p) for p in dictionaries(value)
+            ):
+                raise ReviewHold("REVIEW_PROVENANCE")
+            replacement = tombstone(value) if is_ebay(value) else {}
+            if "title" in value:
+                replacement.update(title=REMOVED, details="", listing_url=None)
+            return replacement, True, True
+        # A typed but identifier-free source record cannot be attributed by association.
+        if (
+            context
+            and context[2] == "MATCH"
+            and not any(p.get("seller") or p.get("seller_id") for p in dictionaries(value))
+            and value.get("raw_title") != REMOVED
+            and value.get("title") != REMOVED
+        ):
+            raise ReviewHold("REVIEW_PROVENANCE")
+        return value, False, True
+    result = {
+        k: redact_snapshots(v, identifiers, secret, aliases, context) for k, v in value.items()
+    }
+    changed = any(r[1] for r in result.values())
+    # Explicit independent provenance protects that record's own prose, but nested copies
+    # are still traversed. Untyped prose beside a removed snapshot is not presumed independent.
+    if (
+        changed
+        and not value.get("source")
+        and any(isinstance(v, str) and v for k, v in value.items())
+    ):
+        raise ReviewHold("REVIEW_PROVENANCE")
+    return (
+        {k: r[0] for k, r in result.items()},
+        changed,
+        bool(value.get("source")) or any(r[2] for r in result.values()),
+    )
 
 
 def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=None):
@@ -110,33 +218,45 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
 
         listings = list(db.execute("SELECT * FROM listings"))
         discovered = list(db.execute("SELECT * FROM discovered_items"))
+        edits = list(db.execute("SELECT * FROM listing_edits"))
         matched_listings, matched_items = set(), set()
+        contexts, original_updates, snapshot_updates, research_updates = {}, set(), [], []
+        snapshot_cases, matching_comparables = set(), set()
         ambiguous = False
         for row in listings:
-            data = loads(row["data"])
-            if not is_ebay(data):
-                continue
-            values = [data, loads(row["original_data"])]
-            values += [
+            current, raw = loads(row["data"]), loads(row["original_data"])
+            history = [
                 loads(e[k])
-                for e in db.execute(
-                    "SELECT before_data,after_data FROM listing_edits WHERE listing_id=?",
-                    (row["id"],),
-                )
+                for e in edits
+                if e["listing_id"] == row["id"]
                 for k in ("before_data", "after_data")
+                if is_ebay(loads(e[k]))
             ]
-            # Snapshot-only stable IDs also identify the linked listing.
-            for case in db.execute("SELECT id FROM maker_cases WHERE listing_id=?", (row["id"],)):
-                values += [
-                    loads(x[0])
-                    for x in db.execute(
-                        "SELECT data FROM maker_scenarios WHERE case_id=?", (case[0],)
-                    )
-                ]
-            state = identity_state(values, identifiers, secret, aliases)
-            if state == "MATCH":
+            known_raw = raw_ebay(raw) or (is_ebay(current) and not raw.get("source"))
+            evidence = ([current] if is_ebay(current) else []) + history
+            if known_raw:
+                evidence.append(raw)
+            aggregate = identity_state(evidence, identifiers, secret, aliases)
+            if aggregate in ("AMBIGUOUS", "UNMAPPED"):
+                raise ReviewHold("REVIEW_IDENTITY")
+            # Original payload has its own provenance, even after a current source-label edit.
+            original_state = identity_state([raw], identifiers, secret, aliases)
+            if known_raw and original_state == "MATCH":
+                original_updates.add(row["id"])
+            elif history and not known_raw and not raw.get("source") and raw:
+                raise ReviewHold("REVIEW_PROVENANCE")
+            state = (
+                identity_state(
+                    [current, raw] if known_raw else [current], identifiers, secret, aliases
+                )
+                if is_ebay(current)
+                else "NONE"
+            )
+            contexts[row["id"]] = (current, raw if known_raw else {}, state)
+            if state == "MATCH" and is_ebay(current):
                 matched_listings.add(row["id"])
-            ambiguous |= state in ("AMBIGUOUS", "UNMAPPED")
+            elif state in ("AMBIGUOUS", "UNMAPPED"):
+                raise ReviewHold("REVIEW_IDENTITY")
         for row in discovered:
             if row["source"].casefold() not in SOURCE:
                 continue
@@ -148,65 +268,69 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
                 )
             ]
             state = identity_state(values, identifiers, secret, aliases)
+            if state in ("AMBIGUOUS", "UNMAPPED"):
+                raise ReviewHold("REVIEW_IDENTITY")
             if state == "MATCH":
                 matched_items.add(row["id"])
-                if row["listing_id"] is not None:
-                    linked = next((x for x in listings if x["id"] == row["listing_id"]), None)
-                    if linked and is_ebay(loads(linked["data"])):
-                        matched_listings.add(row["listing_id"])
-                    else:
-                        ambiguous = True  # Never erase a different source through a foreign key.
-            ambiguous |= state in ("AMBIGUOUS", "UNMAPPED")
-        matched_items |= {
-            r["id"]
-            for r in discovered
-            if r["listing_id"] in matched_listings and r["source"].casefold() in SOURCE
-        }
-        snapshot_updates = []
-        snapshot_runs = set()
-        snapshot_scenarios = set()
-        snapshot_cases = set()
-        for edit in db.execute("SELECT id,listing_id,before_data,after_data FROM listing_edits"):
-            if edit["listing_id"] in matched_listings:
-                continue
+                if row["listing_id"] is not None and row["listing_id"] not in matched_listings:
+                    raise ReviewHold("REVIEW_PROVENANCE")
+        for edit in edits:
             for field in ("before_data", "after_data"):
-                value = loads(edit[field])
-                if is_ebay(value):
-                    state = identity_state([value], identifiers, secret, aliases)
-                    ambiguous |= state in ("AMBIGUOUS", "UNMAPPED")
-                    if state == "MATCH":
-                        snapshot_updates.append((field, json.dumps(tombstone(value)), edit["id"]))
+                value, changed, _ = redact_snapshots(
+                    loads(edit[field]),
+                    identifiers,
+                    secret,
+                    aliases,
+                    contexts.get(edit["listing_id"]),
+                )
+                if changed:
+                    snapshot_updates.append((field, json.dumps(value), edit["id"]))
+        cases = {r["id"]: r for r in db.execute("SELECT * FROM maker_cases")}
+        # First identify affected records; no case-wide deletion follows a snapshot match.
+        for table in ("maker_runs", "maker_scenarios", "maker_decisions", "maker_cases"):
+            for row in db.execute("SELECT * FROM " + table):
+                case_id = row["id"] if table == "maker_cases" else row["case_id"]
+                context = contexts.get(cases[case_id]["listing_id"])
+                value, changed, scoped = redact_snapshots(
+                    loads(row["data"]), identifiers, secret, aliases, context
+                )
+                if changed:
+                    research_updates.append((table, row["id"], json.dumps(value)))
+                    snapshot_cases.add(case_id)
+                elif context and context[2] == "MATCH" and row["data"] != "{}" and not scoped:
+                    raise ReviewHold("REVIEW_PROVENANCE")
+        # An untyped sibling's relationship to the affected history cannot be guessed.
+        for case_id in snapshot_cases:
+            for table in ("maker_runs", "maker_scenarios", "maker_decisions", "maker_cases"):
+                query = (
+                    "SELECT * FROM "
+                    + table
+                    + (" WHERE id=?" if table == "maker_cases" else " WHERE case_id=?")
+                )
+                for row in db.execute(query, (case_id,)):
+                    _, _, scoped = redact_snapshots(
+                        loads(row["data"]),
+                        identifiers,
+                        secret,
+                        aliases,
+                        contexts.get(cases[case_id]["listing_id"]),
+                    )
+                    if not scoped and loads(row["data"]):
+                        raise ReviewHold("REVIEW_PROVENANCE")
         matched_cases = {
-            r[0]
-            for listing in matched_listings
-            for r in db.execute("SELECT id FROM maker_cases WHERE listing_id=?", (listing,))
+            case for case, row in cases.items() if row["listing_id"] in matched_listings
         }
-        for table, selected in (
-            ("maker_runs", snapshot_runs),
-            ("maker_scenarios", snapshot_scenarios),
-        ):
-            for row in db.execute("SELECT id,case_id,data FROM " + table):
-                if row["case_id"] in matched_cases:
-                    continue
-                for value in dictionaries(loads(row["data"])):
-                    if is_ebay(value):
-                        state = identity_state([value], identifiers, secret, aliases)
-                        ambiguous |= state in ("AMBIGUOUS", "UNMAPPED")
-                        if state == "MATCH":
-                            selected.add(row["id"])
-                            snapshot_cases.add(row["case_id"])
-        matching_comparables = set()
         for row in db.execute("SELECT id,data FROM comparable_sales"):
             value = loads(row["data"])
             if is_ebay(value):
                 state = identity_state([value], identifiers, secret, aliases)
-                ambiguous |= state in ("AMBIGUOUS", "UNMAPPED")
+                if state in ("AMBIGUOUS", "UNMAPPED"):
+                    raise ReviewHold("REVIEW_IDENTITY")
                 if state == "MATCH":
                     matching_comparables.add(row["id"])
         for item in matched_items:
             if db.execute("SELECT 1 FROM alert_observations WHERE item_id=?", (item,)).fetchone():
-                db.rollback()
-                return "REVIEW_ALERT_COPIES", 0
+                raise ReviewHold("REVIEW_ALERT_COPIES")
         # Every linked photograph needs a provenance decision; preserve independently owned
         # photographs. Pending paid inference must finish before removing its context.
         photos, vision_cases = [], set()
@@ -310,59 +434,18 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
                 )
         for field, value, row_id in snapshot_updates:
             db.execute("UPDATE listing_edits SET " + field + "=? WHERE id=?", (value, row_id))
-        for run_id in snapshot_runs:
-            db.execute(
-                "UPDATE maker_decisions SET run_id=NULL,data='{}',candidate_id=NULL WHERE run_id=?",
-                (run_id,),
-            )
-            db.execute("DELETE FROM maker_runs WHERE id=?", (run_id,))
-        for scenario_id in snapshot_scenarios:
-            db.execute("DELETE FROM maker_scenarios WHERE id=?", (scenario_id,))
+        for table, row_id, value in research_updates:
+            db.execute("UPDATE " + table + " SET data=? WHERE id=?", (value, row_id))
+        for listing in original_updates:
+            db.execute("UPDATE listings SET original_data='{}' WHERE id=?", (listing,))
         for listing in matched_listings:
             row = next(x for x in listings if x["id"] == listing)
             data = json.dumps(tombstone(loads(row["data"])))
             db.execute(
-                "UPDATE listings SET data=?,original_data='{}',dedup_key=? WHERE id=?",
+                "UPDATE listings SET data=?,dedup_key=? WHERE id=?",
                 (data, "deleted-ebay-listing-" + str(listing), listing),
             )
-            for edit in list(
-                db.execute("SELECT * FROM listing_edits WHERE listing_id=?", (listing,))
-            ):
-                db.execute(
-                    "UPDATE listing_edits SET before_data=?,after_data=? WHERE id=?",
-                    (
-                        json.dumps(tombstone(loads(edit["before_data"]))),
-                        json.dumps(tombstone(loads(edit["after_data"]))),
-                        edit["id"],
-                    ),
-                )
             db.execute("UPDATE feedback SET note='' WHERE listing_id=?", (listing,))
-            for case in list(
-                db.execute("SELECT id FROM maker_cases WHERE listing_id=?", (listing,))
-            ):
-                db.execute(
-                    "UPDATE maker_decisions SET data='{}',run_id=NULL,candidate_id=NULL "
-                    "WHERE case_id=?",
-                    (case[0],),
-                )
-                db.execute("DELETE FROM maker_scenarios WHERE case_id=?", (case[0],))
-                db.execute("DELETE FROM maker_runs WHERE case_id=?", (case[0],))
-                db.execute(
-                    "UPDATE maker_cases SET data=? WHERE id=?",
-                    (json.dumps({"title": REMOVED, "details": "", "listing_url": None}), case[0]),
-                )
-        for case in snapshot_cases - matched_cases:
-            db.execute(
-                "UPDATE maker_decisions SET data='{}',run_id=NULL,candidate_id=NULL "
-                "WHERE case_id=?",
-                (case,),
-            )
-            db.execute("DELETE FROM maker_scenarios WHERE case_id=?", (case,))
-            db.execute("DELETE FROM maker_runs WHERE case_id=?", (case,))
-            db.execute(
-                "UPDATE maker_cases SET data=? WHERE id=?",
-                (json.dumps({"title": REMOVED, "details": "", "listing_url": None}), case),
-            )
         for item in matched_items:
             db.execute(
                 "UPDATE discovered_items SET normalized=?,original_data='{}',ebay_item_id=? "
@@ -383,11 +466,14 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
             if matched_listings
             or matched_items
             or snapshot_updates
-            or snapshot_runs
-            or snapshot_scenarios
+            or research_updates
+            or original_updates
             or matching_comparables
             else "NO_MATCH"
         ), (len(matched_listings) + len(matched_items))
+    except ReviewHold as hold:
+        db.rollback()
+        return str(hold), 0
     finally:
         db.close()
 
@@ -402,8 +488,7 @@ def replay(manifest_path, queue_path, secret):
         or not manifest["assets"]
     ):
         raise ValueError("Complete nonempty inventory attestation required")
-    queue = Queue(queue_path)
-    queue.bind(secret)
+    queue = maintenance_ledger(queue_path, secret)
     statuses = []
     for event_id, identifiers in queue.events():
         for asset in manifest["assets"]:

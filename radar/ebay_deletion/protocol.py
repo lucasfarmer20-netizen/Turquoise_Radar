@@ -99,12 +99,16 @@ def event(body, secret):
     data = object_json(body)
     try:
         meta, notice = data["metadata"], data["notification"]
+        if not isinstance(meta, dict) or not isinstance(notice, dict):
+            raise ValueError()
         if meta["topic"] != TOPIC or meta["schemaVersion"] != "1.0":
             raise ValueError()
         identity = notice["notificationId"]
         if not isinstance(identity, str) or not 1 <= len(identity) <= 256:
             raise ValueError()
         account = notice["data"]
+        if not isinstance(account, dict):
+            raise ValueError()
         identifiers = {}
         for field in ("userId", "eiasToken", "username"):
             value = account.get(field)

@@ -7,10 +7,12 @@ import sqlite3
 from pathlib import Path
 
 from radar.ebay_deletion.processing import replay
+from radar.ebay_deletion.sync import maintenance_ledger
 
 
 def verified_restore(source, destination, manifest, queue, secret):
     """Restore only into a NEW, quarantined path. Never open it before replay succeeds."""
+    maintenance_ledger(queue, secret)
     destination = Path(destination)
     if destination.exists():
         raise ValueError("Restore destination must be new")
@@ -40,7 +42,7 @@ def main():
     parser.add_argument("--manifest")
     parser.add_argument("--queue", required=True)
     parser.add_argument("--apply", action="store_true")
-    parser.add_argument("--require-fresh-ledger", action="store_true")
+    parser.add_argument("--require-fresh-ledger", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--source")
     parser.add_argument("--destination")
     args = parser.parse_args()
@@ -68,10 +70,6 @@ def main():
     if len(secret) < 32:
         parser.error("EBAY_DELETION_HMAC_KEY must be configured")
     try:
-        if args.require_fresh_ledger:
-            from radar.ebay_deletion.sync import require_fresh
-
-            require_fresh(args.queue)
         statuses = (
             verified_restore(args.source, args.destination, args.manifest, args.queue, secret)
             if args.command == "restore" and args.source and args.destination
