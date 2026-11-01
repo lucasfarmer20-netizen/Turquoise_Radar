@@ -3,6 +3,7 @@
 These examples are not evidence of a real saved-search format or a live bargain.
 """
 
+from copy import deepcopy
 from email.message import EmailMessage
 
 import pytest
@@ -12,8 +13,9 @@ from radar.db import AlertMessage, DiscoveredItem
 from radar.intake.parsers import parse_message
 from radar.intake.registry import SourceDefinition
 from radar.intake.service import import_alerts, promote_candidate
-from radar.intake.views import auction_research, inbox_cards, search_status
+from radar.intake.views import auction_research, inbox_cards, search_status, targeted_research
 from radar.main import preferences
+from radar.schemas import Preferences
 
 
 def email_html(body, subject="SYNTHETIC featured auction"):
@@ -164,7 +166,7 @@ def test_source_priority_and_quoted_cost_status_do_not_depend_on_ebay(client):
         s.flush()
         cards = auction_research(inbox_cards(s, preferences(s)))
         assert [c["item"].source for c in cards] == ["ShopGoodwill", "HiBid", "HiBid", "CTBids"]
-        assert cards[1]["item"].raw_title == "SYNTHETIC bracelet"
+        assert cards[1]["item"].raw_title == "SYNTHETIC sterling mixed lot"
         for card in cards:
             costs = {c["label"]: c for c in card["costs"]}
             assert costs["Item / bid"]["status"] == "ESTIMATED"
@@ -177,3 +179,171 @@ def test_source_priority_and_quoted_cost_status_do_not_depend_on_ebay(client):
     assert page.status_code == 200
     assert "Handling · CONFIRMED" in page.text
     assert "Item / bid · ESTIMATED" in page.text
+
+
+@pytest.mark.parametrize(
+    "amount,destination",
+    [
+        ("12.00", "UNKNOWN"),
+        ("12.00", "CONFIRMED_UNAVAILABLE"),
+        (None, "UNKNOWN"),
+        ("12.00", "CONFIRMED_TO_ALASKA"),
+        (None, "CONFIRMED_TO_ALASKA"),
+    ],
+)
+def test_shipping_quote_confirmation_is_separate_from_alaska(
+    client, item, prefs, amount, destination
+):
+    data = item.model_dump(mode="json")
+    data.update(
+        source="HiBid FIXTURE",
+        synthetic=True,
+        raw_title="SYNTHETIC shipping ring",
+        shipping_cost=amount,
+        shipping_status=destination,
+        resale_low="100",
+        resale_high="120",
+    )
+    data["cost_status"]["shipping_cost"] = "CONFIRMED" if amount is not None else "UNKNOWN"
+    original = deepcopy(data)
+    with client.app.state.sessions.begin() as s:
+        row = DiscoveredItem(
+            identity="SYNTHETIC-shipping",
+            source=data["source"],
+            ebay_item_id="SYNTHETIC-shipping",
+            normalized=data,
+            original_data={},
+        )
+        s.add(row)
+        s.flush()
+        card = inbox_cards(s, prefs)[0]
+        quote = next(c for c in card["costs"] if c["label"] == "Quoted shipping")
+        assert quote["value"] == card["item"].shipping_cost
+        assert quote["status"] == data["cost_status"]["shipping_cost"]
+        assert card["item"].shipping_status == destination
+        if destination == "CONFIRMED_UNAVAILABLE":
+            assert card["a"].tier == "PASS"
+        elif destination == "UNKNOWN" or amount is None:
+            assert card["a"].tier != "BUY CANDIDATE"
+        else:
+            assert card["a"].tier == "BUY CANDIDATE"
+        assert row.normalized == original
+    page = client.get("/inbox?focus=auction")
+    assert page.status_code == 200
+    quote_html = f"<dt>Quoted shipping · {quote['status']}</dt><dd>"
+    assert quote_html + ("$12.00" if amount else "UNKNOWN") + " USD</dd>" in page.text
+    assert f'<p class="shipping">{destination} · Soldotna 99669</p>' in page.text
+    assert "Shipping to Alaska ·" not in page.text
+
+
+@pytest.mark.parametrize("title", ["turqoise lot", "sterling mixed lot", "blue stone lot"])
+def test_specific_cue_without_jewelry_noun_precedes_bracelet(client, title):
+    with client.app.state.sessions.begin() as s:
+        for n, text in enumerate(["bracelet", title]):
+            s.add(
+                DiscoveredItem(
+                    identity=f"SYNTHETIC-target-{n}",
+                    source="HiBid FIXTURE",
+                    ebay_item_id=str(n),
+                    original_data={},
+                    normalized={
+                        "source": "HiBid FIXTURE",
+                        "synthetic": True,
+                        "raw_title": "SYNTHETIC " + text,
+                    },
+                )
+            )
+        s.flush()
+        cards = inbox_cards(s, Preferences())
+        before = deepcopy([c["row"].normalized for c in cards])
+        ordered = auction_research(cards)
+        assert ordered[0]["item"].raw_title == "SYNTHETIC " + title
+        assert "jewelry" not in ordered[0]["leads"]
+        assert targeted_research(ordered[0])
+        assert [c["row"].normalized for c in cards] == before
+        assert all(c["item"].material_evidence == "unknown" for c in ordered)
+        assert all(c["a"].tier != "BUY CANDIDATE" for c in ordered)
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "lot",
+        "silver",
+        "unmarked",
+        "unidentified",
+        "parking lot sign",
+        "silver paint lot",
+    ],
+)
+def test_generic_or_nonjewelry_words_do_not_earn_targeted_priority(client, title):
+    with client.app.state.sessions.begin() as s:
+        for n, text in enumerate([title, "bracelet"]):
+            s.add(
+                DiscoveredItem(
+                    identity=f"SYNTHETIC-negative-{n}",
+                    source="HiBid FIXTURE",
+                    ebay_item_id=str(n),
+                    original_data={},
+                    normalized={
+                        "source": "HiBid FIXTURE",
+                        "synthetic": True,
+                        "raw_title": "SYNTHETIC " + text,
+                    },
+                )
+            )
+        s.flush()
+        cards = auction_research(inbox_cards(s, Preferences()))
+        assert not any(targeted_research(c) for c in cards)
+        assert cards[0]["item"].raw_title == "SYNTHETIC bracelet"
+
+
+def test_targeted_priority_preserves_source_precedence_and_stable_ties(client):
+    with client.app.state.sessions.begin() as s:
+        inputs = [
+            ("HiBid", "turqoise lot"),
+            ("HiBid", "blue stone lot"),
+            ("HiBid", "sterling mixed lot"),
+            ("ShopGoodwill", "bracelet"),
+            ("CTBids", "turqoise lot"),
+            ("EstateSales.org", "turqoise lot"),
+            ("EstateSales.net", "turqoise lot"),
+            ("Mercari", "turqoise lot"),
+        ]
+        for n, (source, title) in enumerate(inputs):
+            s.add(
+                DiscoveredItem(
+                    identity=f"SYNTHETIC-stable-{n}",
+                    source=source,
+                    ebay_item_id=str(n),
+                    original_data={},
+                    normalized={
+                        "source": source,
+                        "synthetic": True,
+                        "raw_title": "SYNTHETIC " + title,
+                    },
+                )
+            )
+        s.flush()
+        cards = inbox_cards(s, Preferences())
+        ordered = auction_research(cards)
+        assert [c["item"].source for c in ordered[:4]] == [
+            "ShopGoodwill",
+            "HiBid",
+            "HiBid",
+            "HiBid",
+        ]
+        assert [c["row"].id for c in ordered[1:4]] == [
+            c["row"].id for c in cards if c["item"].source == "HiBid"
+        ]
+        estate = {"CTBids", "EstateSales.org", "EstateSales.net"}
+        assert [c["row"].id for c in ordered[4:]] == [
+            c["row"].id for c in cards if c["item"].source in estate
+        ]
+        assert not any(c["item"].source == "Mercari" for c in ordered)
+    assert "Mercari" in client.get("/inbox").text
+    filtered = client.get("/inbox?focus=auction&source=HiBid&opportunity=misspelling")
+    assert (
+        "SYNTHETIC turqoise lot" in filtered.text
+        and "SYNTHETIC blue stone lot" not in filtered.text
+    )

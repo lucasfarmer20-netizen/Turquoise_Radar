@@ -28,8 +28,20 @@ COST_LABELS = {
     "buyer_service_fee": "Buyer service fee",
     "handling_fee": "Handling",
     "sales_tax": "Tax",
-    "shipping_cost": "Shipping to Alaska",
+    "shipping_cost": "Quoted shipping",
 }
+
+
+def targeted_research(card):
+    """Specific title cues plus jewelry/lot context; never material or maker evidence."""
+    text, leads = card["item"].raw_title.casefold(), card["leads"]
+    if "jewelry" not in leads and not re.search(r"\b(lots?|mixed|jars?)\b", text):
+        return False
+    return bool(
+        ("misspelling" in leads and re.search(r"\b(turqoise|turquiose|navaho|navjo)\b", text))
+        or ("silver" in leads and re.search(r"\b(sterling|925)\b", text))
+        or ("poor description" in leads and re.search(r"\bblue\s+(stone|rock)\b", text))
+    )
 
 
 def auction_research(cards):
@@ -39,6 +51,7 @@ def auction_research(cards):
         eligible,
         key=lambda c: (
             AUCTION_PRIORITY[c["item"].source.removesuffix(" FIXTURE")],
+            -targeted_research(c),
             -("jewelry" in c["leads"]),
             -len(c["leads"]),
         ),
