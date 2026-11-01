@@ -23,13 +23,19 @@ from radar.intake.parsers import (
     MAX_MESSAGES,
     safe_link,
 )
-from radar.intake.registry import STARTER_PHRASES, SourceDefinition, seed_searches
+from radar.intake.registry import (
+    STARTER_PHRASES,
+    SourceDefinition,
+    duplicate_auction_platform,
+    seed_searches,
+)
 from radar.intake.service import (
     PaidCosts,
     confirm_paid_order,
     confirm_query,
     import_alerts,
     import_structured,
+    observation_occurrences,
     promote_candidate,
     source_definition,
 )
@@ -180,9 +186,13 @@ def intake_routes(app, render, preferences):
             message = s.get(AlertMessage, message_id)
             if not message:
                 raise HTTPException(404, "Message not found")
-            observations = list(
-                s.scalars(select(AlertObservation).where(AlertObservation.message_id == message_id))
-            )
+            observations = [
+                card
+                for o in s.scalars(
+                    select(AlertObservation).where(AlertObservation.message_id == message_id)
+                )
+                for card in observation_occurrences(o)
+            ]
             return render(
                 request,
                 "alert_message.html",
@@ -198,7 +208,7 @@ def intake_routes(app, render, preferences):
             raise HTTPException(422, "Explicit source-query evidence confirmation required")
         try:
             with app.state.sessions.begin() as s:
-                confirm_query(s, observation_id)
+                confirm_query(s, observation_id, form.get("occurrence_id") or None)
                 message_id = s.get(AlertObservation, observation_id).message_id
         except ValueError as e:
             raise HTTPException(422, str(e)) from None
@@ -263,6 +273,8 @@ def intake_routes(app, render, preferences):
                 for r in s.scalars(select(IntakeSource))
             ):
                 raise HTTPException(422, "Source identity/name already exists")
+            if duplicate_auction_platform(s, data):
+                raise HTTPException(422, "This platform already has a source; retain its history")
             s.add(IntakeSource(id=id_, data=data.model_dump(mode="json")))
             s.flush()
             seed_searches(s, id_)
@@ -284,6 +296,8 @@ def intake_routes(app, render, preferences):
             row = s.get(IntakeSource, source_id)
             if not row:
                 raise HTTPException(404, "Source not found")
+            if duplicate_auction_platform(s, definition, exclude_id=row.id):
+                raise HTTPException(422, "This platform already has a source; retain its history")
             if any(
                 other.id != row.id and other.data["name"].casefold() == definition.name.casefold()
                 for other in s.scalars(select(IntakeSource))
@@ -351,12 +365,17 @@ def intake_routes(app, render, preferences):
     @app.get("/estate-groups")
     def groups(request: Request):
         with app.state.sessions() as s:
+            cards = inbox_cards(s, preferences(s))
             return render(
                 request,
                 "estate_groups.html",
-                groups=estate_groups(
-                    inbox_cards(s, preferences(s)), list(s.scalars(select(AlertMessage)))
-                ),
+                groups=estate_groups(cards, list(s.scalars(select(AlertMessage)))),
+                ungrouped=[
+                    c
+                    for c in cards
+                    if not (c.get("owner_item") or c["item"]).seller_id
+                    and not (c.get("owner_item") or c["item"]).sale_auction_id
+                ],
             )
 
     @app.get("/invoices")

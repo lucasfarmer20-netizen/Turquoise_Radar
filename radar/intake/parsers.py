@@ -12,7 +12,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, Field
 
-from radar.intake.registry import SourceDefinition
+from radar.intake.registry import SourceDefinition, auction_email_platform
 from radar.schemas import ListingInput
 
 MAX_MESSAGE_BYTES = 512_000
@@ -32,6 +32,7 @@ class MessageType(StrEnum):
     PAYMENT_RECEIVED = "PAYMENT_RECEIVED"
     ORDER_SHIPPED = "ORDER_SHIPPED"
     UNKNOWN = "UNKNOWN"
+    AUCTION_ENDED = "AUCTION_ENDED"
 
 
 class SafeEmailHTML(HTMLParser):
@@ -387,6 +388,12 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
         if isinstance(content, str):
             (html_parts if part.get_content_type() == "text/html" else texts).append(content)
     anchors = []
+    if platform := auction_email_platform(source):
+        from radar.intake.auction_email import parse_auction_email
+
+        return parse_auction_email(
+            message, platform, source, html_parts, texts, attachments, received_override
+        )
     if html_parts:
         extractor = SafeEmailHTML()
         extractor.feed("\n".join(html_parts))

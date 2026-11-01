@@ -12,6 +12,7 @@ from radar.db import (
     Listing,
     SavedSourceSearch,
 )
+from radar.intake.service import observation_occurrences
 from radar.schemas import ListingInput
 from radar.workflow import queue_state
 
@@ -21,6 +22,8 @@ AUCTION_PRIORITY = {
     "CTBids": 2,
     "EstateSales.org": 2,
     "EstateSales.net": 2,
+    "Invaluable": 3,
+    "LiveAuctioneers": 4,
 }
 COST_LABELS = {
     "item_price": "Item / bid",
@@ -46,11 +49,18 @@ def targeted_research(card):
 
 def auction_research(cards):
     """Research vocabulary and source priority, never an inferred bargain score."""
-    eligible = [c for c in cards if c["item"].source.removesuffix(" FIXTURE") in AUCTION_PRIORITY]
+
+    def priority(card):
+        source = {"invaluable": "Invaluable", "liveauctioneers": "LiveAuctioneers"}.get(
+            card.get("auction_platform"), card["item"].source.removesuffix(" FIXTURE")
+        )
+        return AUCTION_PRIORITY.get(source)
+
+    eligible = [c for c in cards if priority(c) is not None and c.get("availability") != "ENDED"]
     return sorted(
         eligible,
         key=lambda c: (
-            AUCTION_PRIORITY[c["item"].source.removesuffix(" FIXTURE")],
+            priority(c),
             -targeted_research(c),
             -("jewelry" in c["leads"]),
             -len(c["leads"]),
@@ -59,15 +69,17 @@ def auction_research(cards):
 
 
 def alert_history(session, listing_id):
-    return list(
-        session.execute(
+    return [
+        (card, message)
+        for observation, message in session.execute(
             select(AlertObservation, AlertMessage)
             .join(AlertMessage, AlertMessage.id == AlertObservation.message_id)
             .join(DiscoveredItem, DiscoveredItem.id == AlertObservation.item_id)
             .where(DiscoveredItem.listing_id == listing_id)
             .order_by(AlertObservation.id)
         )
-    )
+        for card in observation_occurrences(observation)
+    ]
 
 
 def inbox_cards(session, prefs):
@@ -77,7 +89,7 @@ def inbox_cards(session, prefs):
         .join(AlertMessage, AlertMessage.id == AlertObservation.message_id)
         .order_by(AlertObservation.id)
     ):
-        history[o.item_id].append((o, m))
+        history[o.item_id].extend((card, m) for card in observation_occurrences(o))
     api_counts = defaultdict(int)
     for o in session.scalars(select(DiscoveryObservation)):
         api_counts[o.item_id] += 1
@@ -127,6 +139,13 @@ def inbox_cards(session, prefs):
                 item=item,
                 a=a,
                 history=history[row.id],
+                auction_platform=next(
+                    (o.data.get("platform") for o, m in history[row.id] if o.data.get("platform")),
+                    None,
+                ),
+                availability="ENDED"
+                if any(o.data.get("availability") == "ENDED" for o, m in history[row.id])
+                else "UNKNOWN",
                 leads=leads,
                 costs=costs,
                 state="IRRELEVANT"
@@ -180,9 +199,13 @@ def search_status(session):
             for o, m in observations
             if m.source_id == saved.source_id
             and not m.synthetic
-            and o.attribution_verified
-            and o.query_text == saved.phrase
             and m.message_type == "SEARCH_MATCH"
+            and any(
+                card.attribution_verified
+                and card.query_text == saved.phrase
+                and card.data.get("message_role") != "RECOMMENDED"
+                for card in observation_occurrences(o)
+            )
         }
         statuses.append(dict(saved=saved, real_matches=len(matched)))
     return statuses

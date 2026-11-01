@@ -94,7 +94,7 @@ def test_fresh_seed_deduplicates_groups_and_never_creates_query_history(tmp_path
     with sessions.begin() as s:
         registry.seed_sources(s)
         before = rows(s, SavedSourceSearch)
-        assert len(before) == 8 * 65
+        assert len(before) == len(registry.SOURCES) * 65
         assert not rows(s, SearchPattern)
         for source in registry.SOURCES:
             searches = {v["phrase"]: v for v in before.values() if v["source_id"] == source}
@@ -136,7 +136,7 @@ def test_startup_upgrade_preserves_all_old_rows_custom_sources_and_attribution(
                 == 200
             )
             with client.app.state.sessions.begin() as s:
-                assert len(rows(s, SavedSourceSearch)) == 9 * 21
+                assert len(rows(s, SavedSourceSearch)) == (len(registry.SOURCES) + 1) * 21
                 for i, saved in enumerate(s.scalars(select(SavedSourceSearch))):
                     saved.selected = i % 2 == 0
                     saved.configured = i % 3 == 0
@@ -184,7 +184,8 @@ def test_startup_upgrade_preserves_all_old_rows_custom_sources_and_attribution(
         with TestClient(create_app(url)) as client:
             with client.app.state.sessions() as s:
                 after = rows(s, SavedSourceSearch)
-                assert len(after) == 9 * 65 + 4  # two exact case/space variants per source
+                # Two exact case/space variants on each of two sources remain separate.
+                assert len(after) == (len(registry.SOURCES) + 1) * 65 + 4
                 assert {id_: after[id_] for id_ in before} == before
                 assert rows(s, IntakeSource) == sources_before
                 assert {m.__tablename__: rows(s, m) for m in HISTORY} == history_before

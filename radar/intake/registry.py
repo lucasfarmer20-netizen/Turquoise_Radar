@@ -16,6 +16,16 @@ SOURCES = {
         ["hibid.com"],
         "Saved searches/notifications: owner-reported; daily digest format unconfirmed",
     ),
+    "invaluable": (
+        "Invaluable",
+        ["invaluable.com"],
+        "Owner receives saved-search, outbid and spotlight emails; review each observed format",
+    ),
+    "liveauctioneers": (
+        "LiveAuctioneers",
+        ["liveauctioneers.com"],
+        "Observed outbid and ended-item emails with recommendations; search alerts unverified",
+    ),
     "estatesales-org": (
         "EstateSales.org",
         ["estatesales.org"],
@@ -171,6 +181,7 @@ class SourceDefinition(BaseModel):
     sample_kind: Literal["SYNTHETIC", "OWNER_PROVIDED"] = "SYNTHETIC"
     sample_verified: bool = False
     sample_reference: str | None = None
+    reviewed_email_formats: dict[str, str] = Field(default_factory=dict)
     item_path_prefix: str | None = None
     field_labels: dict[str, list[str]] = Field(default_factory=dict)
     restrictions: str = (
@@ -196,6 +207,12 @@ class SourceDefinition(BaseModel):
             )
         if self.sample_verified and not self.sample_reference:
             raise ValueError("Verified formats require a permitted sample reference")
+        if self.reviewed_email_formats and (
+            not self.sample_verified
+            or not self.sample_reference
+            or any(not value.strip() for value in self.reviewed_email_formats.values())
+        ):
+            raise ValueError("Reviewed email formats require verified, referenced sample evidence")
         if self.item_path_prefix and not re.fullmatch(
             r"/[A-Za-z0-9/_-]{1,100}/", self.item_path_prefix
         ):
@@ -210,6 +227,37 @@ class SourceDefinition(BaseModel):
         ):
             raise ValueError("Labels must be short literal text, not regular expressions")
         return self
+
+
+def auction_email_platform(source):
+    """Identify these two email platforms by registered domains, preserving custom IDs/names."""
+    domains = source.domains if isinstance(source, SourceDefinition) else source.get("domains", [])
+    found = [
+        platform
+        for platform in ("invaluable", "liveauctioneers")
+        if any(d == platform + ".com" or d.endswith("." + platform + ".com") for d in domains)
+    ]
+    return found[0] if len(found) == 1 else None
+
+
+def duplicate_auction_platform(session, definition, *, exclude_id=None):
+    """Creation and edits share the same domain ownership check, including mixed aliases."""
+
+    def platforms(source):
+        domains = (
+            source.domains if isinstance(source, SourceDefinition) else source.get("domains", [])
+        )
+        return {
+            platform
+            for platform in ("invaluable", "liveauctioneers")
+            if any(d == platform + ".com" or d.endswith("." + platform + ".com") for d in domains)
+        }
+
+    proposed = platforms(definition)
+    return any(
+        row.id != exclude_id and proposed & platforms(row.data)
+        for row in session.scalars(select(IntakeSource))
+    )
 
 
 def seed_searches(session, source_id):
@@ -238,6 +286,11 @@ def seed_searches(session, source_id):
 def seed_sources(session):
     for source_id, (name, domains, notifications) in SOURCES.items():
         if not session.get(IntakeSource, source_id):
+            if source_id in ("invaluable", "liveauctioneers") and any(
+                auction_email_platform(row.data) == source_id
+                for row in session.scalars(select(IntakeSource))
+            ):
+                continue  # An existing custom source owns this platform's history.
             definition = SourceDefinition(name=name, domains=domains, notifications=notifications)
             session.add(IntakeSource(id=source_id, data=definition.model_dump(mode="json")))
     session.flush()
