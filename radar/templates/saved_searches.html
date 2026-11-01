@@ -1,2 +1,30 @@
-{% extends 'base.html' %}{% block content %}<a href="/inbox">← Inbox</a><p class="eyebrow">OWNER-MANAGED MARKETPLACE SETUP</p><h1>Save the overlooked search.</h1><p>Copy exact phrases and configure searches yourself on the marketplace. No accounts or saved searches are created automatically. Exact matching and search syntax are not assumed supported. A configured checkbox is your record, not a source confirmation.</p><form action="/saved-searches" method="get" class="form-row"><label>Source<select name="source">{% for s in sources %}<option value="{{ s.id }}" {% if source_filter==s.id %}selected{% endif %}>{{ s.data.name }}</option>{% endfor %}</select></label><button>Show recommendations</button></form>
-{% set selected_source=source_filter or sources[0].id %}{% for status in statuses if status.saved.source_id==selected_source %}{% set search=status.saved %}<section class="panel"><p class="eyebrow">{{ search.group_name }} / {{ search.source_id }}</p><div class="form-row"><label>Exact spelling · source-specific<input id="phrase-{{ search.id }}" readonly value="{{ search.phrase }}"></label><button type="button" data-copy="phrase-{{ search.id }}">Copy exact phrase</button></div><form method="post" action="/saved-searches/{{ search.id }}" class="form-row"><label class="check"><input type="checkbox" name="selected" value="true" {% if search.selected %}checked{% endif %}>Selected for sourcing</label><label class="check"><input type="checkbox" name="configured" value="true" {% if search.configured %}checked{% endif %}>I configured this search on the source</label><button>Save owner status</button></form><p>Real attributable candidates: {{ status.real_matches }}. Synthetic, promotional and unverified matches do not count.</p></section>{% endfor %}{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<a href="/inbox">← Inbox</a>
+<p class="eyebrow">OWNER-MANAGED MARKETPLACE SETUP</p>
+<h1>Save the overlooked search.</h1>
+<p>Start with 15 recommended phrases, or browse the full catalog by source and group. Recommendations do not select or activate searches. Your saved choices remain in place.</p>
+<p>Copy exact phrases and configure searches yourself on the marketplace. No accounts or saved searches are created automatically. Word order, quotation marks, Boolean operators, stemming and misspellings may work differently on each source. A configured checkbox is your record, not a source confirmation.</p>
+<p class="muted">These phrases are discovery cues, not evidence of metal content, stone identity, maker, age, cultural attribution or value. Yield is not yet measured for this expanded catalog.</p>
+<form action="/saved-searches" method="get" class="filters saved-search-filters">
+  <label>Source<select name="source">{% for s in sources %}<option value="{{ s.id }}" {% if source_filter==s.id %}selected{% endif %}>{{ s.data.name }}</option>{% endfor %}</select></label>
+  <label>Catalog view<select name="catalog"><option value="starter" {% if catalog_filter=='starter' %}selected{% endif %}>Recommended starter (15)</option><option value="all" {% if catalog_filter=='all' %}selected{% endif %}>All catalog searches</option></select></label>
+  <label>Group<select name="group"><option value="">All groups</option>{% for group in groups %}<option {% if group_filter==group %}selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
+  <button>Show searches</button>
+</form>
+<p id="search-count">Showing {{ statuses|length }} of {{ total }} catalog searches for {% for s in sources if s.id==source_filter %}{{ s.data.name }}{% endfor %}. Catalog availability is separate from configuration and observed matches.</p>
+{% for status in statuses %}{% set search=status.saved %}
+<section class="panel saved-search" id="search-{{ search.id }}">
+  <p class="eyebrow">{{ search.group_name }} / {{ search.source_id }}</p>
+  {% if search.phrase in starter_phrases %}<span class="badge">Recommended starter</span>{% endif %}
+  <div class="form-row"><label>Exact spelling · source-specific<input id="phrase-{{ search.id }}" readonly value="{{ search.phrase }}"></label><button type="button" data-copy="phrase-{{ search.id }}">Copy exact phrase</button></div>
+  <form method="post" action="/saved-searches/{{ search.id }}" class="form-row">
+    <input type="hidden" name="group" value="{{ group_filter }}"><input type="hidden" name="catalog" value="{{ catalog_filter }}">
+    <label class="check"><input type="checkbox" name="selected" value="true" {% if search.selected %}checked{% endif %}>Selected for sourcing</label>
+    <label class="check"><input type="checkbox" name="configured" value="true" {% if search.configured %}checked{% endif %}>I configured this search on the source</label>
+    <button>Save owner status</button>
+  </form>
+  <p>Real attributable candidates: {{ status.real_matches }}. Synthetic, promotional and unverified matches do not count.</p>
+</section>
+{% else %}<section class="panel empty">No searches match these filters. Choose All catalog searches or All groups to broaden the view.</section>{% endfor %}
+{% endblock %}
