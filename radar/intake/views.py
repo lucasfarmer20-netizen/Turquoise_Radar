@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 from sqlalchemy import select
@@ -13,6 +14,48 @@ from radar.db import (
 )
 from radar.schemas import ListingInput
 from radar.workflow import queue_state
+
+AUCTION_PRIORITY = {
+    "ShopGoodwill": 0,
+    "HiBid": 1,
+    "CTBids": 2,
+    "EstateSales.org": 2,
+    "EstateSales.net": 2,
+}
+COST_LABELS = {
+    "item_price": "Item / bid",
+    "buyer_premium": "Buyer premium",
+    "buyer_service_fee": "Buyer service fee",
+    "handling_fee": "Handling",
+    "sales_tax": "Tax",
+    "shipping_cost": "Quoted shipping",
+}
+
+
+def targeted_research(card):
+    """Specific title cues plus jewelry/lot context; never material or maker evidence."""
+    text, leads = card["item"].raw_title.casefold(), card["leads"]
+    if "jewelry" not in leads and not re.search(r"\b(lots?|mixed|jars?)\b", text):
+        return False
+    return bool(
+        ("misspelling" in leads and re.search(r"\b(turqoise|turquiose|navaho|navjo)\b", text))
+        or ("silver" in leads and re.search(r"\b(sterling|925)\b", text))
+        or ("poor description" in leads and re.search(r"\bblue\s+(stone|rock)\b", text))
+    )
+
+
+def auction_research(cards):
+    """Research vocabulary and source priority, never an inferred bargain score."""
+    eligible = [c for c in cards if c["item"].source.removesuffix(" FIXTURE") in AUCTION_PRIORITY]
+    return sorted(
+        eligible,
+        key=lambda c: (
+            AUCTION_PRIORITY[c["item"].source.removesuffix(" FIXTURE")],
+            -targeted_research(c),
+            -("jewelry" in c["leads"]),
+            -len(c["leads"]),
+        ),
+    )
 
 
 def alert_history(session, listing_id):
@@ -45,7 +88,13 @@ def inbox_cards(session, prefs):
         listing = session.get(Listing, row.listing_id) if row.listing_id else None
         text = item.raw_title.casefold()
         leads = []
-        if "ring" in text:
+        if re.search(
+            r"\b(jewelry|jewellery|rings?|earrings?|bracelets?|cuffs?|pendants?|"
+            r"necklaces?|brooches|brooch|conchos?)\b",
+            text,
+        ):
+            leads.append("jewelry")
+        if re.search(r"\brings?\b", text):
             leads.append("ring")
         if any(w in text for w in ("lot", "mixed", "jar")):
             leads.append("lot")
@@ -53,6 +102,16 @@ def inbox_cards(session, prefs):
             leads.append("silver")
         if any(w in text for w in ("signed", "hallmark", "stamped")):
             leads.append("collector")
+        if any(w in text for w in ("turquiose", "turqoise", "navaho", "navjo")):
+            leads.append("misspelling")
+        if any(w in text for w in ("southwestern", "turquoise", "cuff", "concho")):
+            leads.append("southwestern")
+        if any(w in text for w in ("blue stone", "blue rock", "unmarked", "unidentified")):
+            leads.append("poor description")
+        costs = [
+            dict(label=label, value=getattr(item, key), status=item.cost_status.get(key, "UNKNOWN"))
+            for key, label in COST_LABELS.items()
+        ]
         cards.append(
             dict(
                 row=row,
@@ -69,6 +128,7 @@ def inbox_cards(session, prefs):
                 a=a,
                 history=history[row.id],
                 leads=leads,
+                costs=costs,
                 state="IRRELEVANT"
                 if row.inbox_status == "IRRELEVANT"
                 else queue_state(listing, analyze(ListingInput.model_validate(listing.data), prefs))

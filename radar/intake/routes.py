@@ -32,7 +32,7 @@ from radar.intake.service import (
     promote_candidate,
     source_definition,
 )
-from radar.intake.views import estate_groups, inbox_cards, search_status
+from radar.intake.views import auction_research, estate_groups, inbox_cards, search_status
 
 
 def intake_routes(app, render, preferences):
@@ -41,6 +41,8 @@ def intake_routes(app, render, preferences):
         with app.state.sessions() as s:
             cards = inbox_cards(s, preferences(s))
             total = len(cards)
+            if request.query_params.get("focus") == "auction":
+                cards = auction_research(cards)
             if request.query_params.get("source"):
                 cards = [c for c in cards if c["item"].source == request.query_params["source"]]
             if request.query_params.get("opportunity"):

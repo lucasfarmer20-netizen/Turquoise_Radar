@@ -2,14 +2,16 @@
 
 ## Working paths and evidence status
 
-All intake is local and owner-operated. No mailbox password, mailbox OAuth token,
-Gmail/IMAP connection, marketplace login, website fetch or recurring poll is used.
+Application intake is local and owner-operated, with no mailbox connection or
+recurring polling. JRI-007 used one-time read-only access to owner-authorized mail
+through the connected tool; raw messages remain private. No marketplace login,
+website fetch or image retrieval is performed by the importer.
 The existing eBay adapter and its production gates are unchanged.
 
 | Source | Operational now | Real-format validation status |
 |---|---|---|
 | ShopGoodwill | .eml/pasted text, direct item-ID correlation, labelled amounts, bidding/purchase/shipping event classification, paid-order reconciliation, CSV/JSON/manual entry | The addendum describes observed bidding/receipt categories. No actual owner email was supplied here; synthetic tests only. Personal Shopper search-match structure remains provisional. |
-| HiBid | .eml/paste, direct lot vs catalog links, labelled auction/house/price/premium evidence, original closing time/zone, CSV/JSON/manual entry | Observed promotional/closing categories are described by the owner. Actual promotional templates and daily saved-search digests have not been validated here; extraction is provisional. |
+| HiBid | .eml/paste, direct lot vs catalog links, labelled auction/house/price/premium evidence, original closing time/zone, CSV/JSON/manual entry | Observed promotional/closing categories are described by the owner. JRI-007 reviewed three real promotional messages; titles and explicit identities were checked. Daily saved-search digests still lack a real sample; extraction remains provisional. |
 | CTBids, EstateSales.org, EstateSales.net | Generic explicit-label and direct-link intake, CSV/JSON, copied descriptions, optional verified sample rules | Unknown/unlabelled layouts stay for human review; no claim of a confirmed live notification schema. |
 | Poshmark, Mercari | Owner-provided structured records and direct-link/copied-text entry; generic email evidence storage | No source-specific email format or automatic access permission claimed. |
 | Other authorized estate sources | Configure a separate source entry/domain, then use generic labels, structured data or manual entry | Rules require permitted sample verification; no undocumented endpoint or scraping is implemented. |
@@ -298,3 +300,10 @@ Use a fresh temporary database filename each run. The check aborts external requ
 uses synthetic fixtures only and covers paid ownership confirmation, non-allocation,
 repeat imports, catalog-only/opaque notices and twelve mobile pages. It must never
 be pointed at owner inventory. `CHROMIUM_PATH` can select an installed Chromium binary.
+
+## JRI-007 auction-first pilot
+
+See [actual findings and owner setup](JRI-007.md). Use `/inbox?focus=auction`
+to prioritize ShopGoodwill, HiBid and estate leads with explicit cost uncertainty.
+Three real jewelry lots reached metadata-only research; no photographs or buy/pass
+evidence were manufactured. The public test emails remain synthetic regressions.
