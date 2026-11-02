@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -205,3 +206,79 @@ def test_quarantine_rejects_archive_links(tmp_path, keys):
             b"synthetic" * 8,
         )
     assert not (tmp_path / "quarantine").exists()
+
+
+EXPORT_PATH = PATH.with_name("export-recovery.py")
+export_spec = importlib.util.spec_from_file_location("export_recovery", EXPORT_PATH)
+recovery = importlib.util.module_from_spec(export_spec)
+export_spec.loader.exec_module(recovery)
+
+
+def test_owner_export_writes_two_verified_encrypted_copies_without_keys(
+    tmp_path, monkeypatch, capsys, keys
+):
+    public, private = keys
+    ssh = tmp_path / "synthetic-ssh-key"
+    ssh.write_text("SYNTHETIC SSH key; no connection is made")
+    one, two = tmp_path / "one.encrypted", tmp_path / "two.encrypted"
+    secret = "SYNTHETIC-recovery-HMAC-0000000000000000000"
+    monkeypatch.setattr(
+        recovery.getpass, "getpass", lambda prompt: "SYNTHETIC strong passphrase 000000"
+    )
+    calls = []
+
+    def export(host, *args):
+        calls.append(host)
+        return json.dumps(
+            {"receiver_hmac": secret}
+            if host == "tr-ebay-notify-01"
+            else {"backup_decryption_private_pem": private.decode()}
+        ).encode()
+
+    monkeypatch.setattr(recovery, "export", export)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(EXPORT_PATH),
+            "--owner-machine",
+            "--ssh-key-file",
+            str(ssh),
+            "--copy-one",
+            str(one),
+            "--copy-two",
+            str(two),
+        ],
+    )
+    recovery.main()
+    printed = capsys.readouterr().out
+    report = json.loads(printed)
+    assert report["encrypted_copies_verified"] == 2
+    assert calls == ["tr-ebay-notify-01", "tr-ledger-runner-01"]
+    assert one.read_bytes() == two.read_bytes()
+    for path in (one, two):
+        assert secret.encode() not in path.read_bytes() and private not in path.read_bytes()
+        assert path.stat().st_mode & 0o077 == 0
+    assert secret not in printed and private.decode() not in printed
+    ciphertext = one.read_bytes()
+    with pytest.raises(InvalidTag):
+        recovery.open_bundle(ciphertext, "SYNTHETIC wrong passphrase 000000")
+    with pytest.raises(InvalidTag):
+        recovery.open_bundle(
+            ciphertext[:-1] + bytes([ciphertext[-1] ^ 1]), "SYNTHETIC strong passphrase 000000"
+        )
+
+
+def test_owner_export_refuses_wrong_instance_before_secret_read(tmp_path, monkeypatch):
+    calls = []
+
+    def gcloud(*args):
+        calls.append(args)
+        return b"SYNTHETIC-wrong-instance-id"
+
+    monkeypatch.setattr(recovery, "gcloud", gcloud)
+    with pytest.raises(ValueError):
+        recovery.export(
+            "tr-ebay-notify-01", "SYNTHETIC secret export", tmp_path / "ssh", tmp_path / "hosts"
+        )
+    assert len(calls) == 1

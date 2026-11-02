@@ -135,3 +135,94 @@ Measure upload completion and cloud download-through-quarantine duration using
 clearly synthetic data. Verify incorrect keys, corruption, stale/saved proof and
 unavailable live receiver remain blocked. A local crypto round trip is a partial
 check, not evidence of successful cloud recovery or a measured cloud RTO.
+
+## Supported-access handoff for bucket and recovery principal
+
+The attached managed connection rejects bucket creation with
+`403 identity_unsupported_request` through both the Google Auth SDK and Google
+CLI. This is distinct from a demonstrated GCP IAM permission denial:
+`storage.buckets.create` and `storage.buckets.setIamPolicy` are returned by the
+project permission test. Do not relay the deployer's token through a VM or bypass
+the managed connection. Use a supported connection, or have the owner/admin run
+the following from their own authenticated environment after checking that the
+exact bucket is still absent. Inspect any pre-existing bucket rather than taking
+it over. The first create failed and subsequent metadata GET still returns 404.
+
+```sh
+gcloud storage buckets create gs://tr-ebay-ledger-100948930799 \
+  --project=turquoiseradar --location=us-west1 \
+  --default-storage-class=STANDARD --uniform-bucket-level-access \
+  --public-access-prevention --soft-delete-duration=7d --retention-period=1d
+
+gcloud storage buckets update gs://tr-ebay-ledger-100948930799 \
+  --lifecycle-file=deploy/ebay-deletion/backup-lifecycle.json \
+  --update-labels=managed-by=turquoise-radar,task=jri-014,purpose=ledger-backup
+
+gcloud storage buckets add-iam-policy-binding gs://tr-ebay-ledger-100948930799 \
+  --member=serviceAccount:tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com \
+  --role=roles/storage.objectCreator
+
+gcloud iam service-accounts create tr-ledger-restore-reader \
+  --project=turquoiseradar --display-name='Turquoise Radar isolated ledger recovery reader'
+
+gcloud storage buckets add-iam-policy-binding gs://tr-ebay-ledger-100948930799 \
+  --member=serviceAccount:tr-ledger-restore-reader@turquoiseradar.iam.gserviceaccount.com \
+  --role=roles/storage.objectViewer
+```
+
+The IAM administrator must separately designate the owner-controlled recovery
+operator and allow short-lived impersonation on **that recovery service account
+only**. The operator identity is not guessed, and no such grant was applied.
+Do not grant the writer/deployer recovery impersonation or change
+`codex-radar-reader`. A bucket readback and actual writer/restore-reader tests must
+follow; successful execution of these commands alone does not complete recovery
+qualification. The public receiver must still have no service account.
+
+## Approved owner-operated offline export
+
+The owner selected secure offline IAP export: two owner-controlled encrypted copies
+in separate physical locations, with HMAC and decryption-key records logically
+separate inside the bundle. The only recoverable copy must not depend on the
+receiver, runner, bucket or these same recovery keys. A named vault is not required.
+
+Run `export-recovery.py` **on the owner-controlled machine**, with its own approved
+IAP/OS administrator connection and an existing SSH key. It requires local Python
+cryptography >=41 and gcloud. Do not run it in this temporary task environment.
+Mount the two offline destinations and choose a separate strong recovery
+passphrase through the hidden terminal prompts, keeping passphrase recovery
+independent of these hosts and the encrypted copies.
+
+```sh
+python3 deploy/ebay-deletion/export-recovery.py --owner-machine \
+  --ssh-key-file /OWNER/EXISTING_IAP_SSH_KEY \
+  --copy-one /OFFLINE_MEDIA_ONE/turquoise-recovery.encrypted \
+  --copy-two /OFFLINE_MEDIA_TWO/turquoise-recovery.encrypted
+```
+
+The helper checks instance numeric IDs against this deployment receipt, obtains
+Ed25519 keys through authenticated Compute serial reads, and enforces pinned IAP
+SSH. It captures remote key output directly into process memory, never the
+terminal, logs or a plaintext local file. Separate JSON records hold the HMAC and
+RSA private key. Non-secret production project/receiver/bucket identifiers,
+generation date/time and fingerprints accompany them. Scrypt (N=262144, r=8, p=1)
+derives an AES-256-GCM key from the passphrase, with independent random salt/nonce.
+Only encrypted bytes are written, exclusively as new 0600 files. Both copies are
+read back and authenticated/decrypted in memory and compared before reporting
+success. CLI errors are fixed codes and never display captured secret output.
+The helper does not upload recovery material to GCS.
+
+After a successful run, retain only the aggregate verification receipt and
+fingerprints as evidence, and confirm the two media have reached separate physical
+locations. Do not paste key material or passphrases into chat. Script verification
+alone cannot establish physical placement. No export has been executed from this
+task, and no owner export/placement verification has yet been received.
+
+Non-secret identifiers generated on the approved runner:
+
+- Receiver HMAC identifier: `0eb6b203e7fe4ffd`; generated 2026-11-02 (date precision).
+- Encryption public-key SHA-256:
+  `042d38760c4e132e24a072539d8abfc52f90cf37d6e1ef019fd1a85459524e40`.
+- Encryption key generation: 2026-11-02 09:47:54 Alaska time (18:47:54 UTC).
+
+The owner export receipt must match these identifiers. They distinguish keys;
+they do not themselves prove export or custody.

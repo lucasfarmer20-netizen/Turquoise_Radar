@@ -1,4 +1,11 @@
 # Replace the example host only after the owner supplies an owned domain and approves deployment.
+{
+	log {
+		# Default HTTP error events include request headers and challenge query strings.
+		# Drop request-bearing logs; monitor aggregate receiver/service/backup status instead.
+		exclude http.log.error http.log.access
+	}
+}
 ebay-notify.example.invalid {
 	@notification path /ebay/account-deletion
 	handle @notification {
