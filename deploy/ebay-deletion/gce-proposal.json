@@ -1,11 +1,11 @@
 {
-  "status": "PREPARATION_ONLY_AUTHENTICATED_INSPECTION_GAPS",
+  "status": "PREPARATION_ONLY_AUTHENTICATED_READ_ONLY_CHECKS_COMPLETE",
   "provisioning_authorized": false,
   "project_id": "turquoiseradar",
   "billing_account_verified": false,
   "free_tier_remaining_verified": false,
   "existing_resources_inspected": true,
-  "effective_permissions_verified": false,
+  "effective_permissions_verified": true,
   "reuse_suitable_existing_receiver_first": true,
   "new_resources_if_required": {
     "instance": "tr-ebay-notify-01",
@@ -27,7 +27,9 @@
       "region": "us-west1",
       "network_tier": "STANDARD",
       "address": null,
-      "instance_access_config_network_tier": "STANDARD"
+      "instance_access_config_network_tier": "STANDARD",
+      "address_type": "EXTERNAL",
+      "ip_version": "IPV4"
     },
     "network": "tr-ebay-notify-vpc",
     "subnet": "tr-ebay-notify-us-west1",
@@ -42,7 +44,77 @@
       "source_cidr": "35.235.240.0/20",
       "requires_iap_iam": true
     },
-    "workbench_or_owner_data_allowed": false
+    "workbench_or_owner_data_allowed": false,
+    "network_configuration": {
+      "name": "tr-ebay-notify-vpc",
+      "auto_create_subnetworks": false,
+      "routing_mode": "REGIONAL"
+    },
+    "subnet_configuration": {
+      "name": "tr-ebay-notify-us-west1",
+      "region": "us-west1",
+      "network": "tr-ebay-notify-vpc",
+      "ip_cidr_range": "10.84.13.0/28",
+      "stack_type": "IPV4_ONLY"
+    },
+    "vm_network_interface": {
+      "subnetwork": "tr-ebay-notify-us-west1",
+      "region": "us-west1",
+      "access_configs": [
+        {
+          "name": "External NAT",
+          "type": "ONE_TO_ONE_NAT",
+          "network_tier": "STANDARD",
+          "nat_ip_source": "Approved regional tr-ebay-notify-ip reserved numeric IPv4; not an automatically allocated ephemeral IP"
+        }
+      ]
+    },
+    "instance_network_tags": [
+      "tr-ebay-notify"
+    ],
+    "firewall_rules": [
+      {
+        "name": "tr-ebay-notify-web",
+        "network": "tr-ebay-notify-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "source_ranges": [
+          "0.0.0.0/0"
+        ],
+        "target_tags": [
+          "tr-ebay-notify"
+        ],
+        "allowed": [
+          {
+            "ip_protocol": "tcp",
+            "ports": [
+              "80",
+              "443"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "tr-ebay-notify-iap-ssh",
+        "network": "tr-ebay-notify-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "source_ranges": [
+          "35.235.240.0/20"
+        ],
+        "target_tags": [
+          "tr-ebay-notify"
+        ],
+        "allowed": [
+          {
+            "ip_protocol": "tcp",
+            "ports": [
+              "22"
+            ]
+          }
+        ]
+      }
+    ]
   },
   "dns": {
     "registrar_and_dns_provider": "Spaceship",
@@ -82,10 +154,10 @@
     ]
   },
   "project_number": "100948930799",
-  "project_identity_verified": false,
-  "project_lifecycle_state": null,
+  "project_identity_verified": true,
+  "project_lifecycle_state": "ACTIVE",
   "read_only_observation": {
-    "observed_at_utc": "2026-11-02T04:38:29.698387+00:00",
+    "observed_at_utc": "2026-11-02T04:58:12.963325+00:00",
     "configured_identity": "codex-radar-reader@turquoiseradar.iam.gserviceaccount.com",
     "authentication": {
       "status": "authenticated",
@@ -93,25 +165,104 @@
       "method": "Attached GCP external-account SDK refresh with service-account impersonation"
     },
     "runtime_identity_readiness": "ready",
-    "project_selection_source": "Owner supplied; Compute project name and Service Usage project-number scope observed, Resource Manager ID/number/lifecycle verification unavailable",
+    "project_selection_source": "Authoritative Resource Manager projects.get confirms project ID turquoiseradar, number 100948930799 and ACTIVE lifecycle",
     "queries": {
       "project": {
-        "status": "unknown",
-        "http_status": 403,
-        "error_status": "PERMISSION_DENIED",
-        "message": "Cloud Resource Manager API has not been used in project 100948930799 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=100948930799 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "projectNumber": "100948930799",
+          "projectId": "turquoiseradar",
+          "lifecycleState": "ACTIVE",
+          "name": "TurquoiseRadar",
+          "createTime": "2026-11-02T00:45:20.044Z"
+        }
       },
       "testIamPermissions": {
-        "status": "unknown",
-        "http_status": 403,
-        "error_status": "PERMISSION_DENIED",
-        "message": "Cloud Resource Manager API has not been used in project 100948930799 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=100948930799 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+        "status": "observed",
+        "http_status": 200,
+        "method": "Resource Manager projects.testIamPermissions; individually tested each requested permission after initial combined request rejected invalid billing-account-scoped permission",
+        "initial_combined_result": {
+          "status": "unknown",
+          "http_status": 400,
+          "error_status": "INVALID_ARGUMENT",
+          "message": "Permission billing.resourceAssociations.list is not valid for this resource."
+        },
+        "permission_results": {
+          "resourcemanager.projects.get": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.instances.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.disks.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.addresses.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.globalAddresses.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.networks.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.subnetworks.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.firewalls.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "serviceusage.services.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.projects.get": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.regions.get": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "storage.buckets.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.snapshots.list": {
+            "status": "granted",
+            "http_status": 200
+          }
+        },
+        "inapplicable_permission": {
+          "permission": "billing.resourceAssociations.list",
+          "result": {
+            "status": "unknown",
+            "http_status": 400,
+            "error_status": "INVALID_ARGUMENT",
+            "message": "Permission billing.resourceAssociations.list is not valid for this resource."
+          },
+          "reason": "Billing-account-scoped permission is invalid for project resource. Account identity is unavailable and billing access is not required for this proposal."
+        },
+        "tests_observed_at_utc": "2026-11-02T04:58:39.271133+00:00"
       },
       "billing_link": {
         "status": "unknown",
         "http_status": 403,
         "error_status": "PERMISSION_DENIED",
-        "message": "Cloud Billing API has not been used in project 100948930799 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudbilling.googleapis.com/overview?project=100948930799 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+        "message": "Cloud Billing API has not been used in project 100948930799 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudbilling.googleapis.com/overview?project=100948930799 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+        "observed_at_utc": "2026-11-02T04:38:29.698387+00:00",
+        "rechecked_this_continuation": false
       },
       "enabled_services": {
         "status": "observed",
@@ -130,6 +281,7 @@
           "bigqueryreservation.googleapis.com",
           "bigquerystorage.googleapis.com",
           "cloudapis.googleapis.com",
+          "cloudresourcemanager.googleapis.com",
           "cloudtrace.googleapis.com",
           "compute.googleapis.com",
           "dataform.googleapis.com",
@@ -137,6 +289,7 @@
           "datastore.googleapis.com",
           "iam.googleapis.com",
           "iamcredentials.googleapis.com",
+          "iap.googleapis.com",
           "logging.googleapis.com",
           "monitoring.googleapis.com",
           "oslogin.googleapis.com",
@@ -150,10 +303,8 @@
           "sts.googleapis.com",
           "telemetry.googleapis.com"
         ],
-        "count": 30,
+        "count": 32,
         "relevant_not_in_enabled_list": [
-          "iap.googleapis.com",
-          "cloudresourcemanager.googleapis.com",
           "cloudbilling.googleapis.com"
         ]
       },
@@ -666,7 +817,39 @@
         "name": "turquoiseradar",
         "compute_resource_id": "5743901802257603109",
         "compute_resource_id_is_project_number": false,
-        "default_network_tier": "PREMIUM"
+        "default_network_tier": "PREMIUM",
+        "quotas": [
+          {
+            "metric": "NETWORKS",
+            "limit": 5,
+            "usage": 1
+          },
+          {
+            "metric": "FIREWALLS",
+            "limit": 100,
+            "usage": 4
+          },
+          {
+            "metric": "STATIC_ADDRESSES",
+            "limit": 8,
+            "usage": 0
+          },
+          {
+            "metric": "IN_USE_ADDRESSES",
+            "limit": 8,
+            "usage": 0
+          },
+          {
+            "metric": "SUBNETWORKS",
+            "limit": 100,
+            "usage": 0
+          },
+          {
+            "metric": "CPUS_ALL_REGIONS",
+            "limit": 32,
+            "usage": 0
+          }
+        ]
       },
       "region": {
         "status": "observed",
@@ -697,6 +880,11 @@
             "usage": 0
           },
           {
+            "metric": "INSTANCES",
+            "limit": 24,
+            "usage": 0
+          },
+          {
             "metric": "E2_CPUS",
             "limit": 24,
             "usage": 0
@@ -712,16 +900,109 @@
         "resources": []
       },
       "buckets": {
-        "status": "unknown",
-        "http_status": 403,
-        "error_status": null,
-        "message": "codex-radar-reader@turquoiseradar.iam.gserviceaccount.com does not have storage.buckets.list access to the Google Cloud project. Permission 'storage.buckets.list' denied on resource (or it may not exist)."
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "resources": []
       },
       "ephemeral_external_ips": {
         "status": "observed",
         "count": 0,
-        "derivation": "No instances returned by complete aggregated instance list; therefore no instance NIC external NAT IPv4 or external IPv6 addresses",
+        "derivation": "No instances in fresh complete aggregated list; therefore no instance NIC external NAT IPv4 or external IPv6 addresses",
         "scope": "Compute instance interfaces; not other products"
+      },
+      "zone": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "name": "us-west1-b",
+        "state": "UP",
+        "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-west1"
+      },
+      "machine_type": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "name": "e2-micro",
+          "zone": "us-west1-b",
+          "guestCpus": 2,
+          "memoryMb": 1024,
+          "isSharedCpu": true,
+          "maximumPersistentDisks": 16,
+          "maximumPersistentDisksSizeGb": "3072"
+        }
+      },
+      "disk_type": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "name": "pd-standard",
+          "zone": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/zones/us-west1-b",
+          "validDiskSize": "10GB-65536GB",
+          "defaultDiskSizeGb": "500"
+        }
+      },
+      "image": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "name": "ubuntu-2404-noble-amd64-v20261024",
+          "selfLink": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20261024",
+          "status": "READY",
+          "architecture": "X86_64",
+          "diskSizeGb": "10",
+          "guestOsFeatures": [
+            {
+              "type": "VIRTIO_SCSI_MULTIQUEUE"
+            },
+            {
+              "type": "SEV_CAPABLE"
+            },
+            {
+              "type": "SEV_SNP_CAPABLE"
+            },
+            {
+              "type": "SEV_LIVE_MIGRATABLE"
+            },
+            {
+              "type": "SEV_LIVE_MIGRATABLE_V2"
+            },
+            {
+              "type": "SNP_SVSM_CAPABLE"
+            },
+            {
+              "type": "IDPF"
+            },
+            {
+              "type": "TDX_CAPABLE"
+            },
+            {
+              "type": "UEFI_COMPATIBLE"
+            },
+            {
+              "type": "GVNIC"
+            }
+          ]
+        },
+        "deprecated": null
+      },
+      "iap_service": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "name": "projects/100948930799/services/iap.googleapis.com",
+        "state": "ENABLED",
+        "evidence_scope": "Service Usage API enablement and project visibility; no IAP tunnel opened"
       }
     },
     "permission_test_requested": [
@@ -740,15 +1021,15 @@
       "storage.buckets.list",
       "compute.snapshots.list"
     ],
-    "billing_allowances": "Account-specific allowances unverified; Cloud Billing API disabled; no billing account health, current-month usage, credits or remaining allowances retrieved",
+    "billing_allowances": "Account-specific credits, Free Tier usage and remaining allowances unverified. Billing API not required for this proposal; no new billing queries made. Retain conservative published-price no-allowance scenario.",
     "network_evidence": {
       "policy": "restricted/enforced",
       "required_google_api_hosts_in_allowlist": true,
       "authenticated_compute_and_serviceusage_calls_succeeded": true
     },
     "permission_results": {
-      "status": "unknown",
-      "method": "Cloud Resource Manager projects.testIamPermissions",
+      "status": "verified_for_project_inspection",
+      "method": "Resource Manager projects.testIamPermissions",
       "requested": [
         "resourcemanager.projects.get",
         "compute.instances.list",
@@ -765,22 +1046,59 @@
         "storage.buckets.list",
         "compute.snapshots.list"
       ],
-      "granted": null,
-      "denied": null,
-      "reason": "HTTP 403: Cloud Resource Manager API disabled; no returned grant/deny set",
-      "observed_api_access": "Successful list/get calls demonstrate access only to their queried resources; they do not replace testIamPermissions",
-      "storage_buckets_list": "HTTP 403 permission denied; bucket inventory unknown"
+      "granted": [
+        "resourcemanager.projects.get",
+        "compute.instances.list",
+        "compute.disks.list",
+        "compute.addresses.list",
+        "compute.globalAddresses.list",
+        "compute.networks.list",
+        "compute.subnetworks.list",
+        "compute.firewalls.list",
+        "serviceusage.services.list",
+        "compute.projects.get",
+        "compute.regions.get",
+        "storage.buckets.list",
+        "compute.snapshots.list"
+      ],
+      "not_granted": [],
+      "invalid_for_project": [
+        "billing.resourceAssociations.list"
+      ],
+      "billing_permission_verified": false,
+      "additional_visibility_test": {
+        "requested": [
+          "iap.tunnelInstances.accessViaIAP",
+          "iap.tunnelInstances.getIamPolicy",
+          "resourcemanager.projects.getIamPolicy",
+          "serviceusage.services.get",
+          "compute.zones.get",
+          "compute.machineTypes.get",
+          "compute.diskTypes.get"
+        ],
+        "granted": [
+          "compute.diskTypes.get",
+          "compute.machineTypes.get",
+          "compute.zones.get",
+          "serviceusage.services.get"
+        ],
+        "not_granted": [
+          "iap.tunnelInstances.accessViaIAP",
+          "iap.tunnelInstances.getIamPolicy",
+          "resourcemanager.projects.getIamPolicy"
+        ]
+      },
+      "scope": "Inspection identity only. No provisioning or deployment permissions certified; IAP API enablement does not grant tunnel access."
     }
   },
   "remaining_blockers": [
-    "Resource Manager project ID/number association and lifecycle verification unavailable (API disabled); no API enablement authorized",
-    "Project testIamPermissions unavailable (Resource Manager API disabled); deployment permissions separately reviewed; bucket list denied",
-    "Billing link/health and account-wide usage/allowances unavailable (Cloud Billing API disabled); conservative cost acceptance or later evidence; Oregon paid quote",
-    "IAP absent from enabled-services list; any required enablement needs separate authorization",
-    "Organization policy, routes/peering, final network review and capacity/zone availability; current quota headroom is not a reservation",
-    "DNS delegation/records/CAA and conflicts",
-    "Private backup runner/cost, bucket availability/permissions, recovery drill, IAP/SSH and e2-micro qualification",
-    "Explicit deployment approval covering final resources, DNS and activation"
+    "Explicit owner approval of final dedicated resources, DNS and activation; no provisioning authorized",
+    "Account-specific credits and Free Tier usage unverified; retain conservative $11.07/month no-allowance receiver/cloud-backup subtotal with exclusions; exact Oregon paid quote and all-in runner/domain/tax/transfer costs unverified. Cloud Billing API access is not a prerequisite.",
+    "Organization policy, routes/peering and final security review; catalog/quota checks do not guarantee capacity at creation time",
+    "DNS delegation/records/CAA/conflicts; reserved numeric address remains pending approved creation",
+    "Future deployer/admin/runner IAM including IAP tunnel access and OS Login/SSH coexistence; reader has no tested IAP tunnel grant",
+    "Private backup runner/cost, globally unique bucket-name availability and creation/backup permissions, recovery drill and monitoring",
+    "Approved-host e2-micro memory/concurrency, TLS, IAP/SSH, service and recovery qualification"
   ],
   "reuse_review": {
     "existing_receiver_found": false,
@@ -789,6 +1107,52 @@
     "proposed_subnet_cidr_overlap_with_observed_subnets": false,
     "scope": "Observed subnet ranges only; routes, peering and organization policies not assessed",
     "standard_network_tier_must_be_explicit": true,
-    "bucket_existence_and_availability_verified": false
-  }
+    "project_bucket_inventory_verified": true,
+    "existing_backup_bucket_found": false,
+    "bucket_name_global_availability_verified": false
+  },
+  "effective_permissions_scope": "All 13 valid project inspection permissions verified. Billing-account-scoped permission in original set invalid on project; billing and deployment access not certified.",
+  "resource_compatibility": {
+    "status": "compatible_with_observed_catalogs_and_quota_headroom",
+    "capacity_guaranteed": false,
+    "region": "us-west1",
+    "zone": "us-west1-b",
+    "region_and_zone_state": "UP",
+    "machine_type": "e2-micro",
+    "guest_cpus": 2,
+    "memory_mb": 1024,
+    "shared_cpu": true,
+    "disk_type": "pd-standard",
+    "proposed_disk_size_gib": 30,
+    "disk_type_minimum_size_gb": 10,
+    "image_minimum_disk_gb": 10,
+    "image_status": "READY",
+    "image_architecture": "X86_64",
+    "image_resolved_name": "ubuntu-2404-noble-amd64-v20261024",
+    "image_family_resolution_can_change": true,
+    "standard_tier_regional_ipv4": "Explicit STANDARD on regional reservation and VM ONE_TO_ONE_NAT access config; same region and same reserved numeric address required",
+    "network": "New custom-mode dedicated VPC, one IPv4-only subnet and two targeted ingress rules (80/443 public; 22 IAP-only); do not reuse default public SSH/RDP rules",
+    "quota_demand": {
+      "instance": 1,
+      "cpu_conservative_vcpu_budget": 2,
+      "pd_standard_gb": 30,
+      "regional_static_addresses": 1,
+      "regional_in_use_addresses": 1,
+      "vpcs": 1,
+      "custom_subnets": 1,
+      "firewall_rules": 2
+    },
+    "subnet_quota_caveat": "Compute reports SUBNETWORKS usage 0/100 while inventory contains 42 auto-mode subnets. Quota usage is not subnet inventory count. Proposed custom subnet requires one unit.",
+    "subnet_cidr_overlap_with_observed_subnets": false,
+    "limits": "Catalog and quota evidence is not a capacity reservation or organization-policy check; runtime memory/load/IAP/OS Login and recovery still require approved-host qualification."
+  },
+  "iap_readiness": {
+    "api_enabled": true,
+    "serviceusage_visibility_verified": true,
+    "inspection_identity_tunnel_access_granted": false,
+    "tunnel_test_performed": false,
+    "reason": "No receiver exists and no tunnel opened. Future administrator/runner IAM and login require separate approval and verification."
+  },
+  "billing_api_access_required_for_proposal_completion": false,
+  "account_specific_credits_verified": false
 }
