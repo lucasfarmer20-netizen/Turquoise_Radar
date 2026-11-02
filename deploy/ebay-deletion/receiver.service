@@ -1,0 +1,26 @@
+[Unit]
+Description=Isolated eBay account-deletion receiver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ebay-receiver
+Group=ebay-receiver
+WorkingDirectory=/opt/ebay-receiver
+EnvironmentFile=/etc/ebay-receiver/receiver.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/ebay-receiver/.venv/bin/uvicorn radar.ebay_deletion.receiver:from_env --factory --host 127.0.0.1 --port 8091 --workers 1 --no-access-log --log-level warning --limit-concurrency 16 --timeout-keep-alive 5
+Restart=on-failure
+RestartSec=5
+StateDirectory=ebay-receiver
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/ebay-receiver
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

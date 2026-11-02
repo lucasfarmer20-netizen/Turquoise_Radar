@@ -231,3 +231,12 @@ The adapter accepts the documented `Application Access Token` type and continues
 using Bearer authorization for Browse. OAuth errors expose only stage, HTTP status
 and an allowlisted error code or `UNKNOWN`; descriptions and raw bodies are never
 retained. See [the correction and one-time execution outcome](JRI-011-OAUTH.md).
+
+### JRI-012 keyset activation preparation
+
+The owner confirms the Production keyset is disabled pending Marketplace Account
+Deletion/Closure notification setup. Radar persists eBay evidence; do not request
+the non-persistence exemption. See [receiver, deletion coverage, deployment and
+owner activation steps](JRI-012.md). The receiver is not deployed; no discovery
+retry is authorized by this preparation. Notification verification access and
+Browse access remain distinct, with all existing production gates preserved.

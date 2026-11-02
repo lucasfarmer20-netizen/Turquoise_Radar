@@ -423,3 +423,11 @@ historical. Five private workbench cases remain **RESEARCH**, with no permitted
 local photos or completed buying evaluations. See [actual source results,
 limitations and verification](docs/JRI-010.md). ShopGoodwill and HiBid await their
 first relevant notifications independently of this delivery.
+
+### eBay account-deletion preparation (JRI-012)
+
+A separate notification receiver and explicit private removal/restore tools are
+prepared for deployment review. The workbench stays private; no endpoint is live
+and no keyset activation or discovery retry is claimed. Read the [deployment,
+data coverage and exact owner activation sequence](docs/JRI-012.md), including
+identity/copy-review holds, before any activation.
