@@ -76,7 +76,9 @@ Retain Standard class, us-west1, uniform bucket access, enforced public-access
 prevention, 1-day unlocked retention and explicit 7-day soft deletion. Lifecycle
 processing is asynchronous, not an exact object-count guarantee. Include retained
 and soft-deleted bytes in the planning allowance. No retention lock is requested.
-Bucket creation currently fails; none of these settings is claimed as applied.
+The owner subsequently created the bucket. Current readback confirms its base
+security/retention settings, but lifecycle and labels are absent; see the latest
+qualification handoff below. No lifecycle success is inferred from owner commands.
 
 Only after **all** intended uploads pass does an atomic fsynced aggregate receipt
 advance. It contains completion time, duration, counts, encrypted size and tier
@@ -95,10 +97,13 @@ failure code, not exception text or SSH/cloud response bodies. Systemd records a
 failed service and journal entry. This is local failure visibility; no external
 alert delivery or paid monitoring service is configured.
 
-Keep timers disabled until private SSH/HMAC, bucket/writer permissions, recovery
-custody and an initial upload/recovery pass. Then run the first cycle explicitly,
-verify `success.json`, enable both timers, and observe scheduled success and
-failure/age behavior. One-hour RPO is a target until scheduled operation is
+Keep timers disabled until private SSH/HMAC, the approved bucket configuration
+and writer permissions, and an initial explicit upload pass. Verify `success.json`
+and the real age check, enable both timers, and observe scheduled success and
+failure/age behavior. The latest owner instruction permits this before completion
+of the separately gated cloud recovery/offline custody work. The backup timer now
+includes a one-minute start-up trigger as well as the hourly persistent calendar;
+a start-up execution alone does not prove an elapsed hourly RPO. One-hour RPO is a target until scheduled operation is
 demonstrated; four-hour RTO requires the full timed cloud recovery drill.
 
 ## Separately controlled recovery
@@ -106,8 +111,8 @@ demonstrated; four-hour RTO requires the full timed cloud recovery drill.
 Proposed steady-state recovery principal:
 `tr-ledger-restore-reader@turquoiseradar.iam.gserviceaccount.com`, with
 `roles/storage.objectViewer` on this bucket only and separately approved access
-to use that identity. The account is currently absent and the deployer lacks
-service-account creation authority. Do not grant the writer object read/delete,
+to use that identity. The account now exists with bucket-only Object Viewer. Its operator/impersonation
+path remains unconfigured for the attached deployer. Do not grant the writer object read/delete,
 attach it to the public receiver, repurpose the unchanged reader, or issue a
 long-lived service-account key. The administrator must create/control the recovery
 principal or provide an existing explicitly approved equivalent.
@@ -146,7 +151,9 @@ project permission test. Do not relay the deployer's token through a VM or bypas
 the managed connection. Use a supported connection, or have the owner/admin run
 the following from their own authenticated environment after checking that the
 exact bucket is still absent. Inspect any pre-existing bucket rather than taking
-it over. The first create failed and subsequent metadata GET still returns 404.
+it over. That historical create failed. The owner has since created the bucket; do not
+repeat the create or identity-create commands for resources that now exist.
+Current corrective work is only the supported lifecycle/labels update below.
 
 ```sh
 gcloud storage buckets create gs://tr-ebay-ledger-100948930799 \
@@ -226,3 +233,71 @@ Non-secret identifiers generated on the approved runner:
 
 The owner export receipt must match these identifiers. They distinguish keys;
 they do not themselves prove export or custody.
+
+
+## Latest cloud qualification and exact owner/operator handoff
+
+2026-11-02 readback confirms the exact us-west1 Standard bucket, uniform access,
+public-access prevention, 1-day unlocked retention, 7-day soft deletion and the
+bucket-only Creator/Viewer grants. Both dedicated identities have no project role.
+The bucket still has **no lifecycle or labels** (metadata version 3), confirmed
+by both SDK and CLI. A conditional PATCH returned `identity_unsupported_request`.
+The supported owner/admin environment must apply just this correction:
+
+```sh
+gcloud storage buckets update gs://tr-ebay-ledger-100948930799 \
+  --lifecycle-file=deploy/ebay-deletion/backup-lifecycle.json \
+  --update-labels=managed-by=turquoise-radar,task=jri-014,purpose=ledger-backup
+```
+
+Read back the exact lifecycle/labels and unchanged access/retention controls before
+enabling timers. The explicit real cycle already verified all three tiers in
+2.359 seconds; writer data/metadata/list requests returned 403, permission tests
+excluded delete, a real partial-upload failure did not advance either receipt,
+and the real age check and its 90-minute boundary passed. No DELETE was attempted.
+
+A one-event explicitly synthetic encrypted fixture is ready for the approved
+restore operator. Exact reference:
+
+```text
+gs://tr-ebay-ledger-100948930799/synthetic/recovery-qualification-20261102T192436Z-e5a0d02620faa2943ce04f98032c8909.trlb
+```
+
+Ciphertext SHA-256:
+`721b3c7b5356093034f8260c88d8e511e385f5d5bd2a5a9842e2ab1bb9c71170`.
+Encrypted size: 41,508 bytes. This object is a fixture, not live receiver proof.
+The private non-secret reference receipt is
+`/var/lib/tr-ledger-backup/recovery-drill-upload.json` on the runner.
+
+The recovery service account exists, but the attached deployer has no
+`iam.serviceAccounts.getAccessToken` or actAs permission on it. Its service-account
+IAM policy has no bindings. The owner must identify the approved recovery operator
+and provide a supported keyless path; do not silently add a Token Creator grant,
+use the writer/elevated deployer for the download, attach the reader to the runner,
+or issue a service-account key.
+
+Once an approved owner-controlled operator can use short-lived reader impersonation,
+the exact scoped download from that protected operator environment is:
+
+```sh
+gcloud storage cp \
+  gs://tr-ebay-ledger-100948930799/synthetic/recovery-qualification-20261102T192436Z-e5a0d02620faa2943ce04f98032c8909.trlb \
+  /PRIVATE/synthetic-recovery.trlb \
+  --impersonate-service-account=tr-ledger-restore-reader@turquoiseradar.iam.gserviceaccount.com
+```
+
+Verify the ciphertext checksum, then use the existing `cloud-backup.py quarantine`
+command on an approved protected recovery system with separately controlled private
+key/HMAC access. The approved runner's root-only recovery environment can perform
+the quarantine on ciphertext streamed through pinned IAP; the writer must not
+receive the reader's credentials. Measure from reader download start through all
+quarantine checks, keep fixture data outside the live receiver/workbench, and test
+that unavailable live proof and saved nonces remain rejected. Record aggregate
+outcomes, timing and non-secret key identifiers only. These steps have **not** run
+through the reader yet; no cloud RTO or custody success is claimed.
+
+After both timers are correctly enabled, observe a real timer-triggered backup and
+receipt advance. Keep the public endpoint gated until cloud recovery qualifies,
+and keep PR #26 draft until all owner custody/deployment/activation/IAM evidence is
+complete. The pending Spaceship record remains A / ebay-notify / 35.212.153.53 /
+TTL 300; no DNS/TLS or eBay portal success is inferred.

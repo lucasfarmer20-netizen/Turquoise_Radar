@@ -2,6 +2,8 @@
 Description=Hourly private receiver-ledger backup
 
 [Timer]
+# Refresh once after enabling/restarting the timer, then keep the hourly cadence.
+OnActiveSec=1min
 OnCalendar=hourly
 Persistent=true
 AccuracySec=1s
