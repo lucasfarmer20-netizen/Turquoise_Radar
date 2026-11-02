@@ -338,24 +338,43 @@ download start and include all transfer/quarantine verification time. Owner offl
 export/custody also remains pending: require two encrypted verified copies,
 matching identifiers and confirmed separate physical locations.
 
-### DNS and activation handoff
+### DNS, active TLS and remaining activation checks
 
-Prepare this exact Spaceship record in the `turquoiseradar.com` zone:
+The owner completed the Spaceship record in `turquoiseradar.com` and accepted
+TTL **1200 seconds** because 300 was unavailable in the registrar UI. Do not
+change DNS solely to reduce TTL:
 
 | Type | Host | Value | TTL |
 |---|---|---|---|
-| A | `ebay-notify` | `35.212.153.53` | `300` |
+| A | `ebay-notify` | `35.212.153.53` | `1200` |
 
-At 20:30–20:32Z, recursive A/AAAA queries and A queries to both authoritative
-Spaceship nameservers returned NXDOMAIN. Google Public DNS confirmed authenticated
-A NXDOMAIN; Google/Cloudflare DS responses agreed and had authenticated-data flags.
-The owner DNS handoff remains pending. The receiver is active on loopback with
-boot enablement pending; Caddy is inactive/disabled.
+At **11:49:07 AKST on 2026-11-02 (20:49:07Z)**, authoritative Spaceship and Google
+Public DNS readback confirmed that record; Google set the authenticated-data flag.
+The receiver's reserved Standard external address remains `35.212.153.53`.
+Effective public ingress remains TCP 80/443 only; IAP and the private runner /32
+retain their narrow SSH paths. No identity or ingress grant was broadened.
 
-After DNS resolves correctly, qualify public Caddy/TLS and the exact
-`https://ebay-notify.turquoiseradar.com/ebay/account-deletion` boundary. Complete the
-Developers portal handoff, real eBay GET challenge and eBay-signed test delivery;
-verify durable acceptance and a subsequent fresh backup, and record actual
-Production keyset status. Then reduce temporary-deployer privileges and prove
-receiver/runner operation afterward. Keep PR #26 draft until this evidence and
-owner offline custody are complete. No Browse sourcing pilot is authorized.
+Caddy and the loopback receiver are now active and enabled for boot. Caddy's
+production hostname configuration was validated; the systemd drop-in removes
+`--environ`, while Caddy request/error-access exclusions and Uvicorn's disabled
+access logging remain active. The receiver still listens only at
+`127.0.0.1:8091`, with Caddy admin at `127.0.0.1:2019`.
+
+Automatic ACME issuance succeeded. Host-side requests through public DNS/IP
+verified trusted TLS 1.3 and the Let's Encrypt `YE2` certificate for the exact
+hostname, unrelated-path 404s, HTTP-to-HTTPS 308, receiver rejection boundaries and
+a privately verified synthetic challenge. The live ledger remained empty, and
+the new journal contained no synthetic request marker or challenge response.
+Certificate dates/fingerprint and full checks are recorded in [JRI-014](JRI-014.md).
+
+**Independent external HTTPS qualification remains pending.** The workspace probe
+was stopped by a managed-proxy CONNECT 403 because the exact hostname is absent
+from the task's destination allowlist; this was not a response from the receiver.
+The owner configuration handoff is pending. Do not register the endpoint in the
+Developers portal until an independent external check passes.
+
+Then complete the real eBay GET challenge and eBay-signed test delivery; verify
+durable acceptance and a subsequent fresh backup, and record actual Production
+keyset status. Reduce temporary-deployer privileges afterward and prove continued
+receiver/runner operation. Keep PR #26 draft until this evidence and the separate
+owner offline-custody receipt are complete. No Browse sourcing pilot is authorized.
