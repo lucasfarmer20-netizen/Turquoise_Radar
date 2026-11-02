@@ -16,9 +16,24 @@ explicitly historical.
 
 Independent external HTTPS qualification is now complete, including the exact
 notification route's receiver-controlled missing-challenge HTTP 400. The owner
-portal handoff is ready; real eBay activation, its resulting ledger backup and the
-final custody/IAM/operational gates remain open. See the current evidence and gate
-table in [JRI-014](JRI-014.md).
+now reports Production configuration and a real eBay portal test on 2026-11-02.
+The live receiver accepted one event at **22:54:51Z**; independent inspection found
+1 distinct event / 0 processing receipts, valid integrity and matching installed
+signature-before-commit code. A new nonce-bound backup completed at
+**23:01:44.517Z**, advancing the **23:00:02.201Z** receipt and verifying one
+encrypted **41,508-byte** hourly upload with **1 event / 0 receipts**. Private
+comparison confirmed that the runner matched the unchanged live receiver across
+the cycle. The age check passed and both timers remained active and enabled.
+
+This is a real post-event backup, separate from the historical synthetic recovery
+drill. Stored receipts are not reusable current receiver proof; the fresh barrier
+ran inside this cycle. No new object download/decryption is claimed. Actual
+same-event retry and wire HTTP 204 receipt were not observed. The owner separately
+confirmed that the Production keyset is **enabled**; explicit portal validation
+details remain unavailable.
+Offline custody, temporary IAM reduction and post-reduction operation also remain
+open. The current non-secret receipt and observation window are in
+[JRI-014](JRI-014.md). Keep PR #26 draft; no Browse pilot is authorized.
 
 ## Package and runtime
 
@@ -344,7 +359,7 @@ download start and include all transfer/quarantine verification time. Owner offl
 export/custody also remains pending: require two encrypted verified copies,
 matching identifiers and confirmed separate physical locations.
 
-### DNS, active TLS and remaining activation checks
+### Historical DNS/TLS qualification before real delivery
 
 The owner completed the Spaceship record in `turquoiseradar.com` and accepted
 TTL **1200 seconds** because 300 was unavailable in the registrar UI. Do not
@@ -388,11 +403,13 @@ the Production Developers portal registration using the exact endpoint and
 installed verification token through approved private handling, and set the
 monitored notification email.
 
-Then complete the real eBay GET challenge and eBay-signed test delivery; verify
-durable acceptance and a subsequent fresh backup, and record actual Production
-keyset status. Confirm signature verification, durable acceptance exactly once and
-actual duplicate/retry behavior; local fixtures do not satisfy those real-delivery
-gates. After activation, complete the owner offline-custody receipt, reduce
+At that earlier stage, the next gate was the real eBay GET challenge and eBay-signed
+test delivery. The current real-delivery and fresh-backup receipt at the top of
+[JRI-014](JRI-014.md) supersedes the pending-delivery status here. Remaining evidence
+includes detailed portal validation/email results; the owner has now reported
+Production configuration complete and the keyset enabled. Actual same-event retry remains unqualified until a
+retry occurs; local fixtures do not establish a real retry. Complete the owner
+offline-custody receipt, reduce
 temporary-deployer privileges and prove continued receiver/runner operation.
 Keep PR #26 draft until all evidence is complete. No Browse sourcing pilot is
 authorized.
