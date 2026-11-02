@@ -1,0 +1,76 @@
+{
+  "status": "PREPARATION_ONLY_ACCESS_VERIFICATION_PENDING",
+  "provisioning_authorized": false,
+  "project_id": null,
+  "billing_account_verified": false,
+  "free_tier_remaining_verified": false,
+  "existing_resources_inspected": false,
+  "effective_permissions_verified": false,
+  "reuse_suitable_existing_receiver_first": true,
+  "new_resources_if_required": {
+    "instance": "tr-ebay-notify-01",
+    "region": "us-west1",
+    "zone": "us-west1-b",
+    "machine_type": "e2-micro",
+    "provisioning_model": "STANDARD",
+    "image_project": "ubuntu-os-cloud",
+    "image_family": "ubuntu-2404-lts-amd64",
+    "boot_disk": {
+      "name": "tr-ebay-notify-boot",
+      "type": "pd-standard",
+      "size_gib": 30,
+      "auto_delete": false,
+      "encryption": "Google-managed encryption at rest"
+    },
+    "external_ipv4": {
+      "name": "tr-ebay-notify-ip",
+      "region": "us-west1",
+      "network_tier": "STANDARD",
+      "address": null
+    },
+    "network": "tr-ebay-notify-vpc",
+    "subnet": "tr-ebay-notify-us-west1",
+    "proposed_subnet_cidr": "10.84.13.0/28",
+    "service_account": null,
+    "public_ingress_tcp": [80, 443],
+    "ssh_ingress": {"tcp": 22, "source_cidr": "35.235.240.0/20", "requires_iap_iam": true},
+    "workbench_or_owner_data_allowed": false
+  },
+  "dns": {
+    "registrar_and_dns_provider": "Spaceship",
+    "registered_domain": "turquoiseradar.com",
+    "proposed_host": "ebay-notify.turquoiseradar.com",
+    "type": "A",
+    "relative_name": "ebay-notify",
+    "ttl_seconds": 300,
+    "value": "PENDING_APPROVED_GCE_STATIC_IPV4_RESERVATION",
+    "current_zone_and_conflicts_verified": false
+  },
+  "endpoint": "https://ebay-notify.turquoiseradar.com/ebay/account-deletion",
+  "backup": {
+    "location": "Separate trusted private runner to private GCS Standard bucket in us-west1",
+    "proposed_bucket_name": "tr-ebay-ledger-PENDING_PROJECT_NUMBER",
+    "client_side_encryption": true,
+    "hmac_key_recovery_separate": true,
+    "hourly_current_ledger_pull": true,
+    "rpo_target_hours": 1,
+    "rto_planning_target_hours": 4,
+    "targets_measured": false,
+    "storage_budget_gib_month": 5
+  },
+  "monthly_usd_planning_estimate": {
+    "scope": "receiver_and_cloud_backup_subtotal",
+    "all_in_total_verified": false,
+    "hours": 730,
+    "full_unused_eligible_allowances": "3.65",
+    "no_available_allowances": "11.07",
+    "oregon_paid_quote_verified": false,
+    "excluded": [
+      "tax",
+      "existing_domain_renewal",
+      "private_runner_and_monitoring",
+      "additional_storage_and_operations",
+      "chargeable_transfer"
+    ]
+  }
+}
