@@ -431,3 +431,7 @@ prepared for deployment review. The workbench stays private; no endpoint is live
 and no keyset activation or discovery retry is claimed. Read the [deployment,
 data coverage and exact owner activation sequence](docs/JRI-012.md), including
 identity/copy-review holds, before any activation.
+
+JRI-014 private runner backup tooling and its current qualification limits are
+documented in [the backup runbook](docs/JRI-014-BACKUP.md); actual provisioning
+and activation evidence remain in [JRI-014](docs/JRI-014.md).

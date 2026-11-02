@@ -1,0 +1,11 @@
+[Unit]
+Description=Check receiver-ledger backup age every five minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=1s
+Unit=tr-ledger-backup-age.service
+
+[Install]
+WantedBy=timers.target

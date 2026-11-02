@@ -1,0 +1,22 @@
+[Unit]
+Description=Fail if last verified cloud backup is older than 90 minutes
+
+[Service]
+Type=oneshot
+User=tr-ledger-backup
+Group=tr-ledger-backup
+WorkingDirectory=/opt/tr-ledger-backup
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -I /opt/tr-ledger-backup/deploy/ebay-deletion/cloud-backup.py check-age --config /etc/tr-ledger-backup/config.json
+UMask=0077
+LimitCORE=0
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+PrivateNetwork=true
