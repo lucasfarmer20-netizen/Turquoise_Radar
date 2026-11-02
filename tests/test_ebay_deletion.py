@@ -6,6 +6,7 @@ import hashlib
 import json
 import sqlite3
 import subprocess
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -642,3 +643,226 @@ def test_historical_source_change_does_not_hide_ebay_snapshot(synthetic_db):
         ).fetchone()
         assert "SYNTHETIC-SELLER" not in before
         assert after == current
+
+
+class LookupClock:
+    """Receiver clocks move deterministically; the event-loop clock stays real."""
+
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+@pytest.fixture
+def key_lookup(monkeypatch, signed):
+    real_client = httpx.AsyncClient
+
+    def setup(failure=None):
+        clock, upstream, token_calls = LookupClock(), [], []
+
+        async def response(request):
+            # Yield deterministically while the lookup lock is held to exercise contention.
+            await asyncio.sleep(0)
+            upstream.append(request.url.path)
+            if request.url.path.endswith("/token"):
+                if failure == "oauth":
+                    return httpx.Response(503)
+                return httpx.Response(
+                    200, json={"access_token": "SYNTHETIC-TOKEN", "expires_in": 7200}
+                )
+            assert request.url.path.startswith("/commerce/notification/v1/public_key/")
+            if failure == "key":
+                return httpx.Response(503)
+            if failure == "malformed":
+                return httpx.Response(200, content=b"SYNTHETIC-invalid-key-json")
+            return httpx.Response(200, json=signed[3])
+
+        monkeypatch.setattr(
+            httpx,
+            "AsyncClient",
+            lambda **kw: real_client(transport=httpx.MockTransport(response), **kw),
+        )
+        application_token = ApplicationToken("SYNTHETIC-ID", "SYNTHETIC-SECRET")
+
+        async def token():
+            token_calls.append(True)
+            return await application_token()
+
+        keys = PublicKeys(token)
+        monkeypatch.setattr("radar.ebay_deletion.receiver.time", SimpleNamespace(monotonic=clock))
+        return keys, clock, upstream, token_calls
+
+    return setup
+
+
+def test_cached_key_reuse_does_not_spend_uncached_budget(key_lookup):
+    async def check():
+        keys, _, upstream, tokens = key_lookup()
+        first = await keys("SYNTHETIC-cached")
+        for _ in range(40):
+            assert await keys("SYNTHETIC-cached") == first
+        # The cached key used one slot, leaving all seven other slots available.
+        for i in range(7):
+            await keys(f"SYNTHETIC-new-{i}")
+        assert len(tokens) == 8
+        assert len(upstream) == 9  # One cached OAuth token, eight public-key requests.
+        assert len(keys.cache) == 8
+
+    asyncio.run(check())
+
+
+def test_ninth_uncached_key_is_rejected_before_token_or_key_lookup(key_lookup):
+    from radar.ebay_deletion.protocol import VerificationUnavailable
+
+    async def check():
+        keys, _, upstream, tokens = key_lookup()
+        for i in range(8):
+            await keys(f"SYNTHETIC-new-{i}")
+        assert len(tokens) == 8
+        assert len(upstream) == 9
+        for i in range(8, 48):
+            with pytest.raises(VerificationUnavailable):
+                await keys(f"SYNTHETIC-excess-{i}")
+        assert len(tokens) == 8
+        assert len(upstream) == 9
+
+    asyncio.run(check())
+
+
+def test_lookup_budget_recovers_on_rolling_interval_without_boundary_burst(key_lookup):
+    from radar.ebay_deletion.protocol import VerificationUnavailable
+
+    async def check():
+        keys, clock, upstream, tokens = key_lookup()
+        await keys("SYNTHETIC-first")
+        clock.now += 30
+        for i in range(7):
+            await keys(f"SYNTHETIC-later-{i}")
+        clock.now += 29.999
+        with pytest.raises(VerificationUnavailable):
+            await keys("SYNTHETIC-too-soon")
+        clock.now = 1060.0  # Exactly the first attempt's 60-second expiry.
+        await keys("SYNTHETIC-recovered")
+        # Only one slot recovered, not an entire fixed-window bucket.
+        with pytest.raises(VerificationUnavailable):
+            await keys("SYNTHETIC-no-boundary-burst")
+        clock.now = 1090.0
+        for i in range(7):
+            await keys(f"SYNTHETIC-recovered-{i}")
+        with pytest.raises(VerificationUnavailable):
+            await keys("SYNTHETIC-still-bounded")
+        assert len(tokens) == 16
+        assert len(upstream) == 17  # OAuth token reuse unchanged across intervals.
+
+    asyncio.run(check())
+
+
+def test_concurrent_unique_key_attempts_cannot_exceed_budget(key_lookup):
+    from radar.ebay_deletion.protocol import VerificationUnavailable
+
+    async def check():
+        keys, _, upstream, tokens = key_lookup()
+        start = asyncio.Event()
+
+        async def lookup(i):
+            await start.wait()
+            return await keys(f"SYNTHETIC-concurrent-{i}")
+
+        tasks = [asyncio.create_task(lookup(i)) for i in range(40)]
+        start.set()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        assert sum(isinstance(result, dict) for result in results) == 8
+        assert sum(isinstance(result, VerificationUnavailable) for result in results) == 32
+        assert len(tokens) == 8
+        assert len(upstream) == 9
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("failure", ["oauth", "key", "malformed"])
+def test_failed_retrievals_consume_budget_including_repeated_uncached_id(key_lookup, failure):
+    from radar.ebay_deletion.protocol import VerificationUnavailable
+
+    async def check():
+        keys, clock, upstream, tokens = key_lookup(failure)
+        for _ in range(40):
+            with pytest.raises(VerificationUnavailable):
+                await keys("SYNTHETIC-uncached-failure")
+        assert len(tokens) == 8
+        assert len(upstream) == (8 if failure == "oauth" else 9)
+        assert keys.cache == {}
+        clock.now += 60
+        with pytest.raises(VerificationUnavailable):
+            await keys("SYNTHETIC-retry-after-interval")
+        assert len(tokens) == 9
+        assert len(upstream) == (9 if failure == "oauth" else 10)
+
+    asyncio.run(check())
+
+
+def test_exhausted_budget_preserves_challenge_cached_signatures_and_acceptance(
+    tmp_path, signed, key_lookup, caplog
+):
+    keys, _, upstream, tokens = key_lookup()
+    queue = Queue(tmp_path / "synthetic-limited-queue.db")
+    app = create_receiver(endpoint=ENDPOINT, token=TOKEN, secret=SECRET, queue=queue, keys=keys)
+
+    def header(kid):
+        return base64.b64encode(json.dumps({"kid": kid, "signature": signed[1]}).encode()).decode()
+
+    with TestClient(app) as client:
+        assert post(client, signed).status_code == 204  # Cache the real signing key.
+        for i in range(7):
+            assert post(client, signed, header=header(f"SYNTHETIC-new-{i}")).status_code == 204
+        baseline = list(queue.events())
+        for i in range(12):
+            response = post(client, signed, header=header(f"SYNTHETIC-excess-{i}"))
+            assert response.status_code == 503
+            assert response.json() == {"error": "Temporarily unavailable"}
+        for _ in range(12):
+            assert post(client, signed).status_code == 204  # Signed duplicate via cached key.
+        assert queue.events() == baseline
+        assert len(baseline) == 1
+        challenge_response = client.get("/ebay/account-deletion?challenge_code=SYNTHETIC-code")
+        assert challenge_response.status_code == 200
+        assert challenge_response.json() == {
+            "challengeResponse": challenge("SYNTHETIC-code", TOKEN, ENDPOINT)
+        }
+        assert post(client, signed, header="bad-base64").status_code == 412
+        assert post(client, signed, body=b'{"metadata":1}').status_code == 412
+        # Structurally valid, tampered content with a cached key keeps the 412 path.
+        assert (
+            post(
+                client, signed, body=signed[0].replace(b"SYNTHETIC-ACCOUNT", b"ATTACKER-ACCOUNT")
+            ).status_code
+            == 412
+        )
+        assert queue.events() == baseline
+    assert len(tokens) == 8
+    assert len(upstream) == 9
+    assert "SYNTHETIC" not in caplog.text
+
+
+def test_key_cache_expiry_and_32_entry_bound_remain_unchanged(key_lookup):
+    async def check():
+        keys, clock, upstream, _ = key_lookup()
+        first = await keys("SYNTHETIC-first")
+        for i in range(31):
+            clock.now += 60
+            await keys(f"SYNTHETIC-cached-{i}")
+        assert len(keys.cache) == 32
+        assert await keys("SYNTHETIC-first") == first
+        assert len(upstream) == 33
+        clock.now += 60
+        await keys("SYNTHETIC-thirty-third")
+        assert len(keys.cache) == 1  # Preserve existing clear-on-full cache behavior.
+        clock.now += 3599
+        await keys("SYNTHETIC-thirty-third")
+        assert len(upstream) == 34
+        clock.now += 1
+        await keys("SYNTHETIC-thirty-third")  # Expiry at exactly one hour.
+        assert len(upstream) == 35
+
+    asyncio.run(check())

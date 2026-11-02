@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import time
+from collections import deque
 from urllib.parse import urlsplit
 
 import httpx
@@ -23,20 +24,32 @@ from radar.ebay_deletion.protocol import (
 )
 from radar.ebay_deletion.store import Conflict, Queue
 
+NEW_KEY_LOOKUP_LIMIT = 8
+NEW_KEY_LOOKUP_INTERVAL = 60
+
 
 class PublicKeys:
-    """Fixed official endpoint, one-hour bounded cache; token supplied by operator."""
+    """One-hour/32-key cache; bound uncached attempts before any OAuth/key traffic."""
 
     def __init__(self, token_provider):
         self.token_provider = token_provider
         self.cache = {}
         self.lock = asyncio.Lock()
+        self.lookup_attempts = deque()
 
     async def __call__(self, kid):
         async with self.lock:
             now = time.monotonic()
             if kid in self.cache and self.cache[kid][0] > now:
                 return self.cache[kid][1]
+            # Rolling, process-local budget shared across all key IDs. The same lock
+            # makes reservation atomic with cache lookup, before any upstream work.
+            while self.lookup_attempts and self.lookup_attempts[0] <= now - NEW_KEY_LOOKUP_INTERVAL:
+                self.lookup_attempts.popleft()
+            if len(self.lookup_attempts) >= NEW_KEY_LOOKUP_LIMIT:
+                raise VerificationUnavailable("Notification key lookup budget exhausted")
+            # Failed/cancelled attempts retain their slot; no per-ID state or logging.
+            self.lookup_attempts.append(now)
             token = self.token_provider()
             if inspect.isawaitable(token):
                 token = await token
