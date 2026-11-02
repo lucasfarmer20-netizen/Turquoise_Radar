@@ -1,0 +1,5 @@
+# Root-owned mode 0440. No wildcard, extra arguments, root target, or environment override.
+Defaults:ebay-ledger-pull env_reset,!setenv
+Defaults:ebay-ledger-pull secure_path=/usr/sbin:/usr/bin:/sbin:/bin
+Defaults:ebay-ledger-pull !requiretty
+ebay-ledger-pull ALL=(ebay-receiver) NOPASSWD: /opt/ebay-receiver/.venv/bin/python -I /opt/ebay-receiver/deploy/ebay-deletion/snapshot-queue.py

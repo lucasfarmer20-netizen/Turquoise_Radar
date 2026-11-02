@@ -1,0 +1,2 @@
+provider,zone,type,name,value,ttl_seconds,status
+Spaceship,turquoiseradar.com,A,ebay-notify,PENDING_APPROVED_GCE_STATIC_IPV4_RESERVATION,300,PROPOSAL_ONLY_DO_NOT_APPLY
