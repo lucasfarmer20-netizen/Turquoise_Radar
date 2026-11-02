@@ -14,6 +14,12 @@ protected quarantine. One elapsed hourly RPO, full download-through-quarantine R
 and durable owner offline custody remain unqualified. Earlier blocked handoffs are
 explicitly historical.
 
+Independent external HTTPS qualification is now complete, including the exact
+notification route's receiver-controlled missing-challenge HTTP 400. The owner
+portal handoff is ready; real eBay activation, its resulting ledger backup and the
+final custody/IAM/operational gates remain open. See the current evidence and gate
+table in [JRI-014](JRI-014.md).
+
 ## Package and runtime
 
 `deploy/ebay-deletion/package-backup.sh NEW_ARCHIVE REVIEWED_COMMIT` builds an
@@ -367,14 +373,26 @@ a privately verified synthetic challenge. The live ledger remained empty, and
 the new journal contained no synthetic request marker or challenge response.
 Certificate dates/fingerprint and full checks are recorded in [JRI-014](JRI-014.md).
 
-**Independent external HTTPS qualification remains pending.** The workspace probe
-was stopped by a managed-proxy CONNECT 403 because the exact hostname is absent
-from the task's destination allowlist; this was not a response from the receiver.
-The owner configuration handoff is pending. Do not register the endpoint in the
-Developers portal until an independent external check passes.
+**Independent external HTTPS qualification is complete.** On 2026-11-02 at
+13:34:24 AKST (22:34:24Z), a fresh managed environment with enforced outbound
+policy reached the exact notification route without challenge parameters: proxy
+CONNECT **200**, receiver HTTP **400**, successful TLS verification, curl exit
+**0**, unchanged effective URL and no redirects. At 13:35:12 AKST (22:35:12Z),
+the same check also matched the receiver's missing-challenge JSON response.
+GitHub and the receiver root had already returned HTTPS 200 and 404 respectively
+through successful CONNECTs. The hostname was already configured and present in
+the effective allowed hosts. The earlier CONNECT 403 was a managed-egress failure;
+the earlier attribution to a missing owner allowlist entry is corrected. No
+infrastructure or network-policy workaround is required. The owner may now perform
+the Production Developers portal registration using the exact endpoint and
+installed verification token through approved private handling, and set the
+monitored notification email.
 
 Then complete the real eBay GET challenge and eBay-signed test delivery; verify
 durable acceptance and a subsequent fresh backup, and record actual Production
-keyset status. Reduce temporary-deployer privileges afterward and prove continued
-receiver/runner operation. Keep PR #26 draft until this evidence and the separate
-owner offline-custody receipt are complete. No Browse sourcing pilot is authorized.
+keyset status. Confirm signature verification, durable acceptance exactly once and
+actual duplicate/retry behavior; local fixtures do not satisfy those real-delivery
+gates. After activation, complete the owner offline-custody receipt, reduce
+temporary-deployer privileges and prove continued receiver/runner operation.
+Keep PR #26 draft until all evidence is complete. No Browse sourcing pilot is
+authorized.
