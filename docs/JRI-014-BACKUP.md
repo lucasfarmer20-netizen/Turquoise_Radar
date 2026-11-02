@@ -223,6 +223,14 @@ qualification. The public receiver must still have no service account.
 
 ## Approved owner-operated offline export
 
+For the owner's Windows computer, follow the exact
+[WSL2 Ubuntu closeout guide](JRI-014-CLOSEOUT.md). Its owner bundle includes the
+unchanged export helper and an optional timed restore-reader/quarantine helper.
+Synthetic Linux validation does not complete production custody. Do not retrieve
+production recovery keys into Codex or Cloud Shell; wait for the owner's verified
+two-copy/fingerprint/physical-placement/passphrase-recovery receipt before IAM
+reduction. A new production timed recovery receipt is still pending.
+
 The owner selected secure offline IAP export: two owner-controlled encrypted copies
 in separate physical locations, with HMAC and decryption-key records logically
 separate inside the bundle. The only recoverable copy must not depend on the
