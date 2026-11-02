@@ -84,6 +84,9 @@ class Queue:
     def accept(self, event_id, identifiers):
         encoded = json.dumps(identifiers, sort_keys=True)
         with self.connect() as db:
+            # Reserve the writer before checking identity so concurrent deliveries cannot
+            # both observe absence and acknowledge conflicting payloads.
+            db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT identifiers FROM events WHERE id=?", (event_id,)).fetchone()
             if row and row[0] != encoded:
                 raise Conflict("Conflicting delivery")

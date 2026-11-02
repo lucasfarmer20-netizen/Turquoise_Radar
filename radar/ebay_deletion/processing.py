@@ -197,6 +197,68 @@ def redact_snapshots(value, identifiers, secret, aliases, context=None):
     )
 
 
+def review_comparable_copies(db, affected_listings, identifiers, secret, aliases):
+    """Preflight real importer relations and persisted Use comparables/scenario copies.
+
+    ComparableInput has no source or seller identity. Its purchase link identifies
+    potentially dependent evidence, not which prose belongs to that seller. Keep
+    amounts and independent research intact until that provenance is reviewed.
+    """
+    matching, recorded = set(), set()
+    for row in db.execute("SELECT id,data,listing_id FROM comparable_sales"):
+        recorded.add(row["id"])
+        value = json.loads(row["data"])
+        links = (row["listing_id"], value.get("listing_id"))
+        if not value.get("source") and any(
+            type(link) is int and link in affected_listings for link in links
+        ):
+            raise ReviewHold("REVIEW_COMPARABLE_PROVENANCE")
+        # Older inventories may have explicit provenance. Do not discard independent
+        # records simply because they share a purchase link with affected evidence.
+        if is_ebay(value):
+            state = identity_state([value], identifiers, secret, aliases)
+            if state in ("AMBIGUOUS", "UNMAPPED"):
+                raise ReviewHold("REVIEW_IDENTITY")
+            if state == "MATCH":
+                matching.add(row["id"])
+
+    # These are the application's persisted listing/research copy locations. Scan
+    # original snapshots too, before any planned redaction hides their relationships.
+    for table, columns in (
+        ("listings", ("data", "original_data")),
+        ("listing_edits", ("before_data", "after_data")),
+        ("maker_cases", ("data",)),
+        ("maker_runs", ("data",)),
+        ("maker_decisions", ("data",)),
+        ("maker_scenarios", ("data",)),
+        ("vision_runs", ("data",)),
+    ):
+        for row in db.execute("SELECT " + ",".join(columns) + " FROM " + table):
+            for encoded in row:
+                for part in dictionaries(json.loads(encoded)):
+                    link = part.get("listing_id")
+                    # Scenario comparable_snapshots survive removal of their source row.
+                    if (
+                        "sale_price" in part
+                        and "evidence" in part
+                        and not part.get("source")
+                        and type(link) is int
+                        and link in affected_listings
+                    ):
+                        raise ReviewHold("REVIEW_COMPARABLE_PROVENANCE")
+                    for field in ("resale_comparable_ids", "comparable_ids"):
+                        references = part.get(field, [])
+                        if isinstance(references, list) and any(
+                            type(ref) is int
+                            and (ref in matching or (affected_listings and ref not in recorded))
+                            for ref in references
+                        ):
+                            # Copied resale_basis is untyped prose. Removing the originating
+                            # row cannot resolve it; a dangling reference cannot prove safety.
+                            raise ReviewHold("REVIEW_COMPARABLE_PROVENANCE")
+    return matching
+
+
 def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=None):
     """Stop app first. Uses only existing DBs; no schema migration or demo seeding."""
     aliases = aliases or {}
@@ -219,7 +281,7 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
         listings = list(db.execute("SELECT * FROM listings"))
         discovered = list(db.execute("SELECT * FROM discovered_items"))
         edits = list(db.execute("SELECT * FROM listing_edits"))
-        matched_listings, matched_items = set(), set()
+        matched_listings, matched_items, affected_listings = set(), set(), set()
         contexts, original_updates, snapshot_updates, research_updates = {}, set(), [], []
         snapshot_cases, matching_comparables = set(), set()
         ambiguous = False
@@ -239,6 +301,8 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
             aggregate = identity_state(evidence, identifiers, secret, aliases)
             if aggregate in ("AMBIGUOUS", "UNMAPPED"):
                 raise ReviewHold("REVIEW_IDENTITY")
+            if aggregate == "MATCH":
+                affected_listings.add(row["id"])
             # Original payload has its own provenance, even after a current source-label edit.
             original_state = identity_state([raw], identifiers, secret, aliases)
             if known_raw and original_state == "MATCH":
@@ -324,14 +388,9 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
         matched_cases = {
             case for case, row in cases.items() if row["listing_id"] in matched_listings
         }
-        for row in db.execute("SELECT id,data FROM comparable_sales"):
-            value = loads(row["data"])
-            if is_ebay(value):
-                state = identity_state([value], identifiers, secret, aliases)
-                if state in ("AMBIGUOUS", "UNMAPPED"):
-                    raise ReviewHold("REVIEW_IDENTITY")
-                if state == "MATCH":
-                    matching_comparables.add(row["id"])
+        matching_comparables = review_comparable_copies(
+            db, affected_listings, identifiers, secret, aliases
+        )
         for item in matched_items:
             if db.execute("SELECT 1 FROM alert_observations WHERE item_id=?", (item,)).fetchone():
                 raise ReviewHold("REVIEW_ALERT_COPIES")
