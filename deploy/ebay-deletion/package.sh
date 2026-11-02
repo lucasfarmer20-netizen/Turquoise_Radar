@@ -26,7 +26,15 @@ set -- \
     deploy/ebay-deletion/receiver.env.example \
     deploy/ebay-deletion/receiver.service \
     deploy/ebay-deletion/snapshot-queue.py \
-    docs/JRI-012.md
+    deploy/ebay-deletion/install-receiver.py \
+    deploy/ebay-deletion/backup-ledger.py \
+    deploy/ebay-deletion/sshd-ledger.conf \
+    deploy/ebay-deletion/sudoers-ledger \
+    deploy/ebay-deletion/ssh-client.conf.example \
+    deploy/ebay-deletion/gce-proposal.json \
+    deploy/ebay-deletion/dns-proposal.csv \
+    docs/JRI-012.md \
+    docs/JRI-013.md
 # Refuse missing paths or symlinks; no directory inclusion or working-tree reads.
 for path do
     mode=$(git -C "$repo_root" ls-tree "$commit" -- "$path" | cut -d ' ' -f 1)

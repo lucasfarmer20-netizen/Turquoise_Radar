@@ -80,6 +80,7 @@ def package_repo(tmp_path):
         "uv.lock",
         "deploy/ebay-deletion",
         "docs/JRI-012.md",
+        "docs/JRI-013.md",
     ).splitlines()
     for name in files:
         target = repo / name
@@ -124,6 +125,14 @@ def test_archive_uses_reviewed_commit_allowlist_and_excludes_private_files(tmp_p
         assert "radar/ebay_deletion/verify.cjs" in names
         assert archive.extractfile("radar/ebay_deletion/verify.cjs").read() == reviewed_helper
         assert "deploy/ebay-deletion/receiver.env.example" in names
+        assert {
+            "deploy/ebay-deletion/install-receiver.py",
+            "deploy/ebay-deletion/backup-ledger.py",
+            "deploy/ebay-deletion/sshd-ledger.conf",
+            "deploy/ebay-deletion/sudoers-ledger",
+            "deploy/ebay-deletion/ssh-client.conf.example",
+            "docs/JRI-013.md",
+        } <= set(names)
         assert "radar/main.py" not in names
         assert "radar/db.py" not in names
         assert "deploy/ebay-deletion/unreviewed-private.json" not in names
