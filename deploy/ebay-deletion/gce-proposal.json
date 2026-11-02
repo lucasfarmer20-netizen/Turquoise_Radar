@@ -1,0 +1,1158 @@
+{
+  "status": "PREPARATION_ONLY_AUTHENTICATED_READ_ONLY_CHECKS_COMPLETE",
+  "provisioning_authorized": false,
+  "project_id": "turquoiseradar",
+  "billing_account_verified": false,
+  "free_tier_remaining_verified": false,
+  "existing_resources_inspected": true,
+  "effective_permissions_verified": true,
+  "reuse_suitable_existing_receiver_first": true,
+  "new_resources_if_required": {
+    "instance": "tr-ebay-notify-01",
+    "region": "us-west1",
+    "zone": "us-west1-b",
+    "machine_type": "e2-micro",
+    "provisioning_model": "STANDARD",
+    "image_project": "ubuntu-os-cloud",
+    "image_family": "ubuntu-2404-lts-amd64",
+    "boot_disk": {
+      "name": "tr-ebay-notify-boot",
+      "type": "pd-standard",
+      "size_gib": 30,
+      "auto_delete": false,
+      "encryption": "Google-managed encryption at rest"
+    },
+    "external_ipv4": {
+      "name": "tr-ebay-notify-ip",
+      "region": "us-west1",
+      "network_tier": "STANDARD",
+      "address": null,
+      "instance_access_config_network_tier": "STANDARD",
+      "address_type": "EXTERNAL",
+      "ip_version": "IPV4"
+    },
+    "network": "tr-ebay-notify-vpc",
+    "subnet": "tr-ebay-notify-us-west1",
+    "proposed_subnet_cidr": "10.84.13.0/28",
+    "service_account": null,
+    "public_ingress_tcp": [
+      80,
+      443
+    ],
+    "ssh_ingress": {
+      "tcp": 22,
+      "source_cidr": "35.235.240.0/20",
+      "requires_iap_iam": true
+    },
+    "workbench_or_owner_data_allowed": false,
+    "network_configuration": {
+      "name": "tr-ebay-notify-vpc",
+      "auto_create_subnetworks": false,
+      "routing_mode": "REGIONAL"
+    },
+    "subnet_configuration": {
+      "name": "tr-ebay-notify-us-west1",
+      "region": "us-west1",
+      "network": "tr-ebay-notify-vpc",
+      "ip_cidr_range": "10.84.13.0/28",
+      "stack_type": "IPV4_ONLY"
+    },
+    "vm_network_interface": {
+      "subnetwork": "tr-ebay-notify-us-west1",
+      "region": "us-west1",
+      "access_configs": [
+        {
+          "name": "External NAT",
+          "type": "ONE_TO_ONE_NAT",
+          "network_tier": "STANDARD",
+          "nat_ip_source": "Approved regional tr-ebay-notify-ip reserved numeric IPv4; not an automatically allocated ephemeral IP"
+        }
+      ]
+    },
+    "instance_network_tags": [
+      "tr-ebay-notify"
+    ],
+    "firewall_rules": [
+      {
+        "name": "tr-ebay-notify-web",
+        "network": "tr-ebay-notify-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "source_ranges": [
+          "0.0.0.0/0"
+        ],
+        "target_tags": [
+          "tr-ebay-notify"
+        ],
+        "allowed": [
+          {
+            "ip_protocol": "tcp",
+            "ports": [
+              "80",
+              "443"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "tr-ebay-notify-iap-ssh",
+        "network": "tr-ebay-notify-vpc",
+        "direction": "INGRESS",
+        "priority": 1000,
+        "source_ranges": [
+          "35.235.240.0/20"
+        ],
+        "target_tags": [
+          "tr-ebay-notify"
+        ],
+        "allowed": [
+          {
+            "ip_protocol": "tcp",
+            "ports": [
+              "22"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "dns": {
+    "registrar_and_dns_provider": "Spaceship",
+    "registered_domain": "turquoiseradar.com",
+    "proposed_host": "ebay-notify.turquoiseradar.com",
+    "type": "A",
+    "relative_name": "ebay-notify",
+    "ttl_seconds": 300,
+    "value": "PENDING_APPROVED_GCE_STATIC_IPV4_RESERVATION",
+    "current_zone_and_conflicts_verified": false
+  },
+  "endpoint": "https://ebay-notify.turquoiseradar.com/ebay/account-deletion",
+  "backup": {
+    "location": "Separate trusted private runner to private GCS Standard bucket in us-west1",
+    "proposed_bucket_name": "tr-ebay-ledger-100948930799",
+    "client_side_encryption": true,
+    "hmac_key_recovery_separate": true,
+    "hourly_current_ledger_pull": true,
+    "rpo_target_hours": 1,
+    "rto_planning_target_hours": 4,
+    "targets_measured": false,
+    "storage_budget_gib_month": 5
+  },
+  "monthly_usd_planning_estimate": {
+    "scope": "receiver_and_cloud_backup_subtotal",
+    "all_in_total_verified": false,
+    "hours": 730,
+    "full_unused_eligible_allowances": "3.65",
+    "no_available_allowances": "11.07",
+    "oregon_paid_quote_verified": false,
+    "excluded": [
+      "tax",
+      "existing_domain_renewal",
+      "private_runner_and_monitoring",
+      "additional_storage_and_operations",
+      "chargeable_transfer"
+    ]
+  },
+  "project_number": "100948930799",
+  "project_identity_verified": true,
+  "project_lifecycle_state": "ACTIVE",
+  "read_only_observation": {
+    "observed_at_utc": "2026-11-02T04:58:12.963325+00:00",
+    "configured_identity": "codex-radar-reader@turquoiseradar.iam.gserviceaccount.com",
+    "authentication": {
+      "status": "authenticated",
+      "service_account_email": "codex-radar-reader@turquoiseradar.iam.gserviceaccount.com",
+      "method": "Attached GCP external-account SDK refresh with service-account impersonation"
+    },
+    "runtime_identity_readiness": "ready",
+    "project_selection_source": "Authoritative Resource Manager projects.get confirms project ID turquoiseradar, number 100948930799 and ACTIVE lifecycle",
+    "queries": {
+      "project": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "projectNumber": "100948930799",
+          "projectId": "turquoiseradar",
+          "lifecycleState": "ACTIVE",
+          "name": "TurquoiseRadar",
+          "createTime": "2026-11-02T00:45:20.044Z"
+        }
+      },
+      "testIamPermissions": {
+        "status": "observed",
+        "http_status": 200,
+        "method": "Resource Manager projects.testIamPermissions; individually tested each requested permission after initial combined request rejected invalid billing-account-scoped permission",
+        "initial_combined_result": {
+          "status": "unknown",
+          "http_status": 400,
+          "error_status": "INVALID_ARGUMENT",
+          "message": "Permission billing.resourceAssociations.list is not valid for this resource."
+        },
+        "permission_results": {
+          "resourcemanager.projects.get": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.instances.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.disks.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.addresses.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.globalAddresses.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.networks.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.subnetworks.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.firewalls.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "serviceusage.services.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.projects.get": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.regions.get": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "storage.buckets.list": {
+            "status": "granted",
+            "http_status": 200
+          },
+          "compute.snapshots.list": {
+            "status": "granted",
+            "http_status": 200
+          }
+        },
+        "inapplicable_permission": {
+          "permission": "billing.resourceAssociations.list",
+          "result": {
+            "status": "unknown",
+            "http_status": 400,
+            "error_status": "INVALID_ARGUMENT",
+            "message": "Permission billing.resourceAssociations.list is not valid for this resource."
+          },
+          "reason": "Billing-account-scoped permission is invalid for project resource. Account identity is unavailable and billing access is not required for this proposal."
+        },
+        "tests_observed_at_utc": "2026-11-02T04:58:39.271133+00:00"
+      },
+      "billing_link": {
+        "status": "unknown",
+        "http_status": 403,
+        "error_status": "PERMISSION_DENIED",
+        "message": "Cloud Billing API has not been used in project 100948930799 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudbilling.googleapis.com/overview?project=100948930799 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+        "observed_at_utc": "2026-11-02T04:38:29.698387+00:00",
+        "rechecked_this_continuation": false
+      },
+      "enabled_services": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "services": [
+          "analyticshub.googleapis.com",
+          "apptopology.googleapis.com",
+          "backupdr.googleapis.com",
+          "bigquery.googleapis.com",
+          "bigqueryconnection.googleapis.com",
+          "bigquerydatapolicy.googleapis.com",
+          "bigquerydatatransfer.googleapis.com",
+          "bigquerymigration.googleapis.com",
+          "bigqueryreservation.googleapis.com",
+          "bigquerystorage.googleapis.com",
+          "cloudapis.googleapis.com",
+          "cloudresourcemanager.googleapis.com",
+          "cloudtrace.googleapis.com",
+          "compute.googleapis.com",
+          "dataform.googleapis.com",
+          "dataplex.googleapis.com",
+          "datastore.googleapis.com",
+          "iam.googleapis.com",
+          "iamcredentials.googleapis.com",
+          "iap.googleapis.com",
+          "logging.googleapis.com",
+          "monitoring.googleapis.com",
+          "oslogin.googleapis.com",
+          "servicemanagement.googleapis.com",
+          "servicenetworking.googleapis.com",
+          "serviceusage.googleapis.com",
+          "sql-component.googleapis.com",
+          "storage-api.googleapis.com",
+          "storage-component.googleapis.com",
+          "storage.googleapis.com",
+          "sts.googleapis.com",
+          "telemetry.googleapis.com"
+        ],
+        "count": 32,
+        "relevant_not_in_enabled_list": [
+          "cloudbilling.googleapis.com"
+        ]
+      },
+      "instances": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "unreachable_scopes": [],
+        "scope_warning_codes": [
+          "NO_RESULTS_ON_PAGE"
+        ],
+        "no_results_scope_count": 132,
+        "resources": []
+      },
+      "disks": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "unreachable_scopes": [],
+        "scope_warning_codes": [
+          "NO_RESULTS_ON_PAGE"
+        ],
+        "no_results_scope_count": 175,
+        "resources": []
+      },
+      "addresses": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "unreachable_scopes": [],
+        "scope_warning_codes": [
+          "NO_RESULTS_ON_PAGE"
+        ],
+        "no_results_scope_count": 44,
+        "resources": []
+      },
+      "global_addresses": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "resources": []
+      },
+      "networks": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 1,
+        "resources": [
+          {
+            "name": "default",
+            "autoCreateSubnetworks": true,
+            "routingConfig": {
+              "routingMode": "REGIONAL",
+              "bgpBestPathSelectionMode": "LEGACY"
+            }
+          }
+        ]
+      },
+      "subnetworks": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 42,
+        "unreachable_scopes": [],
+        "scope_warning_codes": [
+          "NO_RESULTS_ON_PAGE"
+        ],
+        "no_results_scope_count": 1,
+        "resources": [
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-central1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.128.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.132.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-west1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.138.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-east1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.140.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-east1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.142.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-northeast1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.146.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-southeast1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.148.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-east4",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.150.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/australia-southeast1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.152.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.154.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west3",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.156.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/southamerica-east1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.158.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-south1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.160.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/northamerica-northeast1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.162.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west4",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.164.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-north1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.166.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-west2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.168.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-east2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.170.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west6",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.172.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-northeast2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.174.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-northeast3",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.178.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-west3",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.180.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-west4",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.182.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-southeast2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.184.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-central2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.186.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/northamerica-northeast2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.188.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-south2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.190.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/australia-southeast2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.192.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/southamerica-west1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.194.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west8",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.198.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west9",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.200.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-east5",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.202.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-southwest1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.204.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-south1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.206.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/me-west1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.208.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west12",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.210.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/me-central1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.212.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-west10",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.214.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/africa-south1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.218.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/northamerica-south1",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.224.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/europe-north2",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.226.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          },
+          {
+            "name": "default",
+            "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/asia-southeast3",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "ipCidrRange": "10.232.0.0/20",
+            "privateIpGoogleAccess": false,
+            "stackType": "IPV4_ONLY"
+          }
+        ]
+      },
+      "firewalls": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 4,
+        "resources": [
+          {
+            "name": "default-allow-icmp",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "priority": 65534,
+            "sourceRanges": [
+              "0.0.0.0/0"
+            ],
+            "allowed": [
+              {
+                "IPProtocol": "icmp"
+              }
+            ],
+            "direction": "INGRESS",
+            "disabled": false
+          },
+          {
+            "name": "default-allow-internal",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "priority": 65534,
+            "sourceRanges": [
+              "10.128.0.0/9"
+            ],
+            "allowed": [
+              {
+                "IPProtocol": "tcp",
+                "ports": [
+                  "0-65535"
+                ]
+              },
+              {
+                "IPProtocol": "udp",
+                "ports": [
+                  "0-65535"
+                ]
+              },
+              {
+                "IPProtocol": "icmp"
+              }
+            ],
+            "direction": "INGRESS",
+            "disabled": false
+          },
+          {
+            "name": "default-allow-rdp",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "priority": 65534,
+            "sourceRanges": [
+              "0.0.0.0/0"
+            ],
+            "allowed": [
+              {
+                "IPProtocol": "tcp",
+                "ports": [
+                  "3389"
+                ]
+              }
+            ],
+            "direction": "INGRESS",
+            "disabled": false
+          },
+          {
+            "name": "default-allow-ssh",
+            "network": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/global/networks/default",
+            "priority": 65534,
+            "sourceRanges": [
+              "0.0.0.0/0"
+            ],
+            "allowed": [
+              {
+                "IPProtocol": "tcp",
+                "ports": [
+                  "22"
+                ]
+              }
+            ],
+            "direction": "INGRESS",
+            "disabled": false
+          }
+        ]
+      },
+      "compute_project": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "name": "turquoiseradar",
+        "compute_resource_id": "5743901802257603109",
+        "compute_resource_id_is_project_number": false,
+        "default_network_tier": "PREMIUM",
+        "quotas": [
+          {
+            "metric": "NETWORKS",
+            "limit": 5,
+            "usage": 1
+          },
+          {
+            "metric": "FIREWALLS",
+            "limit": 100,
+            "usage": 4
+          },
+          {
+            "metric": "STATIC_ADDRESSES",
+            "limit": 8,
+            "usage": 0
+          },
+          {
+            "metric": "IN_USE_ADDRESSES",
+            "limit": 8,
+            "usage": 0
+          },
+          {
+            "metric": "SUBNETWORKS",
+            "limit": 100,
+            "usage": 0
+          },
+          {
+            "metric": "CPUS_ALL_REGIONS",
+            "limit": 32,
+            "usage": 0
+          }
+        ]
+      },
+      "region": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "name": "us-west1",
+        "state": "UP",
+        "quotas": [
+          {
+            "metric": "CPUS",
+            "limit": 100,
+            "usage": 0
+          },
+          {
+            "metric": "DISKS_TOTAL_GB",
+            "limit": 4096,
+            "usage": 0
+          },
+          {
+            "metric": "STATIC_ADDRESSES",
+            "limit": 8,
+            "usage": 0
+          },
+          {
+            "metric": "IN_USE_ADDRESSES",
+            "limit": 8,
+            "usage": 0
+          },
+          {
+            "metric": "INSTANCES",
+            "limit": 24,
+            "usage": 0
+          },
+          {
+            "metric": "E2_CPUS",
+            "limit": 24,
+            "usage": 0
+          }
+        ]
+      },
+      "snapshots": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "resources": []
+      },
+      "buckets": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "count": 0,
+        "resources": []
+      },
+      "ephemeral_external_ips": {
+        "status": "observed",
+        "count": 0,
+        "derivation": "No instances in fresh complete aggregated list; therefore no instance NIC external NAT IPv4 or external IPv6 addresses",
+        "scope": "Compute instance interfaces; not other products"
+      },
+      "zone": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "name": "us-west1-b",
+        "state": "UP",
+        "region": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/regions/us-west1"
+      },
+      "machine_type": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "name": "e2-micro",
+          "zone": "us-west1-b",
+          "guestCpus": 2,
+          "memoryMb": 1024,
+          "isSharedCpu": true,
+          "maximumPersistentDisks": 16,
+          "maximumPersistentDisksSizeGb": "3072"
+        }
+      },
+      "disk_type": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "name": "pd-standard",
+          "zone": "https://www.googleapis.com/compute/v1/projects/turquoiseradar/zones/us-west1-b",
+          "validDiskSize": "10GB-65536GB",
+          "defaultDiskSizeGb": "500"
+        }
+      },
+      "image": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "resource": {
+          "name": "ubuntu-2404-noble-amd64-v20261024",
+          "selfLink": "https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20261024",
+          "status": "READY",
+          "architecture": "X86_64",
+          "diskSizeGb": "10",
+          "guestOsFeatures": [
+            {
+              "type": "VIRTIO_SCSI_MULTIQUEUE"
+            },
+            {
+              "type": "SEV_CAPABLE"
+            },
+            {
+              "type": "SEV_SNP_CAPABLE"
+            },
+            {
+              "type": "SEV_LIVE_MIGRATABLE"
+            },
+            {
+              "type": "SEV_LIVE_MIGRATABLE_V2"
+            },
+            {
+              "type": "SNP_SVSM_CAPABLE"
+            },
+            {
+              "type": "IDPF"
+            },
+            {
+              "type": "TDX_CAPABLE"
+            },
+            {
+              "type": "UEFI_COMPATIBLE"
+            },
+            {
+              "type": "GVNIC"
+            }
+          ]
+        },
+        "deprecated": null
+      },
+      "iap_service": {
+        "status": "observed",
+        "http_status": 200,
+        "pages_read": 1,
+        "pagination_complete": true,
+        "name": "projects/100948930799/services/iap.googleapis.com",
+        "state": "ENABLED",
+        "evidence_scope": "Service Usage API enablement and project visibility; no IAP tunnel opened"
+      }
+    },
+    "permission_test_requested": [
+      "resourcemanager.projects.get",
+      "compute.instances.list",
+      "compute.disks.list",
+      "compute.addresses.list",
+      "compute.globalAddresses.list",
+      "compute.networks.list",
+      "compute.subnetworks.list",
+      "compute.firewalls.list",
+      "serviceusage.services.list",
+      "billing.resourceAssociations.list",
+      "compute.projects.get",
+      "compute.regions.get",
+      "storage.buckets.list",
+      "compute.snapshots.list"
+    ],
+    "billing_allowances": "Account-specific credits, Free Tier usage and remaining allowances unverified. Billing API not required for this proposal; no new billing queries made. Retain conservative published-price no-allowance scenario.",
+    "network_evidence": {
+      "policy": "restricted/enforced",
+      "required_google_api_hosts_in_allowlist": true,
+      "authenticated_compute_and_serviceusage_calls_succeeded": true
+    },
+    "permission_results": {
+      "status": "verified_for_project_inspection",
+      "method": "Resource Manager projects.testIamPermissions",
+      "requested": [
+        "resourcemanager.projects.get",
+        "compute.instances.list",
+        "compute.disks.list",
+        "compute.addresses.list",
+        "compute.globalAddresses.list",
+        "compute.networks.list",
+        "compute.subnetworks.list",
+        "compute.firewalls.list",
+        "serviceusage.services.list",
+        "billing.resourceAssociations.list",
+        "compute.projects.get",
+        "compute.regions.get",
+        "storage.buckets.list",
+        "compute.snapshots.list"
+      ],
+      "granted": [
+        "resourcemanager.projects.get",
+        "compute.instances.list",
+        "compute.disks.list",
+        "compute.addresses.list",
+        "compute.globalAddresses.list",
+        "compute.networks.list",
+        "compute.subnetworks.list",
+        "compute.firewalls.list",
+        "serviceusage.services.list",
+        "compute.projects.get",
+        "compute.regions.get",
+        "storage.buckets.list",
+        "compute.snapshots.list"
+      ],
+      "not_granted": [],
+      "invalid_for_project": [
+        "billing.resourceAssociations.list"
+      ],
+      "billing_permission_verified": false,
+      "additional_visibility_test": {
+        "requested": [
+          "iap.tunnelInstances.accessViaIAP",
+          "iap.tunnelInstances.getIamPolicy",
+          "resourcemanager.projects.getIamPolicy",
+          "serviceusage.services.get",
+          "compute.zones.get",
+          "compute.machineTypes.get",
+          "compute.diskTypes.get"
+        ],
+        "granted": [
+          "compute.diskTypes.get",
+          "compute.machineTypes.get",
+          "compute.zones.get",
+          "serviceusage.services.get"
+        ],
+        "not_granted": [
+          "iap.tunnelInstances.accessViaIAP",
+          "iap.tunnelInstances.getIamPolicy",
+          "resourcemanager.projects.getIamPolicy"
+        ]
+      },
+      "scope": "Inspection identity only. No provisioning or deployment permissions certified; IAP API enablement does not grant tunnel access."
+    }
+  },
+  "remaining_blockers": [
+    "Explicit owner approval of final dedicated resources, DNS and activation; no provisioning authorized",
+    "Account-specific credits and Free Tier usage unverified; retain conservative $11.07/month no-allowance receiver/cloud-backup subtotal with exclusions; exact Oregon paid quote and all-in runner/domain/tax/transfer costs unverified. Cloud Billing API access is not a prerequisite.",
+    "Organization policy, routes/peering and final security review; catalog/quota checks do not guarantee capacity at creation time",
+    "DNS delegation/records/CAA/conflicts; reserved numeric address remains pending approved creation",
+    "Future deployer/admin/runner IAM including IAP tunnel access and OS Login/SSH coexistence; reader has no tested IAP tunnel grant",
+    "Private backup runner/cost, globally unique bucket-name availability and creation/backup permissions, recovery drill and monitoring",
+    "Approved-host e2-micro memory/concurrency, TLS, IAP/SSH, service and recovery qualification"
+  ],
+  "reuse_review": {
+    "existing_receiver_found": false,
+    "default_network_suitable_as_is": false,
+    "reason": "No VM/disk/IP to reuse. Default auto-mode VPC has public SSH/RDP/ICMP and broad internal ingress. Retain proposed dedicated VPC/subnet and restricted IAP-only SSH; no existing firewall changes authorized.",
+    "proposed_subnet_cidr_overlap_with_observed_subnets": false,
+    "scope": "Observed subnet ranges only; routes, peering and organization policies not assessed",
+    "standard_network_tier_must_be_explicit": true,
+    "project_bucket_inventory_verified": true,
+    "existing_backup_bucket_found": false,
+    "bucket_name_global_availability_verified": false
+  },
+  "effective_permissions_scope": "All 13 valid project inspection permissions verified. Billing-account-scoped permission in original set invalid on project; billing and deployment access not certified.",
+  "resource_compatibility": {
+    "status": "compatible_with_observed_catalogs_and_quota_headroom",
+    "capacity_guaranteed": false,
+    "region": "us-west1",
+    "zone": "us-west1-b",
+    "region_and_zone_state": "UP",
+    "machine_type": "e2-micro",
+    "guest_cpus": 2,
+    "memory_mb": 1024,
+    "shared_cpu": true,
+    "disk_type": "pd-standard",
+    "proposed_disk_size_gib": 30,
+    "disk_type_minimum_size_gb": 10,
+    "image_minimum_disk_gb": 10,
+    "image_status": "READY",
+    "image_architecture": "X86_64",
+    "image_resolved_name": "ubuntu-2404-noble-amd64-v20261024",
+    "image_family_resolution_can_change": true,
+    "standard_tier_regional_ipv4": "Explicit STANDARD on regional reservation and VM ONE_TO_ONE_NAT access config; same region and same reserved numeric address required",
+    "network": "New custom-mode dedicated VPC, one IPv4-only subnet and two targeted ingress rules (80/443 public; 22 IAP-only); do not reuse default public SSH/RDP rules",
+    "quota_demand": {
+      "instance": 1,
+      "cpu_conservative_vcpu_budget": 2,
+      "pd_standard_gb": 30,
+      "regional_static_addresses": 1,
+      "regional_in_use_addresses": 1,
+      "vpcs": 1,
+      "custom_subnets": 1,
+      "firewall_rules": 2
+    },
+    "subnet_quota_caveat": "Compute reports SUBNETWORKS usage 0/100 while inventory contains 42 auto-mode subnets. Quota usage is not subnet inventory count. Proposed custom subnet requires one unit.",
+    "subnet_cidr_overlap_with_observed_subnets": false,
+    "limits": "Catalog and quota evidence is not a capacity reservation or organization-policy check; runtime memory/load/IAP/OS Login and recovery still require approved-host qualification."
+  },
+  "iap_readiness": {
+    "api_enabled": true,
+    "serviceusage_visibility_verified": true,
+    "inspection_identity_tunnel_access_granted": false,
+    "tunnel_test_performed": false,
+    "reason": "No receiver exists and no tunnel opened. Future administrator/runner IAM and login require separate approval and verification."
+  },
+  "billing_api_access_required_for_proposal_completion": false,
+  "account_specific_credits_verified": false
+}

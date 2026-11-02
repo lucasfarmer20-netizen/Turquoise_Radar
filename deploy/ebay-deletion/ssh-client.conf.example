@@ -1,0 +1,25 @@
+# Private worker only. Replace uppercase placeholders; never use the admin key here.
+# Include this file BEFORE broader Host * rules in ~/.ssh/config.
+Host ebay-deletion-ledger
+    HostName RECEIVER_VM_NAME
+    User ebay-ledger-pull
+    IdentityFile ~/.ssh/ebay-deletion-ledger_ed25519
+    IdentitiesOnly yes
+    IdentityAgent none
+    BatchMode yes
+    StrictHostKeyChecking yes
+    CheckHostIP no
+    HostKeyAlias ebay-deletion-ledger-RECEIVER_INSTANCE_ID
+    UserKnownHostsFile ~/.ssh/ebay-deletion-ledger_known_hosts
+    GlobalKnownHostsFile /dev/null
+    UpdateHostKeys no
+    HostKeyAlgorithms ssh-ed25519
+    ForwardAgent no
+    ClearAllForwardings yes
+    RequestTTY no
+    ConnectTimeout 10
+    ProxyCommand gcloud compute start-iap-tunnel RECEIVER_VM_NAME 22 --listen-on-stdin --project=PROJECT_ID --zone=us-west1-b --verbosity=error
+# Populate known_hosts ONLY from an authenticated admin/console channel:
+# ebay-deletion-ledger-RECEIVER_INSTANCE_ID ssh-ed25519 VERIFIED_HOST_PUBLIC_KEY
+# No ssh-keyscan trust-on-first-use. Replacement hosts require deliberate pin replacement.
+# Private-worker environment: EBAY_DELETION_SSH_TARGET=ebay-deletion-ledger
