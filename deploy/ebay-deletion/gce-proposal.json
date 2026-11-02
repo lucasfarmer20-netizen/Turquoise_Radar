@@ -1,7 +1,7 @@
 {
-  "status": "PREPARATION_ONLY_ACCESS_VERIFICATION_PENDING",
+  "status": "PREPARATION_ONLY_AUTHENTICATION_BLOCKED",
   "provisioning_authorized": false,
-  "project_id": null,
+  "project_id": "turquoiseradar",
   "billing_account_verified": false,
   "free_tier_remaining_verified": false,
   "existing_resources_inspected": false,
@@ -32,8 +32,15 @@
     "subnet": "tr-ebay-notify-us-west1",
     "proposed_subnet_cidr": "10.84.13.0/28",
     "service_account": null,
-    "public_ingress_tcp": [80, 443],
-    "ssh_ingress": {"tcp": 22, "source_cidr": "35.235.240.0/20", "requires_iap_iam": true},
+    "public_ingress_tcp": [
+      80,
+      443
+    ],
+    "ssh_ingress": {
+      "tcp": 22,
+      "source_cidr": "35.235.240.0/20",
+      "requires_iap_iam": true
+    },
     "workbench_or_owner_data_allowed": false
   },
   "dns": {
@@ -49,7 +56,7 @@
   "endpoint": "https://ebay-notify.turquoiseradar.com/ebay/account-deletion",
   "backup": {
     "location": "Separate trusted private runner to private GCS Standard bucket in us-west1",
-    "proposed_bucket_name": "tr-ebay-ledger-PENDING_PROJECT_NUMBER",
+    "proposed_bucket_name": "tr-ebay-ledger-100948930799",
     "client_side_encryption": true,
     "hmac_key_recovery_separate": true,
     "hourly_current_ledger_pull": true,
@@ -72,5 +79,105 @@
       "additional_storage_and_operations",
       "chargeable_transfer"
     ]
-  }
+  },
+  "project_number": "100948930799",
+  "project_identity_verified": false,
+  "project_lifecycle_state": null,
+  "read_only_observation": {
+    "observed_at_utc": "2026-11-02T03:34:07.717568+00:00",
+    "configured_identity": "codex-radar-reader@turquoiseradar.iam.gserviceaccount.com",
+    "queries": {
+      "project": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "instances": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "disks": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "addresses": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "networks": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "subnetworks": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "firewalls": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "enabled_services": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "billing_link": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      },
+      "testIamPermissions": {
+        "status": "unknown",
+        "reason": "Authentication did not complete; query not executed"
+      }
+    },
+    "authentication": {
+      "status": "unknown",
+      "error_type": "TransportError",
+      "diagnostic_flags": {
+        "403": true,
+        "407": false,
+        "denied": false,
+        "proxy": true,
+        "sts.googleapis.com": false,
+        "iamcredentials.googleapis.com": false,
+        "certificate": false,
+        "8446": false,
+        "timeout": false
+      }
+    },
+    "runtime_identity_readiness": "ready",
+    "project_selection_source": "Owner supplied; ID/number association not authenticated",
+    "network_evidence": {
+      "policy": "restricted/enforced",
+      "required_google_api_hosts_in_allowlist": false,
+      "unauthenticated_route_checks": {
+        "cloudresourcemanager.googleapis.com": "proxy HTTP 403",
+        "compute.googleapis.com": "proxy HTTP 403"
+      }
+    },
+    "permission_test_requested": [
+      "resourcemanager.projects.get",
+      "compute.instances.list",
+      "compute.disks.list",
+      "compute.addresses.list",
+      "compute.globalAddresses.list",
+      "compute.networks.list",
+      "compute.subnetworks.list",
+      "compute.firewalls.list",
+      "serviceusage.services.list",
+      "billing.resourceAssociations.list",
+      "compute.projects.get",
+      "compute.regions.get",
+      "storage.buckets.list",
+      "compute.snapshots.list"
+    ],
+    "billing_allowances": "Account-specific allowances unverified; no billing facts or usage retrieved"
+  },
+  "remaining_blockers": [
+    "Actual authentication through attached GCP connection; proxy HTTP 403 during SDK refresh",
+    "Authenticated project identity/lifecycle, complete paginated resource inventory and reuse review",
+    "Successful testIamPermissions for inspection; deployment permissions separately reviewed",
+    "Billing link/health and account-wide usage/allowances or explicit conservative cost acceptance; Oregon paid quote",
+    "Organization policy, quotas, DNS delegation/records/CAA and conflicts",
+    "Private backup runner/cost, recovery drill, IAP/SSH and e2-micro qualification",
+    "Explicit deployment approval covering final resources, DNS and activation"
+  ]
 }
