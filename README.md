@@ -160,6 +160,14 @@ then preview the actual plan. The first real four-query Browse pilot retains its
 separate owner approval gate. See [JRI-015 workflow and next pilot](docs/JRI-015.md).
 This development is independent of the pending JRI-014 receiver closeout.
 
+JRI-016 adds **Search evaluation & vocabulary**, a read-only view of real recorded
+source/query relationships, latest owner feedback and bounded unexecuted phrase
+suggestions. It also qualifies received ShopGoodwill Personal Shopper and HiBid
+saved-search structures without fetching listings or images. The new private
+five-message batch contains 27 distinct items; this is separate from historical
+inventory, which is currently inaccessible. See [actual evidence and remaining
+gates](docs/JRI-016.md) and the [minimal private transfer](docs/JRI-016-PRIVATE-HANDOFF.md).
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
@@ -175,9 +183,11 @@ multi-item shipping equally. **Saved search assistant** copies exact phrases and
 records owner-managed setup, while **Seller / auction groups** show known costs
 and independently confirmed combined-shipping evidence.
 
-The actual Personal Shopper / HiBid daily digest formats remain provisional.
-No real owner emails were supplied for validation; clearly synthetic fixtures
-exercise the supported structures. See [alert setup and limitations](docs/ALERT-SETUP.md).
+JRI-016 inspected genuine Personal Shopper / HiBid saved-search messages and adds
+narrow reviewed-format parsers. Each format still requires its own private source
+review before automatic query credit; current availability and costs remain
+separate checks. Public tests use synthetic messages. See [current evidence](docs/JRI-016.md)
+and [alert setup and limitations](docs/ALERT-SETUP.md).
 A separate synthetic demo is available with `.venv/bin/python -m radar.intake.demo`;
 never seed fixtures into owner inventory.
 
