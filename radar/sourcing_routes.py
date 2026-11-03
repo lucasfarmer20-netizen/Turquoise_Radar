@@ -70,7 +70,12 @@ def sourcing_routes(app, render, preferences):
                     continue
                 results.append(card)
             if sort == "priority":
-                results.sort(key=lambda c: (c["a"].score, c["last_seen"], c["key"]), reverse=True)
+                results.sort(
+                    key=lambda c: (
+                        c["research_priority_weight"], c["research_score"], c["last_seen"], c["key"]
+                    ),
+                    reverse=True,
+                )
             else:
                 results.sort(key=lambda c: (c["last_seen"], c["key"]), reverse=True)
             pages = max(1, (len(results) + PAGE_SIZE - 1) // PAGE_SIZE)

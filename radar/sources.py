@@ -123,7 +123,15 @@ def upsert_listing(session, item, original):
         merged = {**row.data, **original}
         # The supplied observed fields update; omitted owner evidence stays intact.
         merged["search_pattern_id"] = item.search_pattern_id or row.data.get("search_pattern_id")
-        row.data = ListingInput.model_validate(merged).model_dump(mode="json")
+        validated = ListingInput.model_validate(merged)
+        if "research_observations" in original and (
+            validated.research_observations
+            != ListingInput.model_validate(row.data).research_observations
+        ):
+            raise ValueError(
+                "Existing research history must change through the audited append helper"
+            )
+        row.data = validated.model_dump(mode="json")
         row.last_seen = utcnow()
     session.flush()
     return row, is_new

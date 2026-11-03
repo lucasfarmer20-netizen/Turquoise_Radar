@@ -173,7 +173,11 @@ approved five-message application. Its 27 genuine items and three research listi
 remain distinct from missing historical records. Scope checks preserve local
 evidence, photos and feedback while blocking new sourcing/analysis execution.
 Acquisition currency corrections explicitly clear older amounts instead of
-relabeling them. See [the actual import and manual trial receipt](docs/JRI-017.md).
+relabeling them. Dated owner research now separates observed bids, realized auction
+results, partial cost subtotals, Alaska quote/fulfillment evidence and shipping
+burden. Ended opportunities retain their research history in the closed view;
+seller claims do not become verified material or owner decisions. See
+[the actual import and manual trial receipt](docs/JRI-017.md).
 
 ## Multi-source inbox (Task 004)
 
