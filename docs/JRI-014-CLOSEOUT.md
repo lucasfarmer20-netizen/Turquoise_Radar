@@ -4,16 +4,20 @@
 the owner explicitly selected **"Approve revised policy and IAM plan"** in response
 to the reviewed recovery-limitation and scoped-removal question. The two-USB export
 gate is replaced by the accepted limitation below; no additional approval is needed
-for the reviewed removal scope. Production IAM execution is still pending because
-the attached identities do not provide an administrator path. No resources, keys,
-backups or IAM bindings were changed by this task.
+for the reviewed removal scope. The owner reports executing the first removal
+block in Cloud Shell; no mutation timestamp was supplied. Effective project/bucket
+mutation and runner actAs checks now return no tested grants. Fresh literal-policy
+readback remains blocked by the attached identities' reduced read permissions, so
+Phase 1 is not yet fully verified. This verification made no IAM, resource, key or
+backup changes. Federation remains unchanged.
 
 ## Minimal closeout
 
 1. **Complete:** owner accepted the recovery limitation below instead of requiring
    the two-USB export or a timed recovery drill to close JRI-014.
-2. Have the authorized Google administrator remove the reviewed temporary deployer
-   access, independently of the deferred offline export.
+2. Complete the fresh administrator policy readback for the reported first-block
+   removal, then retire only the dedicated deployment federation binding. Provider
+   retirement still requires its exact verified mapping.
 3. Verify the existing receiver, private backup path and preserved identities after
    reduction. Then recommend PR #26 ready for review/merge. Keep it draft meanwhile.
 
@@ -78,7 +82,7 @@ Read-only observation: **2026-11-02 15:52:51 AKST
 `100948930799`, with no parent returned. These are observed direct bindings; final
 permission denial and operational health are checked after authorized removal.
 
-| Resource | Remove only | Current policy etag |
+| Resource | Remove only | Pre-removal policy etag |
 |---|---|---|
 | Project `turquoiseradar` | The deployer member from the nine roles below | `BwZfTtWb3Gs=` |
 | `tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com` | Deployer `roles/iam.serviceAccountUser` | `BwZfT2YuBis=` |
@@ -94,9 +98,9 @@ principal://iam.googleapis.com/projects/100948930799/locations/global/workloadId
 
 The administrator must reread these policies immediately before applying, confirm
 this exact member/role/condition scope, and compare afterward. Do not overwrite
-whole policies from an old snapshot. The following commands are **authorized but
-not yet applied**. Execute under the administrator's own approved identity; do not
-request the owner's policy/IAM approval again:
+whole policies from an old snapshot. The first block below is **owner-reported
+complete** and retained as the exact removal scope, not an instruction to repeat
+it. No mutation timestamp was supplied. Do not request policy/IAM approval again:
 
 ```bash
 set -euo pipefail
@@ -122,9 +126,11 @@ gcloud iam service-accounts remove-iam-policy-binding \
   --role=roles/iam.serviceAccountUser --condition=None --quiet
 ```
 
-At this point, use non-mutating permission tests with the deployer to check that
-Compute mutation, Storage mutation and runner actAs grants are absent. Do not issue
-a destructive request as a test. Then remove only its observed federation subject:
+After fresh policy readback and effective-permission verification pass, the
+authorized administrator's exact next step is the single-member removal below.
+It is **not executed in this verification task**. Reread the deployer service-account
+policy first and confirm this unconditioned member/role pair still matches; do not
+change the reader service account or shared pool:
 
 ```bash
 gcloud iam service-accounts remove-iam-policy-binding \
@@ -159,7 +165,7 @@ read both running VMs, confirmed the receiver's empty service-account attachment
 and the runner's expected attached identity. This is pre-reduction preservation
 evidence, not a substitute for the post-reduction checks.
 
-## Administrator execution handoff
+## Historical administrator execution handoff
 
 After approval, read-only Google `testIamPermissions` calls at
 **2026-11-02 16:09:52.554 AKST (2026-11-03 01:09:52.554 UTC)** all returned HTTP 200:
@@ -179,7 +185,78 @@ repurposed. The owner was asked to have
 the authorized administrator apply the first command block and report completion
 and time. Check deployer mutation/actAs denial before applying the second block
 that removes its dedicated federation subject. Provider retirement still requires
-the exact administrator-verified mapping.
+the exact administrator-verified mapping. The subsequent owner report and fresh
+verification observations below supersede this earlier execution-pending status.
+
+## Phase 1 verification — effective checks pass; policy readback pending
+
+The owner reports removing all nine project roles and the runner
+`roles/iam.serviceAccountUser` binding through the approved first block in Cloud
+Shell. **The actual IAM mutation timestamp is unknown.** The following UTC times
+are fresh observation times on **2026-11-03**, not reconstructed mutation times.
+The existing manifest aliases were selected explicitly for each subprocess;
+configured accounts were confirmed as deployer (`GCP_2`) and reader (`GCP`).
+
+| Observation completed (UTC) | Check | Actual result |
+|---|---|---|
+| 01:25:02.952 | Deployer project `testIamPermissions`, 32 requested permissions | HTTP 200; zero granted |
+| 01:25:02.932 | Runner service-account `testIamPermissions`: actAs/getIamPolicy/setIamPolicy | HTTP 200; zero granted, including `iam.serviceAccounts.actAs` |
+| 01:25:03.203 | Backup bucket `testPermissions`, seven requested permissions | HTTP 200; zero granted |
+| 01:25:03.766 | Reader GET of receiver VM | HTTP 200; existing instance `8560186650804972514`, RUNNING, no service account |
+| 01:25:03.808 | Reader GET of runner VM | HTTP 200; existing instance `5443443387925882803`, RUNNING, original runner identity |
+| 01:25:03.778 | Reader GET of backup bucket metadata | HTTP 200; same bucket, uniform bucket-level access enabled, public access prevention enforced |
+| 01:25:02.944 / 01:25:02.941 | Project IAM read, deployer / reader | Google HTTP 403 `PERMISSION_DENIED`; policy unavailable, not empty |
+| 01:25:38.967 / 01:25:40.540 | Runner IAM read through gcloud, deployer / reader | `PERMISSION_DENIED`; binding list unavailable |
+
+The 32 project permissions cover Compute instance create/delete/start/stop/reset,
+metadata/service-account/IAM changes and OS admin login; common instance metadata;
+network and firewall create/update/delete; disk create/delete/resize/snapshot;
+address create/delete; Storage bucket create/delete/update/setIamPolicy and object
+create/delete/update; IAP tunnel access; and project IAM get/set. The bucket test
+separately checks bucket IAM get/set, bucket delete/update and object
+create/delete/update. These are successful permission-test responses with empty
+grant sets, not failed authentication and not destructive mutation attempts.
+
+Instance-specific permission-test attempts returned HTTP 403 at
+**01:25:54.649 / 01:25:54.956** and do not establish an empty resource-level grant
+set. A diagnostic retry identified missing `compute.instances.list` in the error;
+no additional access was requested. The positive denial evidence above is scoped
+to the successful project, bucket and runner-SA permission tests.
+
+The normal CLI also could not reread reader/deployer/restore-reader SA policies;
+bucket-policy reads returned HTTP 403. An initial alternate SA API resource form
+returned managed `identity_unsupported_request`; this is kept separate from the
+normal CLI's Google `PERMISSION_DENIED`. No reader role was expanded, no network
+policy was changed and no existing resource or identity was modified. Narrow
+bucket/owner recovery grants remain required and were not changed by this task;
+their current binding lists were not independently reread here.
+
+**Do not mark Phase 1 fully verified yet.** Permission loss supports the owner's
+report but is not a substitute for the requested fresh literal-binding readback.
+The administrator has been asked to run these read-only commands and return their
+non-secret output. Both successful reads must show no matched deployer bindings
+(`[]`); any remaining binding or command failure requires inspection. No new IAM
+grant is needed, and the first removal block should not be repeated blindly.
+The installed SDK's filter/flatten/projection was checked locally against synthetic
+present, absent, empty and lookalike members. Only the literal member matched;
+this is command validation, not production policy evidence.
+
+```bash
+date -u '+Observation UTC: %Y-%m-%dT%H:%M:%SZ'
+gcloud projects get-iam-policy turquoiseradar \
+  --flatten='bindings[].members' \
+  --filter='bindings.members=serviceAccount:codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com' \
+  --format='json(etag,bindings.role,bindings.members,bindings.condition)'
+gcloud iam service-accounts get-iam-policy \
+  tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com \
+  --project=turquoiseradar --flatten='bindings[].members' \
+  --filter='bindings.members=serviceAccount:codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com' \
+  --format='json(etag,bindings.role,bindings.members,bindings.condition)'
+```
+
+Federation retirement and final service/backup/restore-reader checks remain
+pending. The existing real notification and encrypted post-event backup evidence
+is preserved; no activation, provisioning or sourcing was repeated.
 
 ## Small post-reduction receipt
 
