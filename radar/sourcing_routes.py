@@ -1,15 +1,19 @@
 """Private sourcing feed and explicit, local-only search preparation."""
 
 from collections import Counter
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import select
 
-from radar.db import DiscoveryGroup, IntakeSource, SavedSourceSearch
+from radar.compact_feed import decorate_compact_cards, read_compact_photo
+from radar.db import DiscoveryGroup, Feedback, IntakeSource, Listing, SavedSourceSearch
 from radar.discovery.config import DiscoveryError
-from radar.discovery.service import budgets
+from radar.discovery.service import budgets, promote
+from radar.feedback import record_feedback
+from radar.intake.service import promote_candidate
+from radar.schemas import FeedbackInput
 from radar.search_evaluation import evaluate_searches
 from radar.sourcing_catalog import MAX_STAGED_PHRASES, catalog_entries, stage_catalog_group
 from radar.sourcing_feed import build_feed
@@ -39,7 +43,7 @@ def sourcing_routes(app, render, preferences):
         sort = q.get("sort", "recent")
         if (
             dataset not in DATASETS
-            or scope not in ("active", "archive", "all")
+            or scope not in ("active", "needs_photos", "ended", "reviewed", "archive", "all")
             or state not in ("", *STATES, "IRRELEVANT")
             or sort not in ("recent", "priority")
         ):
@@ -52,7 +56,7 @@ def sourcing_routes(app, render, preferences):
             raise HTTPException(422, "Page must be a positive integer") from None
         source = q.get("source", "")
         with app.state.sessions() as session:
-            cards = build_feed(session, preferences(session))
+            cards = decorate_compact_cards(session, build_feed(session, preferences(session)))
             counts = Counter(card["dataset"] for card in cards)
             sources = sorted({card["item"].source for card in cards})
             if source and source not in sources:
@@ -60,19 +64,33 @@ def sourcing_routes(app, render, preferences):
                 sources.append(source)
                 sources.sort()
             results = []
+            view_counts = Counter(active=0, needs_photos=0, ended=0, reviewed=0, archive=0, all=0)
             for card in cards:
-                archived = card["state"] in CLOSED_STATES or card["availability"] == "ENDED"
                 if dataset != "all" and card["dataset"] != dataset:
-                    continue
-                if scope == "active" and archived or scope == "archive" and not archived:
                     continue
                 if state and card["state"] != state or source and card["item"].source != source:
                     continue
-                results.append(card)
+                ended = card["compact"]["ended"]
+                archived = card["state"] in CLOSED_STATES or ended
+                views = {"all"}
+                if ended:
+                    views.add("ended")
+                if archived:
+                    views.add("archive")
+                    if card["state"] in CLOSED_STATES:
+                        views.add("reviewed")
+                else:
+                    views.add("active" if card["compact"]["photo_url"] else "needs_photos")
+                view_counts.update(views)
+                if scope in views:
+                    results.append(card)
             if sort == "priority":
                 results.sort(
                     key=lambda c: (
-                        c["research_priority_weight"], c["research_score"], c["last_seen"], c["key"]
+                        c["research_priority_weight"],
+                        c["research_score"],
+                        c["last_seen"],
+                        c["key"],
                     ),
                     reverse=True,
                 )
@@ -91,6 +109,7 @@ def sourcing_routes(app, render, preferences):
                 cards=results[(page - 1) * PAGE_SIZE : page * PAGE_SIZE],
                 total=len(results),
                 counts=counts,
+                view_counts=view_counts,
                 filters=filters,
                 datasets=DATASETS,
                 states=[*STATES, "IRRELEVANT"],
@@ -99,7 +118,104 @@ def sourcing_routes(app, render, preferences):
                 pages=pages,
                 previous=page_url(page - 1) if page > 1 else None,
                 following=page_url(page + 1) if page < pages else None,
+                return_to=page_url(page),
+                tab_urls={
+                    target: "/feed?" + urlencode({**filters, "scope": target})
+                    for target in ("active", "needs_photos", "ended", "reviewed", "archive", "all")
+                },
             )
+
+    @app.get("/feed/photos/{photo_id}")
+    def compact_photo(photo_id: str):
+        with app.state.sessions() as session:
+            try:
+                raw = read_compact_photo(session, preferences(session), photo_id)
+            except (OSError, ValueError):
+                raise HTTPException(404, "Private photo unavailable") from None
+        return Response(
+            raw,
+            media_type="image/png",
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+
+    @app.post("/feed/review/{kind}/{target_id}")
+    async def compact_review(request: Request, kind: str, target_id: int):
+        form = await request.form()
+        decision = form.get("decision")
+        if kind not in ("listing", "candidate") or target_id < 1:
+            raise HTTPException(404, "Review target unavailable")
+        if decision not in ("GO", "NO_GO"):
+            raise HTTPException(422, "Choose GO or NO GO")
+        action = "Interested" if decision == "GO" else "Passed"
+        try:
+            expected = (
+                int(form["expected_feedback_id"]) if form.get("expected_feedback_id") else None
+            )
+            if expected is not None and expected < 1:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise HTTPException(422, "Invalid prior feedback receipt") from None
+        with app.state.sessions.begin() as session:
+            # Serialize promotion plus feedback and retries in the existing local SQLite app.
+            if session.get_bind().dialect.name == "sqlite":
+                session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            card = next(
+                (
+                    card
+                    for card in build_feed(session, preferences(session))
+                    if (kind == "listing" and card["listing_id"] == target_id)
+                    or (kind == "candidate" and target_id in card["candidate_ids"])
+                ),
+                None,
+            )
+            if card is None:
+                raise HTTPException(404, "Review target unavailable")
+            try:
+                if kind == "listing":
+                    listing = session.get(Listing, target_id)
+                elif any(e["kind"] == "discovery" for e in card["query_evidence"]):
+                    listing = promote(session, target_id)
+                else:
+                    listing = promote_candidate(session, target_id)
+            except (ValueError, DiscoveryError):
+                raise HTTPException(409, "Review target changed; reload the feed") from None
+            if listing is None:
+                raise HTTPException(404, "Review target unavailable")
+            if listing.review_state == "PURCHASED":
+                raise HTTPException(409, "Review purchased records in the workbench")
+            latest = session.scalar(
+                select(Feedback)
+                .where(Feedback.listing_id == listing.id)
+                .order_by(Feedback.created_at.desc(), Feedback.id.desc())
+                .limit(1)
+            )
+            if latest and latest.action == action:
+                receipt = latest
+            else:
+                if (latest.id if latest else None) != expected:
+                    raise HTTPException(
+                        409, "Feedback changed; reload before changing the decision"
+                    )
+                receipt = record_feedback(session, listing, FeedbackInput(action=action))
+                session.flush()
+            result = {
+                "saved": True,
+                "decision": decision,
+                "action": action,
+                "feedback_id": receipt.id,
+                "listing_id": listing.id,
+                "state": listing.review_state,
+                "research_url": f"/listings/{listing.id}",
+            }
+        if "application/json" in request.headers.get("accept", ""):
+            return JSONResponse(result)
+        return_to = form.get("return_to", "/feed")
+        try:
+            parsed = urlsplit(return_to)
+            safe_return = parsed.path == "/feed" and not (parsed.scheme or parsed.netloc)
+        except (ValueError, TypeError):
+            safe_return = False
+        return RedirectResponse(return_to if safe_return else "/feed", status_code=303)
 
     @app.get("/feed/prepare")
     def prepare(request: Request):

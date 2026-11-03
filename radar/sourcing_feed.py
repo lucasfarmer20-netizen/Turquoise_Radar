@@ -207,7 +207,9 @@ def _build_feed(session, prefs):
             )
     feedback = {}
     for row in session.scalars(select(Feedback).order_by(Feedback.created_at, Feedback.id)):
-        feedback[row.listing_id] = dict(action=row.action, created_at=_utc(row.created_at))
+        feedback[row.listing_id] = dict(
+            id=row.id, action=row.action, created_at=_utc(row.created_at)
+        )
     groups = {
         f"listing:{row.id}": (row, [])
         for row in listings.values()
@@ -246,7 +248,8 @@ def _build_feed(session, prefs):
             "ENDED"
             if expired
             or any(row.id in ended for row in linked)
-            or research and research["availability"] == "ENDED"
+            or research
+            and research["availability"] == "ENDED"
             else "ACTIVE_AT_OBSERVATION"
             if research and research["availability"] == "ACTIVE_AT_OBSERVATION"
             else "UNKNOWN"
@@ -267,6 +270,7 @@ def _build_feed(session, prefs):
                 candidate_ids=[row.id for row in linked],
                 item=item,
                 a=analysis,
+                spot_timestamp=prefs.spot_timestamp,
                 research=research,
                 research_priority_weight=research["priority_weight"] if research else 0,
                 research_score=analysis.score - (research["burden_penalty"] if research else 0),

@@ -22,6 +22,7 @@ from radar.anomalies import (
 from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
 from radar.discovery.routes import discovery_routes
 from radar.discovery.service import discovery_history, seed_discovery
+from radar.feedback import record_feedback
 from radar.identification.routes import IdentificationBodyLimit, identification_routes
 from radar.identification.service import workbench_context
 from radar.intake.limits import AlertBodyLimit
@@ -334,46 +335,7 @@ def create_app(database_url=None, *, expected_scope=None):
             listing = s.get(Listing, listing_id)
             if not listing:
                 raise HTTPException(404, "Listing not found")
-            prior = list(s.scalars(select(Feedback).where(Feedback.listing_id == listing_id)))
-            # Milestone counters apply once per listing. A repeated Sold edits profit by delta.
-            pattern = s.get(SearchPattern, listing.data.get("search_pattern_id") or "")
-            if (
-                pattern
-                and listing.data.get("raw_search_phrase") == pattern.phrase
-                and listing.data.get("query_attribution_verified") is not False
-            ):
-                if data.action == "Interested" and not any(f.action == "Interested" for f in prior):
-                    pattern.useful_matches += 1
-                if data.action == "Purchased" and not any(f.action == "Purchased" for f in prior):
-                    pattern.successful_purchases += 1
-                if data.action == "Sold" and data.realized_profit is not None:
-                    previous = next(
-                        (
-                            Decimal(f.realized_profit)
-                            for f in reversed(prior)
-                            if f.action == "Sold" and f.realized_profit is not None
-                        ),
-                        Decimal(0),
-                    )
-                    pattern.realized_profit = str(
-                        Decimal(pattern.realized_profit) + data.realized_profit - previous
-                    )
-            if data.action in ("Purchased", "Sold"):
-                listing.review_state = "PURCHASED"
-            elif data.action in ("Passed", "False positive"):
-                listing.review_state = "PASSED"
-            elif data.action == "Interested":
-                listing.review_state = "WATCH"
-            s.add(
-                Feedback(
-                    listing_id=listing_id,
-                    action=data.action,
-                    note=data.note,
-                    realized_profit=str(data.realized_profit)
-                    if data.realized_profit is not None
-                    else None,
-                )
-            )
+            record_feedback(s, listing, data)
         if request.headers.get("HX-Request"):
             return HTMLResponse("<p>Feedback recorded. Refresh to see history.</p>")
         return RedirectResponse(f"/listings/{listing_id}", status_code=303)

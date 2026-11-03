@@ -46,14 +46,19 @@ def attachment_workspace(client, tmp_path, monkeypatch):
         observed_date=date(2027, 1, 6),
     )
     item = ListingInput(
-        source="ShopGoodwill", source_listing_id=SOURCE_ID, listing_url=SOURCE_URL,
-        raw_title="SYNTHETIC later attachment", synthetic=True,
+        source="ShopGoodwill",
+        source_listing_id=SOURCE_ID,
+        listing_url=SOURCE_URL,
+        raw_title="SYNTHETIC later attachment",
+        synthetic=True,
         research_observations=[report],
     )
     with client.app.state.sessions.begin() as session:
         row = Listing(
-            dedup_key="synthetic-later-files", data=item.model_dump(mode="json"),
-            original_data={"synthetic_original": "preserved"}, review_state="RESEARCH",
+            dedup_key="synthetic-later-files",
+            data=item.model_dump(mode="json"),
+            original_data={"synthetic_original": "preserved"},
+            review_state="RESEARCH",
         )
         session.add(row)
         session.flush()
@@ -64,10 +69,15 @@ def attachment_workspace(client, tmp_path, monkeypatch):
 def attach(client, listing_id, originals, raw, *, screenshot=False, photo_id=None):
     artifact_id = ("b" if screenshot else "a") * 32
     attachment = ResearchAttachment(
-        artifact_id=artifact_id, source="ShopGoodwill", source_listing_id=SOURCE_ID,
-        source_url=SOURCE_URL, observation_id="synthetic-original-report",
-        received_at=RECEIVED, reviewed_at=REVIEWED,
-        original_sha256=hashlib.sha256(raw).hexdigest(), bytes=len(raw),
+        artifact_id=artifact_id,
+        source="ShopGoodwill",
+        source_listing_id=SOURCE_ID,
+        source_url=SOURCE_URL,
+        observation_id="synthetic-original-report",
+        received_at=RECEIVED,
+        reviewed_at=REVIEWED,
+        original_sha256=hashlib.sha256(raw).hexdigest(),
+        bytes=len(raw),
         kind="SCREENSHOT" if screenshot else "AUCTION_TERMS",
         display_name="SYNTHETIC screenshot.png" if screenshot else "SYNTHETIC terms.md",
         vision_photo_id=photo_id,
@@ -88,11 +98,9 @@ def test_terms_download_is_verified_plaintext_and_report_history_is_preserved(
     client, attachment_workspace
 ):
     listing_id, originals, _, report = attachment_workspace
-    raw = b'# SYNTHETIC terms\n<script>alert(1)</script>\n![image](https://invalid.test/pixel)\n'
+    raw = b"# SYNTHETIC terms\n<script>alert(1)</script>\n![image](https://invalid.test/pixel)\n"
     attachment, _ = attach(client, listing_id, originals, raw)
-    response = client.get(
-        f"/listings/{listing_id}/research-attachments/{attachment.artifact_id}"
-    )
+    response = client.get(f"/listings/{listing_id}/research-attachments/{attachment.artifact_id}")
     assert response.status_code == 200
     assert response.content == raw
     assert response.headers["content-type"] == "text/plain; charset=utf-8"
@@ -100,9 +108,11 @@ def test_terms_download_is_verified_plaintext_and_report_history_is_preserved(
     assert "no-store" in response.headers["cache-control"]
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["content-security-policy"] == "default-src 'none'; sandbox"
-    feed = client.get("/feed?dataset=fixture")
+    feed = client.get("/feed?dataset=fixture&scope=all")
     detail = client.get(f"/listings/{listing_id}")
-    for page in (feed, detail):
+    assert feed.status_code == 200
+    assert "Supporting files received later" not in feed.text
+    for page in (detail,):
         assert page.status_code == 200
         assert "1 supporting file received later" in page.text
         assert "2027-01-07 12:00:00 UTC" in page.text
@@ -141,7 +151,8 @@ def test_unavailable_or_wrong_listing_terms_fail_closed(client, attachment_works
     else:
         with client.app.state.sessions.begin() as session:
             other = Listing(
-                dedup_key="synthetic-unrelated", original_data={},
+                dedup_key="synthetic-unrelated",
+                original_data={},
                 data=ListingInput(source="manual", raw_title="SYNTHETIC unrelated").model_dump(
                     mode="json"
                 ),
@@ -149,9 +160,7 @@ def test_unavailable_or_wrong_listing_terms_fail_closed(client, attachment_works
             session.add(other)
             session.flush()
             listing_id = other.id
-    response = client.get(
-        f"/listings/{listing_id}/research-attachments/{attachment.artifact_id}"
-    )
+    response = client.get(f"/listings/{listing_id}/research-attachments/{attachment.artifact_id}")
     assert response.status_code == 404
     assert "no-store" in response.headers["cache-control"]
     assert response.headers["x-content-type-options"] == "nosniff"
@@ -171,25 +180,22 @@ def test_screenshot_uses_only_private_normalized_photo_path(client, attachment_w
     case_id = int(case.url.path.rsplit("/", 1)[1])
     upload = client.post(
         f"/vision/cases/{case_id}/photos",
-        data={"roles": "FRONT"}, files={"files": ("SYNTHETIC.png", raw, "image/png")},
+        data={"roles": "FRONT"},
+        files={"files": ("SYNTHETIC.png", raw, "image/png")},
     )
     assert upload.status_code == 200
     with client.app.state.sessions() as session:
         photo = session.scalar(select(VisionPhoto).where(VisionPhoto.case_id == case_id))
         photo_id = photo.id
-    attachment, _ = attach(
-        client, listing_id, originals, raw, screenshot=True, photo_id=photo_id
-    )
-    feed = client.get("/feed?dataset=fixture")
-    assert Images(feed.text).sources == [f"/vision/photos/{photo_id}"]
+    attachment, _ = attach(client, listing_id, originals, raw, screenshot=True, photo_id=photo_id)
+    feed = client.get("/feed?dataset=fixture&scope=all")
+    assert Images(feed.text).sources == [f"/feed/photos/{photo_id}"]
     normalized = client.get(f"/vision/photos/{photo_id}")
     assert normalized.status_code == 200
     assert normalized.headers["content-type"] == "image/png"
     assert "no-store" in normalized.headers["cache-control"]
     assert normalized.headers["x-content-type-options"] == "nosniff"
     assert b"SYNTHETIC_PRIVATE_METADATA" not in normalized.content
-    original = client.get(
-        f"/listings/{listing_id}/research-attachments/{attachment.artifact_id}"
-    )
+    original = client.get(f"/listings/{listing_id}/research-attachments/{attachment.artifact_id}")
     assert original.status_code == 404
     assert str(originals) not in feed.text

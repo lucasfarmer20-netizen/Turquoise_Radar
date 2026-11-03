@@ -107,12 +107,12 @@ def test_default_real_feed_and_explicit_nonlive_filters(client, item):
             row = candidate(session, item.model_copy(update={"raw_title": name}), name)
             for mode in modes:
                 observation(session, row, mode)
-    response = client.get("/feed")
+    response = client.get("/feed?scope=needs_photos")
     assert titles(response) == {"Synthetic production evidence"}
     assert "Synthetic fixture evidence" not in response.text
     assert response.context["counts"] == {"real": 1, "fixture": 1, "sandbox": 1, "mixed": 1}
     for dataset in ("fixture", "sandbox", "mixed"):
-        page = client.get("/feed", params={"dataset": dataset})
+        page = client.get("/feed", params={"dataset": dataset, "scope": "needs_photos"})
         assert titles(page) == {f"Synthetic {dataset} evidence"}
         assert f"{dataset.upper()} · NON-LIVE" in page.text
 
@@ -134,7 +134,7 @@ def test_closed_and_ended_items_remain_available_in_explicit_archive(client, ite
             "irrelevant",
             state="IRRELEVANT",
         )
-    assert titles(client.get("/feed")) == {"Open synthetic"}
+    assert titles(client.get("/feed?scope=needs_photos")) == {"Open synthetic"}
     assert titles(client.get("/feed?scope=archive")) == {
         "Passed synthetic",
         "Ended synthetic",
@@ -163,16 +163,17 @@ def test_linked_card_uses_owner_state_and_latest_feedback_without_merging_manual
                 Feedback(listing_id=owner.id, action="Interested", created_at=NOW),
             ]
         )
-    response = client.get("/feed")
+    response = client.get("/feed?scope=needs_photos")
     assert len(response.context["cards"]) == 2
     cards = {card["listing_id"]: card for card in response.context["cards"]}
     assert cards[owner.id]["state"] == "WATCH"
     assert cards[owner.id]["candidate_ids"] == [first.id, second.id]
     assert cards[manual.id]["candidate_ids"] == []
-    assert "Latest owner feedback: <strong>Interested</strong>" in response.text
-    assert "Latest owner feedback: <strong>Passed</strong>" not in response.text
-    assert "2 recorded observations" in response.text
-    assert "owner capture" in response.text
+    assert "GO ✓" in response.text
+    assert "NO GO ✓" not in response.text
+    assert cards[owner.id]["observation_count"] == 2
+    assert cards[manual.id]["observation_count"] == 0
+    assert "recorded observations" not in response.text
 
 
 def test_exact_query_correction_currency_and_unknown_cost_render_separately(client, item):
@@ -184,42 +185,44 @@ def test_exact_query_correction_currency_and_unknown_cost_render_separately(clie
         observation(
             session, row, "production", query="  turqoise <ring>  ", corrected="turquoise ring"
         )
-    response = client.get("/feed")
+    response = client.get("/feed?scope=needs_photos")
     assert response.status_code == 200
-    assert "<code>  turqoise &lt;ring&gt;  </code>" in response.text
-    assert "SOURCE CORRECTED · PRODUCTION" in response.text
-    assert "Correction: CORRECTED → <code>turquoise ring</code>" in response.text
+    card = response.context["cards"][0]
+    evidence = card["query_evidence"][0]
+    assert evidence["query"] == "  turqoise <ring>  "
+    assert evidence["correction_state"] == "CORRECTED"
+    assert evidence["corrected_query"] == "turquoise ring"
     assert "15.00 CAD" in response.text
-    assert "Delivered acquisition cost</dt><dd>UNKNOWN" in response.text
-    assert "Unknown cost components: shipping cost." in response.text
-    assert "observed price is not a final winning bid" in response.text
-    assert "Confirm Alaska 99669 shipping eligibility" in response.text
+    assert card["a"].landed is None
+    assert card["missing_costs"] == ["shipping_cost"]
+    assert "NEEDS INFO" in response.text
+    assert "<code>" not in response.text
     assert "SYNTHETIC RAW DATA NEVER RENDER" not in response.text
 
 
 def test_candidate_promotion_and_existing_owner_feedback_actions_work_from_feed(client, item):
     with client.app.state.sessions.begin() as session:
         row = candidate(session, item, "promote")
-    before = client.get("/feed")
-    assert f'action="/inbox/candidates/{row.id}/review"' in before.text
+    before = client.get("/feed?scope=needs_photos")
+    assert f'action="/feed/review/candidate/{row.id}"' in before.text
     promoted = client.post(f"/inbox/candidates/{row.id}/review", follow_redirects=False)
     assert promoted.status_code == 303
     with client.app.state.sessions() as session:
         listing_id = session.get(DiscoveredItem, row.id).listing_id
     assert promoted.headers["location"] == f"/listings/{listing_id}"
-    after = client.get("/feed")
+    after = client.get("/feed?scope=needs_photos")
     assert len(after.context["cards"]) == 1
-    assert f'action="/listings/{listing_id}/feedback"' in after.text
+    assert f'action="/feed/review/listing/{listing_id}"' in after.text
     assert (
         client.post(f"/listings/{listing_id}/feedback", data={"action": "Interested"}).status_code
         == 200
     )
-    assert client.get("/feed").context["cards"][0]["state"] == "WATCH"
+    assert client.get("/feed?scope=needs_photos").context["cards"][0]["state"] == "WATCH"
     assert (
         client.post(f"/listings/{listing_id}/feedback", data={"action": "Passed"}).status_code
         == 200
     )
-    assert titles(client.get("/feed")) == set()
+    assert titles(client.get("/feed?scope=needs_photos")) == set()
     archived = client.get("/feed?scope=archive")
     assert archived.context["cards"][0]["latest_feedback"]["action"] == "Passed"
 
@@ -234,9 +237,9 @@ def test_browse_candidate_uses_discovery_promotion_and_preserves_provider_envelo
         )
         row.original_data = original
         observation(session, row, "production")
-    response = client.get("/feed")
+    response = client.get("/feed?scope=needs_photos")
     action = f"/discovery/items/{row.id}/review"
-    assert f'action="{action}"' in response.text
+    assert f'action="/feed/review/candidate/{row.id}"' in response.text
     assert f'href="/discovery/items/{row.id}"' in response.text
     assert client.post(action, follow_redirects=False).status_code == 303
     with client.app.state.sessions() as session:

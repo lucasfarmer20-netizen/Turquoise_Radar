@@ -121,6 +121,7 @@ def mutation_allowed(path):
             r"|inbox/observations/[0-9]+/confirm-query"
             r"|vision/cases/[0-9]+/photos"
             r"|vision/photos/[a-f0-9]{32}/remove"
+            r"|feed/review/(?:listing|candidate)/[0-9]+"
             r"|feed/prepare|saved-searches/[0-9]+"
             r"|patterns(?:/[^/]+/toggle)?|settings|calibration"
             r")",

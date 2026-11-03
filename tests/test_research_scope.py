@@ -270,10 +270,9 @@ def test_plain_sqlite_backup_preserves_scope_and_owner_feedback(scoped_db, tmp_p
             assert destination.execute("PRAGMA foreign_key_check").fetchall() == []
     with TestClient(create_app(f"sqlite:///{snapshot}", expected_scope=NEW_ONLY_SCOPE)) as client:
         assert client.get("/health").json()["scope"] == new_only_marker()
-        assert (
-            "Latest owner feedback: <strong>Passed</strong>"
-            in client.get("/feed?scope=archive").text
-        )
+        archive = client.get("/feed?scope=archive")
+        assert "NO GO ✓" in archive.text
+        assert archive.context["cards"][0]["latest_feedback"]["action"] == "Passed"
         with client.app.state.sessions() as session:
             assert session.get(Listing, 1).review_state == "PASSED"
             assert len(list(session.scalars(select(Feedback)))) == 1

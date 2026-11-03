@@ -149,8 +149,8 @@ See the [owner workflow, local setup and persistence notes](docs/JRI-005.md).
 
 Open **Sourcing feed** for inbox candidates and owner-reviewed listings in one view.
 Linked observations share a card; exact query history, current owner feedback,
-Alaska shipping and missing delivered-cost evidence remain visible. Real data is
-the default, with separate fixture/sandbox/mixed views and an explicit closed-item
+Alaska shipping and missing delivered-cost evidence remain available in research.
+Real data is the default, with separate fixture/sandbox/mixed views and an explicit closed-item
 archive. Viewing the feed makes no marketplace requests.
 
 **Prepare searches** connects the existing 65-phrase catalog to new disabled
@@ -180,6 +180,16 @@ seller claims do not become verified material or owner decisions. Later owner
 screenshots and terms attach through verified private receipts while preserving
 earlier reports; previews stay local and terms download as inert text. See
 [the actual import and manual trial receipt](docs/JRI-017.md).
+
+JRI-018 makes `/feed` a compact photo grid with dated prices, supported deadlines,
+one-line price assessments and direct **GO / NO GO** feedback. GO saves Interested;
+NO GO saves Passed in the existing reversible review history. **Needs Photos**
+retains items without verified local item photographs, and **Ended** retains
+closed auctions. Full costs, source evidence and research remain behind **Research**.
+Unknown fees, Alaska fulfillment, currency or valuation evidence prevent a deal
+label. The isolated real-data cohort has two open photo cards, one ended photo
+card and 24 items needing photos; all three photographed items need more pricing
+evidence. See [compact-feed behavior and verification](docs/JRI-018.md).
 
 ## Multi-source inbox (Task 004)
 
