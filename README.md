@@ -176,7 +176,9 @@ Acquisition currency corrections explicitly clear older amounts instead of
 relabeling them. Dated owner research now separates observed bids, realized auction
 results, partial cost subtotals, Alaska quote/fulfillment evidence and shipping
 burden. Ended opportunities retain their research history in the closed view;
-seller claims do not become verified material or owner decisions. See
+seller claims do not become verified material or owner decisions. Later owner
+screenshots and terms attach through verified private receipts while preserving
+earlier reports; previews stay local and terms download as inert text. See
 [the actual import and manual trial receipt](docs/JRI-017.md).
 
 ## Multi-source inbox (Task 004)

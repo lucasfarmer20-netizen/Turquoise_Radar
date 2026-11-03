@@ -1,10 +1,21 @@
 """Append-only owner research and quote economics, separate from source/decision history."""
 
+import os
 from copy import deepcopy
 from decimal import ROUND_CEILING, Decimal
+from pathlib import Path
 
-from radar.db import Listing, ListingEdit
-from radar.schemas import ListingInput, ResearchObservation, Shipping, ValueStatus
+from radar.db import Listing, ListingEdit, VisionCase, VisionPhoto
+from radar.jewelry.images import clean_image
+from radar.jewelry.schemas import OWNER
+from radar.research_assets import read_research_asset, read_research_photo
+from radar.schemas import (
+    ListingInput,
+    ResearchAttachment,
+    ResearchObservation,
+    Shipping,
+    ValueStatus,
+)
 
 QUOTE_FIELDS = {
     "item_price": "item_quote",
@@ -173,6 +184,65 @@ def append_research_observation(session, listing_id, observation, *, canonical_u
         row.data = after
         session.add(ListingEdit(listing_id=row.id, before_data=before, after_data=deepcopy(after)))
     return True
+
+
+def append_research_attachments(session, listing_id, attachments, root, *, photo_root=None):
+    """Append validated later receipts in one audit; leave reports and decisions unchanged.
+
+    Original files and normalized photos must already exist. All metadata, ownership
+    and bytes are checked before assigning any row; the caller commits the transaction.
+    Exact repeats remain no-ops but still require the private files to pass validation.
+    """
+    attachments = [ResearchAttachment.model_validate(value) for value in attachments]
+    if not 1 <= len(attachments) <= 50:
+        raise ValueError("Supply one to fifty private research attachments")
+    with session.no_autoflush:
+        row = session.get(Listing, listing_id)
+        if row is None:
+            raise ValueError("Research listing not found")
+        item = ListingInput.model_validate(row.data)
+        known = {entry.artifact_id: entry for entry in item.research_attachments}
+        added = []
+        for attachment in attachments:
+            if existing := known.get(attachment.artifact_id):
+                if existing != attachment:
+                    raise ValueError("Artifact ID already has different receipt evidence")
+            else:
+                known[attachment.artifact_id] = attachment
+                added.append(attachment.model_dump(mode="json"))
+        after = deepcopy(row.data)
+        after["research_attachments"] = [*after.get("research_attachments", []), *added]
+        ListingInput.model_validate(after)
+        if photo_root is None:
+            bind = session.get_bind()
+            database = Path(bind.engine.url.database or "data/radar.db")
+            photo_root = os.getenv(
+                "VISION_IMAGE_DIR", str(database.parent / (database.stem + "-vision-images"))
+            )
+        photo_root = Path(photo_root).absolute()
+        for attachment in attachments:
+            raw = read_research_asset(root, attachment)
+            if attachment.kind == "SCREENSHOT":
+                photo = session.get(VisionPhoto, attachment.vision_photo_id)
+                case = session.get(VisionCase, photo.case_id) if photo else None
+                if (
+                    photo is None
+                    or not photo.active
+                    or photo.original_hash != attachment.original_sha256
+                    or case is None
+                    or case.owner_id != OWNER
+                    or case.listing_id != listing_id
+                ):
+                    raise ValueError("Research screenshot must bind this owner's listing photo")
+                normalized = read_research_photo(photo_root, photo)
+                if clean_image(raw).data != normalized:
+                    raise ValueError("Research screenshot does not match its normalized photo")
+        if not added:
+            return 0
+        before = deepcopy(row.data)
+        row.data = after
+        session.add(ListingEdit(listing_id=row.id, before_data=before, after_data=deepcopy(after)))
+    return len(added)
 
 
 def _subtotal(components, base):

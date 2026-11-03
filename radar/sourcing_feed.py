@@ -277,6 +277,7 @@ def _build_feed(session, prefs):
                 query_evidence=history or _query_from_item(item),
                 observation_count=sum(counts[row.id] for row in linked),
                 research_observation_count=len(item.research_observations),
+                research_attachment_count=len(item.research_attachments),
                 latest_feedback=feedback.get(listing.id) if listing else None,
                 missing_costs=[k for k, value in analysis.costs.items() if value is None],
                 next_evidence=_next_evidence(item, analysis, availability),

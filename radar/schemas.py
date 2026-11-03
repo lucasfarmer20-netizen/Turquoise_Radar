@@ -141,6 +141,60 @@ class Preferences(BaseModel):
 ResearchText = Annotated[str, StringConstraints(min_length=1, max_length=2000)]
 
 
+def _research_identity(source, source_listing_id, source_url):
+    domain = "shopgoodwill.com" if source == "ShopGoodwill" else "hibid.com"
+    host = source_url.host or ""
+    if (
+        source_url.scheme != "https"
+        or source_url.username
+        or source_url.password
+        or not (host == domain or host.endswith("." + domain))
+    ):
+        raise ValueError("Research URL must belong to the named marketplace")
+    pattern = r"/item/([^/]+)/?" if source == "ShopGoodwill" else r"/lot/([^/]+)(?:/.*)?"
+    identity = re.fullmatch(pattern, source_url.path, re.IGNORECASE)
+    if not identity or identity[1] != source_listing_id:
+        raise ValueError("Research source item ID must match its direct listing URL")
+
+
+class ResearchAttachment(BaseModel):
+    """A separately received private original, bound to an unchanged owner report."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    artifact_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    source: Literal["ShopGoodwill", "HiBid"]
+    source_listing_id: str = Field(min_length=1, max_length=200)
+    source_url: HttpUrl
+    observation_id: str = Field(pattern=r"^[A-Za-z0-9_.-]{1,100}$")
+    received_at: datetime
+    original_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    bytes: int = Field(ge=1, le=10_000_000)
+    kind: Literal["SCREENSHOT", "AUCTION_TERMS"]
+    display_name: str = Field(min_length=1, max_length=200)
+    vision_photo_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    reviewed_at: datetime | None = None
+    review_note: str | None = Field(default=None, min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def attachment_boundaries(self):
+        _research_identity(self.source, self.source_listing_id, self.source_url)
+        for value in (self.received_at, self.reviewed_at):
+            if value is not None and value.utcoffset() is None:
+                raise ValueError("Attachment timestamps require an explicit UTC offset")
+        if self.display_name in (".", "..") or any(
+            char in "/\\" or ord(char) < 32 or ord(char) == 127 for char in self.display_name
+        ):
+            raise ValueError("Attachment display name must be a plain basename")
+        if (self.kind == "SCREENSHOT") != (self.vision_photo_id is not None):
+            raise ValueError("Screenshots require a normalized photo; terms cannot refer to one")
+        if self.kind == "AUCTION_TERMS" and self.bytes > 1_000_000:
+            raise ValueError("Auction terms exceed the private text size limit")
+        if (self.reviewed_at is not None) != bool(self.review_note and self.review_note.strip()):
+            raise ValueError("Attachment review requires both a timestamp and a note")
+        return self
+
+
 class ResearchObservation(BaseModel):
     """Append-only owner reports; source claims do not establish verified financial facts."""
 
@@ -207,19 +261,7 @@ class ResearchObservation(BaseModel):
                 raise ValueError("Research timestamps require an explicit UTC offset")
         if self.observed_at is not None and self.observed_at.date() != self.observed_date:
             raise ValueError("Observed date must match the explicitly supplied observation time")
-        domain = "shopgoodwill.com" if self.source == "ShopGoodwill" else "hibid.com"
-        host = self.source_url.host or ""
-        if (
-            self.source_url.scheme != "https"
-            or self.source_url.username
-            or self.source_url.password
-            or not (host == domain or host.endswith("." + domain))
-        ):
-            raise ValueError("Research URL must belong to the named marketplace")
-        pattern = r"/item/([^/]+)/?" if self.source == "ShopGoodwill" else r"/lot/([^/]+)(?:/.*)?"
-        identity = re.fullmatch(pattern, self.source_url.path, re.IGNORECASE)
-        if not identity or identity[1] != self.source_listing_id:
-            raise ValueError("Research source item ID must match its direct listing URL")
+        _research_identity(self.source, self.source_listing_id, self.source_url)
         if (self.reported_end_at is None) != (self.reported_end_zone is None):
             raise ValueError("A reported deadline requires its explicit source timezone")
         if self.reported_end_zone:
@@ -316,6 +358,7 @@ class ListingInput(BaseModel):
     invoice_allocation_confirmed: bool = False
     invoice_allocation_evidence: str | None = None
     research_observations: list[ResearchObservation] = Field(default_factory=list, max_length=50)
+    research_attachments: list[ResearchAttachment] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode="after")
     def evidence(self):
@@ -332,6 +375,19 @@ class ListingInput(BaseModel):
                     "Research observations must uniquely bind this source item and URL"
                 )
             seen_observations.add(observation.observation_id)
+        seen_artifacts, seen_hashes = set(), set()
+        for attachment in self.research_attachments:
+            if (
+                attachment.artifact_id in seen_artifacts
+                or attachment.original_sha256 in seen_hashes
+                or attachment.source != self.source
+                or attachment.source_listing_id != self.source_listing_id
+                or attachment.source_url != self.listing_url
+                or attachment.observation_id not in seen_observations
+            ):
+                raise ValueError("Research attachments must uniquely bind this item and its report")
+            seen_artifacts.add(attachment.artifact_id)
+            seen_hashes.add(attachment.original_sha256)
         if self.invoice_allocation_confirmed and not self.invoice_allocation_evidence:
             raise ValueError("Invoice allocation confirmation requires evidence")
         if (self.resale_low is None) != (self.resale_high is None):

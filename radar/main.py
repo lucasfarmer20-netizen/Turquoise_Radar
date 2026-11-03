@@ -31,6 +31,7 @@ from radar.intake.views import alert_history
 from radar.jewelry.routes import VisionBodyLimit, vision_routes
 from radar.owner_routes import owner_routes
 from radar.research_evidence import research_projection
+from radar.research_routes import research_routes
 from radar.research_scope import inspect_scope, mutation_allowed
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping, utcnow
 from radar.sources import import_rows, upsert_listing
@@ -127,10 +128,11 @@ def create_app(database_url=None, *, expected_scope=None):
             response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
-        response.headers["Content-Security-Policy"] = (
+        response.headers.setdefault(
+            "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
-            "base-uri 'self'; form-action 'self'"
+            "base-uri 'self'; form-action 'self'",
         )
         if scope:
             response.headers["X-Radar-Research-Scope"] = scope.schema_version
@@ -438,6 +440,7 @@ def create_app(database_url=None, *, expected_scope=None):
     discovery_routes(app, render, preferences)
     intake_routes(app, render, preferences)
     sourcing_routes(app, render, preferences)
+    research_routes(app)
     vision_routes(app, render)
     identification_routes(app, render, preferences)
     return app

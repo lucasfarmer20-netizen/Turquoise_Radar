@@ -1,4 +1,4 @@
-{% set o=r.latest %}
+{% set o=r.latest %}{% set later_attachments=i.research_attachments|selectattr('observation_id','equalto',o.observation_id)|list %}
 {% macro money(value, currency) -%}
 {% if value is none %}UNKNOWN{% else %}{{ '%0.2f'|format(value) }} {{ currency }}{% if currency=='XXX' %} · ISO currency unverified{% endif %}{% endif %}
 {%- endmacro %}
@@ -6,7 +6,7 @@
 <div class="labels"><span class="badge review">RESEARCH · {{ r.priority }} PRIORITY</span><span class="badge">OWNER-REPORTED EVIDENCE</span></div>
 <p>{{ o.priority_reason }}</p>
 <p class="muted">Owner-reported screenshots / auction terms · observed {{ o.observed_date }}{% if o.observed_at %} at {{ o.observed_at|zoned_time('UTC') }}{% else %} · exact capture time and timezone UNKNOWN{% endif %}. Recorded {{ o.recorded_at|zoned_time('UTC') }}.</p>
-<p class="muted">{% if o.artifacts_received %}Supporting files recorded privately; source claims still require verification.{% else %}Original screenshots and terms files have not been received; these findings are the owner's report, not an inspection of stored images.{% endif %}</p>
+<p class="muted">{% if later_attachments %}This report was initially recorded from the owner's account without the original files. {{ later_attachments|length }} supporting file{{ '' if later_attachments|length==1 else 's' }} received later; receipt and review are recorded in the supporting files section. The original report and its timestamps remain unchanged.{% else %}Original screenshots and terms files have not been received; these findings are the owner's report, not an inspection of stored images.{% endif %}</p>
 <p><strong>Availability:</strong> {% if o.availability=='ACTIVE_AT_OBSERVATION' %}Active at observation · current availability unverified{% elif o.availability=='ENDED' %}ENDED · historical research; no owner purchase or PASS implied{% else %}UNKNOWN{% endif %}.</p>
 {% if o.reported_end_at %}<p>Reported lot deadline: <time datetime="{{ o.reported_end_at.isoformat() }}">{{ o.reported_end_at|zoned_time('America/Los_Angeles') }}</time> Pacific · {{ o.reported_end_at|zoned_time('America/Anchorage') }} Alaska · {{ o.reported_end_at|zoned_time('UTC') }}.{% if o.reported_end_zone!='America/Los_Angeles' %} Source zone: {{ o.reported_end_zone }}.{% endif %}</p>{% elif o.auction_start_date or o.auction_end_date %}<p>Auction dates: {{ o.auction_start_date or 'UNKNOWN' }} through {{ o.auction_end_date or 'UNKNOWN' }} · exact closing time UNKNOWN.</p>{% endif %}
 {% if o.realized_hammer is not none %}
@@ -25,6 +25,7 @@
 {% if o.shipping_restrictions %}<ul class="risk">{% for restriction in o.shipping_restrictions %}<li>{{ restriction }}</li>{% endfor %}</ul>{% endif %}
 {% if r.shipping_handling is not none %}<p><strong>Shipping and handling:</strong> {{ money(r.shipping_handling, o.currency) }} · {{ r.shipping_item_ratio|pct }} of observed item price · {{ r.shipping_subtotal_ratio|pct }} of known quoted subtotal.</p><p class="muted">Shipping burden affects research ordering only. It is not a PASS decision; supported maker, collector or margin evidence can justify further research.{% if r.burden_exempt %} Existing supporting evidence exempts this item from the burden penalty.{% endif %}</p>{% endif %}
 <details{% if not research_compact|default(false) %} open{% endif %}><summary>Material claims and remaining research</summary>
+{% if later_attachments %}<p class="muted">Original report wording retained below; supporting files received later are listed separately. Statements that original files were unavailable describe the original report date.</p>{% endif %}
 <p>Seller: {{ o.seller_name or 'UNKNOWN' }} · auctioneer: {{ o.auctioneer_name or 'UNKNOWN' }} · location: {{ o.seller_location or 'UNKNOWN' }}.</p>
 <p>Seller-reported gross weight: {{ o.gross_weight_g if o.gross_weight_g is not none else 'UNKNOWN' }} g. Eligible silver weight and independently verified purity: UNKNOWN.</p>
 {% for label,claims in [('Seller material claims',o.material_claims),('Owner-reported visible marks',o.reported_marks),('Seller-reported testing',o.seller_test_claims),('Reported pieces',o.piece_descriptions)] %}<h5>{{ label }}</h5><ul>{% for claim in claims %}<li>{{ claim }}</li>{% else %}<li>UNKNOWN</li>{% endfor %}</ul>{% endfor %}
