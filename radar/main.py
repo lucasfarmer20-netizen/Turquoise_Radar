@@ -31,6 +31,7 @@ from radar.jewelry.routes import VisionBodyLimit, vision_routes
 from radar.owner_routes import owner_routes
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
 from radar.sources import import_rows, upsert_listing
+from radar.sourcing_routes import sourcing_routes
 from radar.workflow import attributed_patterns, queue_state
 
 ROOT = Path(__file__).resolve().parent
@@ -93,7 +94,7 @@ def create_app(database_url=None):
             "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
             "base-uri 'self'; form-action 'self'"
         )
-        if request.url.path.startswith("/identify"):
+        if request.url.path.startswith(("/identify", "/feed")):
             response.headers["Cache-Control"] = "private, no-store"
             response.headers["Content-Security-Policy"] = response.headers[
                 "Content-Security-Policy"
@@ -379,6 +380,7 @@ def create_app(database_url=None):
     owner_routes(app, render, preferences, view)
     discovery_routes(app, render, preferences)
     intake_routes(app, render, preferences)
+    sourcing_routes(app, render, preferences)
     vision_routes(app, render)
     identification_routes(app, render, preferences)
     return app
