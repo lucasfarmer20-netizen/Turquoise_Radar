@@ -29,6 +29,7 @@ from radar.intake.routes import intake_routes
 from radar.intake.views import alert_history
 from radar.jewelry.routes import VisionBodyLimit, vision_routes
 from radar.owner_routes import owner_routes
+from radar.research_scope import inspect_scope, mutation_allowed
 from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
 from radar.sources import import_rows, upsert_listing
 from radar.sourcing_routes import sourcing_routes
@@ -59,9 +60,10 @@ def view(row, prefs, patterns):
     }
 
 
-def create_app(database_url=None):
+def create_app(database_url=None, *, expected_scope=None):
     @asynccontextmanager
     async def lifespan(app):
+        app.state.research_scope = inspect_scope(database_url, expected_scope)
         app.state.engine, app.state.sessions = database(database_url)
         with app.state.sessions.begin() as session:
             seed_patterns(session)
@@ -86,7 +88,19 @@ def create_app(database_url=None):
             request.headers.get("sec-fetch-site") == "cross-site" or (origin and origin != expected)
         ):
             return HTMLResponse("Cross-origin mutation rejected", status_code=403)
-        response = await call_next(request)
+        scope = getattr(app.state, "research_scope", None)
+        if (
+            scope
+            and request.method not in ("GET", "HEAD", "OPTIONS")
+            and not mutation_allowed(request.url.path)
+        ):
+            response = HTMLResponse(
+                "NEW-ONLY, REAL-EMAIL RESEARCH: this action is outside the approved email "
+                "cohort. Local evidence, photo and owner-feedback review remain available.",
+                status_code=403,
+            )
+        else:
+            response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Content-Security-Policy"] = (
@@ -94,7 +108,9 @@ def create_app(database_url=None):
             "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
             "base-uri 'self'; form-action 'self'"
         )
-        if request.url.path.startswith(("/identify", "/feed")):
+        if scope:
+            response.headers["X-Radar-Research-Scope"] = scope.schema_version
+        if scope or request.url.path.startswith(("/identify", "/feed")):
             response.headers["Cache-Control"] = "private, no-store"
             response.headers["Content-Security-Policy"] = response.headers[
                 "Content-Security-Policy"
@@ -102,13 +118,17 @@ def create_app(database_url=None):
         return response
 
     def render(request, name, **context):
+        context["research_scope"] = getattr(app.state, "research_scope", None)
         return TEMPLATES.TemplateResponse(request=request, name=name, context=context)
 
     @app.get("/health")
     def health():
         with app.state.sessions() as s:
             s.execute(select(Setting).limit(1))
-        return {"status": "ok", "destination": "99669", "mode": "private"}
+        result = {"status": "ok", "destination": "99669", "mode": "private"}
+        if app.state.research_scope:
+            result["scope"] = app.state.research_scope.model_dump(by_alias=True)
+        return result
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request):

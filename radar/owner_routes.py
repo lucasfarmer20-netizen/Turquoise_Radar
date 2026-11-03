@@ -25,6 +25,7 @@ ACQUISITION = [
     "handling_fee",
 ]
 EDITABLE = ACQUISITION + [
+    "currency",
     "source_listing_id",
     "seller_id",
     "sale_auction_id",
@@ -212,6 +213,32 @@ def owner_routes(app, render, preferences, view):
                 raise HTTPException(404, "Listing not found")
             before = dict(row.data)
             updates = {k: (v if v != "" else None) for k, v in form.items() if k in EDITABLE}
+            if "currency" in updates:
+                currency = updates["currency"]
+                if not isinstance(currency, str):
+                    raise HTTPException(
+                        422, "Enter a three-letter currency code or XXX for UNKNOWN"
+                    )
+                currency = currency.strip()
+                if not (
+                    len(currency) == 3
+                    and currency.isascii()
+                    and currency.isalpha()
+                    and currency.isupper()
+                ):
+                    raise HTTPException(
+                        422, "Enter a three-letter currency code or XXX for UNKNOWN"
+                    )
+                updates["currency"] = currency
+            currency_changed = updates.get("currency", before.get("currency", "USD")) != before.get(
+                "currency", "USD"
+            )
+            if currency_changed and form.get("confirm_currency_change") != "yes":
+                raise HTTPException(
+                    422,
+                    "Confirm the currency change and clearing of acquisition amounts; "
+                    "save currency first, then enter new quotes",
+                )
             for key in ("resale_confirmed", "weight_verified", "invoice_allocation_confirmed"):
                 if key in form:
                     updates[key] = form[key] == "true"
@@ -220,6 +247,17 @@ def owner_routes(app, render, preferences, view):
                 updates["combined_shipping_available"] = None if value == "" else value == "true"
             statuses = dict(before.get("cost_status", {}))
             statuses.update({k: form[k + "_status"] for k in ACQUISITION if k + "_status" in form})
+            if currency_changed:
+                # A complete editor submission includes old amounts. Do not
+                # relabel or convert them when the owner corrects the currency.
+                updates.update({key: None for key in ACQUISITION})
+                statuses.update({key: "UNKNOWN" for key in ACQUISITION})
+                updates.update(
+                    buyer_profile=None,
+                    invoice_fee_allocation=None,
+                    invoice_allocation_confirmed=False,
+                    invoice_allocation_evidence=None,
+                )
             try:
                 if updates.get("item_end_time") is not None:
                     # Validate only an entered/changed deadline, keeping untouched
