@@ -1,10 +1,10 @@
 # JRI-014 private ledger backup operation
 
-**Proposed simplified closeout:** see [the owner decision and reviewed IAM plan](JRI-014-CLOSEOUT.md).
-The proposal defers mandatory independent offline custody in exchange for an
-explicit owner-accepted limitation: existing encrypted cloud backups are **not
-guaranteed recoverable after loss of the required on-host keys**. Owner acceptance
-and IAM mutation authorization remain pending. No four-hour RTO is demonstrated.
+**Accepted simplified closeout:** see [the owner decision and authorized IAM plan](JRI-014-CLOSEOUT.md).
+The owner approved deferring mandatory independent offline custody in exchange for
+the explicit limitation: existing encrypted cloud backups are **not guaranteed
+recoverable after loss of the required on-host keys**. The reviewed IAM reduction
+is authorized and awaits administrator execution. No four-hour RTO is demonstrated.
 Backup operation, signature/deletion handling, HMAC binding and fresh nonce checks
 are unchanged; no production key or backup is deleted or rotated.
 
@@ -39,9 +39,8 @@ ran inside this cycle. No new object download/decryption is claimed. Actual
 same-event retry and wire HTTP 204 receipt were not observed. The owner separately
 confirmed that the Production keyset is **enabled**; explicit portal validation
 details remain unavailable.
-Independent custody remains unverified. Under the proposed policy, its deferral
-would no longer block IAM closeout once the owner accepts the limitation and
-authorizes reduction. Temporary IAM reduction and post-reduction operation remain
+Independent custody remains unverified. Under the accepted policy, its deferral
+does not block IAM closeout. Temporary IAM reduction and post-reduction operation remain
 pending. The current non-secret receipt and observation window are in
 [JRI-014](JRI-014.md). Keep PR #26 draft; no Browse pilot is authorized.
 
@@ -233,13 +232,13 @@ qualification. The public receiver must still have no service account.
 
 ## Optional owner-operated offline export
 
-The [simplified closeout proposal](JRI-014-CLOSEOUT.md) describes optional future
+The [accepted closeout policy](JRI-014-CLOSEOUT.md) describes optional future
 custody using an existing owner-controlled encrypted vault. The earlier
 [WSL2 two-media guide](https://github.com/lucasfarmer20-netizen/Turquoise_Radar/blob/803ee28cb92d559403268d3cab31f70fffd9632e/docs/JRI-014-CLOSEOUT.md)
 and source bundle remain historical optional tooling. Synthetic Linux validation
 does not complete production custody. Never retrieve production recovery keys into
-Codex or Cloud Shell. IAM reduction requires explicit revised-gate authorization;
-the proposal does not require another export or timed drill before that decision.
+Codex or Cloud Shell. Revised-gate authorization has been received; no further
+export or timed drill is required before the authorized IAM reduction.
 
 The earlier owner-selected secure offline IAP export specified two encrypted copies
 in separate physical locations, with HMAC and decryption-key records logically
