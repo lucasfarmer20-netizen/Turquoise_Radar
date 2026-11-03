@@ -1,5 +1,13 @@
 # JRI-014 private ledger backup operation
 
+**Proposed simplified closeout:** see [the owner decision and reviewed IAM plan](JRI-014-CLOSEOUT.md).
+The proposal defers mandatory independent offline custody in exchange for an
+explicit owner-accepted limitation: existing encrypted cloud backups are **not
+guaranteed recoverable after loss of the required on-host keys**. Owner acceptance
+and IAM mutation authorization remain pending. No four-hour RTO is demonstrated.
+Backup operation, signature/deletion handling, HMAC binding and fresh nonce checks
+are unchanged; no production key or backup is deleted or rotated.
+
 The owner approved `tr-ledger-runner-01`, a private non-Spot e2-micro in
 us-west1-b with a retained 10 GiB pd-standard disk and the dedicated
 `tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com` identity. Conservative
@@ -31,8 +39,10 @@ ran inside this cycle. No new object download/decryption is claimed. Actual
 same-event retry and wire HTTP 204 receipt were not observed. The owner separately
 confirmed that the Production keyset is **enabled**; explicit portal validation
 details remain unavailable.
-Offline custody, temporary IAM reduction and post-reduction operation also remain
-open. The current non-secret receipt and observation window are in
+Independent custody remains unverified. Under the proposed policy, its deferral
+would no longer block IAM closeout once the owner accepts the limitation and
+authorizes reduction. Temporary IAM reduction and post-reduction operation remain
+pending. The current non-secret receipt and observation window are in
 [JRI-014](JRI-014.md). Keep PR #26 draft; no Browse pilot is authorized.
 
 ## Package and runtime
@@ -221,17 +231,17 @@ Do not grant the writer/deployer recovery impersonation or change
 follow; successful execution of these commands alone does not complete recovery
 qualification. The public receiver must still have no service account.
 
-## Approved owner-operated offline export
+## Optional owner-operated offline export
 
-For the owner's Windows computer, follow the exact
-[WSL2 Ubuntu closeout guide](JRI-014-CLOSEOUT.md). Its owner bundle includes the
-unchanged export helper and an optional timed restore-reader/quarantine helper.
-Synthetic Linux validation does not complete production custody. Do not retrieve
-production recovery keys into Codex or Cloud Shell; wait for the owner's verified
-two-copy/fingerprint/physical-placement/passphrase-recovery receipt before IAM
-reduction. A new production timed recovery receipt is still pending.
+The [simplified closeout proposal](JRI-014-CLOSEOUT.md) describes optional future
+custody using an existing owner-controlled encrypted vault. The earlier
+[WSL2 two-media guide](https://github.com/lucasfarmer20-netizen/Turquoise_Radar/blob/803ee28cb92d559403268d3cab31f70fffd9632e/docs/JRI-014-CLOSEOUT.md)
+and source bundle remain historical optional tooling. Synthetic Linux validation
+does not complete production custody. Never retrieve production recovery keys into
+Codex or Cloud Shell. IAM reduction requires explicit revised-gate authorization;
+the proposal does not require another export or timed drill before that decision.
 
-The owner selected secure offline IAP export: two owner-controlled encrypted copies
+The earlier owner-selected secure offline IAP export specified two encrypted copies
 in separate physical locations, with HMAC and decryption-key records logically
 separate inside the bundle. The only recoverable copy must not depend on the
 receiver, runner, bucket or these same recovery keys. A named vault is not required.

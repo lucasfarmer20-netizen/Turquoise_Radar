@@ -1,405 +1,185 @@
-# JRI-014 owner recovery custody and final IAM closeout
+# JRI-014 — proposed simplified internal-tool closeout
 
-The real eBay acceptance and post-event backup at `8b5e2f3` remain valid. This
-procedure does not repeat activation or provisioning. PR #26 stays draft until
-owner custody, administrator IAM reduction and post-reduction verification pass.
-The unobserved actual retry and wire-level HTTP 204 receipt remain unverified.
+**Decision pending.** This is a reviewed proposal for the owner-operated sourcing
+app, not a record of accepted risk or authorized IAM mutation. The owner asked to
+prepare it; explicit acceptance of the revised gate and authorization of the IAM
+removal are still required. No production resources, keys, backups or permissions
+were changed in this review.
 
-## Windows / WSL2 Ubuntu owner procedure
+## Minimal closeout
 
-Run these steps on the owner's Windows computer, never in Codex or Cloud Shell.
-The downloadable `jri014-owner-recovery.zip` contains only reviewed source,
-instructions and a source/hash manifest; it contains no production credentials.
-Keep the Linux working directory and authenticated CLI configuration on WSL's
-Linux filesystem, outside Windows/cloud-synchronized folders. The two output
-files go directly to two different removable physical devices. Use a trusted
-owner-controlled computer with protected local storage, and no shell tracing or
-terminal transcript during secret handling.
+1. Record the owner's acceptance of the recovery limitation below instead of
+   requiring the two-USB export or a timed recovery drill to close JRI-014.
+2. Have the authorized Google administrator remove the reviewed temporary deployer
+   access, independently of the deferred offline export.
+3. Verify the existing receiver, private backup path and preserved identities after
+   reduction. Then recommend PR #26 ready for review/merge. Keep it draft meanwhile.
 
-These commands target **x86_64 WSL2 Ubuntu 24.04**. The Ubuntu package/runtime and
-synthetic helper tests were exercised in an Ubuntu 24.04 container. Windows WSL
-installation, DrvFS mounts, owner authentication and actual physical media must
-be checked on the owner's computer; the container does not certify those steps.
+The enabled Production keyset, registered deletion endpoint, signature checks,
+durable deletion handling, Caddy, receiver, private runner, encrypted cloud backups
+and narrow operational permissions remain in place. No activation or provisioning
+is repeated. No actual duplicate eBay delivery or wire-level 204 receipt is required
+for this closeout; their absence remains explicitly recorded.
 
-### 1. Install or select Ubuntu 24.04
+## Proposed recovery limitation — owner acceptance required
 
-In Windows PowerShell as Administrator, if this distribution is not installed:
+> I accept deferring independent recovery-key custody for this internal tool.
+> Existing cloud backups remain encrypted and verified at upload, but they are
+> **not guaranteed recoverable after loss of the required on-host keys**. Neither
+> independent key custody nor a four-hour recovery target has been demonstrated.
+> This limitation replaces the mandatory two-USB export/timed-drill closeout gate;
+> it does not waive eBay deletion handling or authorize an empty replacement ledger.
 
-```powershell
-wsl --install -d Ubuntu-24.04
+Record acceptance only after an explicit owner reply. No key or backup is deleted,
+rotated, exported into Codex or treated as independently recoverable. Existing
+backup timers, age checks, HMAC binding and per-operation fresh nonce proof remain
+mandatory. A successful encrypted upload proves an upload, not survival of lost
+recovery keys. The previous local quarantine timing does not demonstrate a full RTO.
+
+If required keys or deletion-ledger continuity are lost, pause affected eBay-data
+intake/import/export/replay/restore/reopening and receiver restart/redeployment
+until complete valid state has been recovered and verified, or affected-data
+removal/sanitized reconciliation has been completed and verified under an explicit
+decision. Never use a new HMAC or empty ledger to bypass prior deletion obligations.
+Unrelated isolated owner workflows need not be blocked. This is an operational
+requirement: the current receiver constructor can create a missing queue file;
+this proposal does **not** claim an automatic fail-closed receiver-startup guard.
+No runtime change is made here.
+
+## Optional future custody — one existing owner-controlled vault
+
+When convenient, use an existing encrypted vault independent of the production
+hosts/project, rather than requiring two USB devices or another service:
+
+1. On an owner-controlled computer, use the existing approved export helper with
+   its two required **new local encrypted staging files**. Those staging files are
+   verification copies, not independent physical custody. Check the existing HMAC
+   and public-key identifiers in the backup runbook.
+2. Store one verified encrypted bundle in that existing owner-controlled vault.
+   Retrieve the vault copy and compare its ciphertext SHA-256 with the original
+   that the helper authenticated and decrypted successfully in memory.
+3. Keep the bundle passphrase and vault/account recovery independently recoverable
+   from the production machines. Retain only a non-secret receipt of verification.
+   Remove temporary staging files when safely retained; do not claim secure erasure.
+
+Call this verified vault custody only after owner verification. It is optional,
+adds no infrastructure, and proves neither two-media custody nor a recovery-time
+objective. Never put key values/passphrases in chat, Git or task output. The earlier
+[WSL2 two-media instructions](https://github.com/lucasfarmer20-netizen/Turquoise_Radar/blob/803ee28cb92d559403268d3cab31f70fffd9632e/docs/JRI-014-CLOSEOUT.md)
+and existing helpers remain available as optional historical tooling, not a new
+required product milestone under the proposed policy.
+
+## Reviewed IAM removal scope
+
+Read-only observation: **2026-11-02 15:52:51 AKST
+(2026-11-03 00:52:51 UTC)**. Project `turquoiseradar` is active, project number
+`100948930799`, with no parent returned. These are observed direct bindings; final
+permission denial and operational health are checked after authorized removal.
+
+| Resource | Remove only | Current policy etag |
+|---|---|---|
+| Project `turquoiseradar` | The deployer member from the nine roles below | `BwZfTtWb3Gs=` |
+| `tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com` | Deployer `roles/iam.serviceAccountUser` | `BwZfT2YuBis=` |
+| `codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com` | The single dedicated subject's `roles/iam.workloadIdentityUser` binding below | `BwZfTtPff4w=` |
+
+The exact deployer member is
+`serviceAccount:codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com`.
+All listed bindings were unconditioned. The dedicated observed federation subject is:
+
+```text
+principal://iam.googleapis.com/projects/100948930799/locations/global/workloadIdentityPools/codex/subject/oai:v1:oic:oic_6ae8ccf36cec819487de78d9ed901222
 ```
 
-Restart if requested, create the Linux user when prompted, then in PowerShell:
-
-```powershell
-wsl --list --verbose
-```
-
-Require `Ubuntu-24.04` with VERSION `2`. If that distribution exists as version 1,
-convert only it with `wsl --set-version Ubuntu-24.04 2`. Open it with:
-
-```powershell
-wsl -d Ubuntu-24.04
-```
-
-The commands below run in that interactive Ubuntu terminal. Stop on an error;
-do not continue into the export after a failed prerequisite.
-
-### 2. Prepare the Linux tools and reviewed source bundle
+The administrator must reread these policies immediately before applying, confirm
+this exact member/role/condition scope, and compare afterward. Do not overwrite
+whole policies from an old snapshot. The following commands are **prepared only;
+execute after the owner's explicit revised-gate and IAM authorization**, under the
+administrator's own approved identity:
 
 ```bash
 set -euo pipefail
-set +x
-umask 077
-ulimit -c 0
-test -t 0
-test -t 2
-test "$(uname -m)" = x86_64
-sudo apt-get update
-sudo apt-get install -y python3 python3-cryptography openssh-client curl ca-certificates
-python3 -c 'import sys,cryptography; assert sys.version_info >= (3,12); assert int(cryptography.__version__.split(".")[0]) >= 41; print("Python/cryptography ready")'
-
-recovery_work="$HOME/tr-recovery-owner"
-test ! -e "$recovery_work"
-mkdir -m 700 "$recovery_work"
-read -r -p 'WSL path to downloaded jri014-owner-recovery.zip: ' recovery_archive
-python3 -m zipfile -e "$recovery_archive" "$recovery_work"
-cd "$recovery_work"
-python3 - <<'PY'
-import hashlib,json,pathlib
-d=json.loads(pathlib.Path('SOURCE.json').read_text())
-for name,want in d['files_sha256'].items():
-    assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()==want, name
-print('Source files verified; reviewed commit:', d['source_commit'])
-PY
+for role in \
+  roles/compute.instanceAdmin.v1 \
+  roles/compute.networkAdmin \
+  roles/compute.osAdminLogin \
+  roles/compute.securityAdmin \
+  roles/iam.securityReviewer \
+  roles/iap.tunnelResourceAccessor \
+  roles/orgpolicy.policyViewer \
+  roles/serviceusage.serviceUsageViewer \
+  roles/storage.admin
+do
+  gcloud projects remove-iam-policy-binding turquoiseradar \
+    --member=serviceAccount:codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com \
+    --role="$role" --condition=None --quiet
+done
+gcloud iam service-accounts remove-iam-policy-binding \
+  tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com \
+  --project=turquoiseradar \
+  --member=serviceAccount:codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com \
+  --role=roles/iam.serviceAccountUser --condition=None --quiet
 ```
 
-A Windows download such as `C:\Users\OWNER\Downloads\jri014-owner-recovery.zip`
-is `/mnt/c/Users/OWNER/Downloads/jri014-owner-recovery.zip` in WSL. Enter the real
-path at the prompt; spaces are supported. Only the source archive is read from
-that Windows path. The helper needs about 256 MiB for each Scrypt derivation;
-leave adequate free WSL memory.
-
-Install the tested Google Linux CLI archive. The fixed version and checksum
-avoid silently changing the tested CLI. This uses TLS verification throughout.
+At this point, use non-mutating permission tests with the deployer to check that
+Compute mutation, Storage mutation and runner actAs grants are absent. Do not issue
+a destructive request as a test. Then remove only its observed federation subject:
 
 ```bash
-curl --fail --show-error --location \
-  --output google-cloud-cli.tar.gz \
-  https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-591.0.0-linux-x86_64.tar.gz
-printf '%s\n' '8b8c1be16284f7072359de05d31fe5ce52b6052fb295404a62a54b7d03ec4326  google-cloud-cli.tar.gz' | sha256sum --check
-tar -xzf google-cloud-cli.tar.gz
-export PATH="$recovery_work/google-cloud-sdk/bin:$PATH"
-gcloud --version
+gcloud iam service-accounts remove-iam-policy-binding \
+  codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com \
+  --project=turquoiseradar \
+  --member='principal://iam.googleapis.com/projects/100948930799/locations/global/workloadIdentityPools/codex/subject/oai:v1:oic:oic_6ae8ccf36cec819487de78d9ed901222' \
+  --role=roles/iam.workloadIdentityUser --condition=None --quiet
 ```
 
-If using a Windows ARM computer, stop before the x86_64 package step; a matching
-ARM package requires separate validation. Do not run Windows `gcloud.exe` from
-these Linux helper commands.
+Also disable/retire the dedicated `turquoise-radar-deploy` provider/connection once
+its exact mapping is checked by the administrator. Managed pool-list and targeted
+provider-read requests returned `identity_unsupported_request`; this is not proof
+that the Google provider is missing or that its state is disabled. The known pool
+is `codex`, derived from the observed subject; do not delete this shared pool or
+alter the read-only provider. Provider mutation remains conditional on the exact
+administrator readback; no guessed provider command is supplied. Removing the
+observed deployer impersonation binding already addresses that grant. Provider
+revocation alone would not remove permissions from previously issued credentials.
 
-### 3. Authenticate as the approved owner and prepare pinned IAP access
+Preserve the independently read-back protections:
 
-Use a new dedicated CLI configuration. Do not copy the managed deployer's
-federation files, use Cloud Shell, or create a service-account key. The approved
-owner recovery operator is `lucas.farmer20@gmail.com`. This procedure assumes its
-existing approved IAP/OS administrator access; it grants no project/IAM roles.
+- `codex-radar-reader`: project Compute Viewer and Storage Bucket Viewer, plus its
+  distinct existing read-only federation subject; no new OS/admin grants.
+- Runner: bucket-only Object Creator. Restore reader: bucket-only Object Viewer.
+- Owner: Token Creator only on the separate restore-reader service account.
+- Receiver: no attached service account. Runner: its existing dedicated identity.
+- All production VMs, network, firewall, address, disks, bucket, encryption keys,
+  backups, unrelated IAM members and organization policy.
 
-```bash
-export CLOUDSDK_CORE_DISABLE_FILE_LOGGING=true
-export CLOUDSDK_CORE_LOG_HTTP=false
-gcloud config configurations create jri014-owner-recovery
-export CLOUDSDK_ACTIVE_CONFIG_NAME=jri014-owner-recovery
-gcloud auth login lucas.farmer20@gmail.com --no-launch-browser
-gcloud config set account lucas.farmer20@gmail.com
-gcloud config set project turquoiseradar
-```
+At **15:54:17 AKST (00:54:17 UTC on November 3)**, the unchanged reader successfully
+read both running VMs, confirmed the receiver's empty service-account attachment,
+and the runner's expected attached identity. This is pre-reduction preservation
+evidence, not a substitute for the post-reduction checks.
 
-Complete Google's login in your own browser; do not send login codes or credentials
-to this task. If the named configuration already exists, inspect/reuse your own
-known configuration deliberately instead of overwriting it. A service-account
-impersonation/credential override must not be configured for the export. The
-separate restore-reader impersonation is explicit only in the timing step.
+## Small post-reduction receipt
 
-The existing helper requires an SSH key. The following creates a new dedicated
-owner-local key, uploads only its public half through OS Login for two hours, and
-loads the private key into the local SSH agent. Choose its passphrase through the
-hidden `ssh-keygen` prompts. This is an SSH access key, not a recovery-key export.
+After authorized reduction, record only non-secret results:
 
-```bash
-recovery_ssh="$recovery_work/owner-iap"
-test ! -e "$recovery_ssh"
-ssh-keygen -t ed25519 -a 100 -f "$recovery_ssh" -C jri014-owner-recovery
-eval "$(ssh-agent -s)"
-ssh-add "$recovery_ssh"
-gcloud compute os-login ssh-keys add \
-  --key-file="$recovery_ssh.pub" --ttl=2h --project=turquoiseradar \
-  --format=json > owner-login-receipt.json
-recovery_fingerprint=$(python3 - <<'PY'
-import json,pathlib
-d=json.loads(pathlib.Path('owner-login-receipt.json').read_text())
-p=d.get('loginProfile',d)
-key=pathlib.Path('owner-iap.pub').read_text().split()[:2]
-matches=[k for k,v in p['sshPublicKeys'].items() if v['key'].split()[:2]==key]
-assert len(matches)==1
-print(matches[0])
-PY
-)
-```
+- Deployer mutation/actAs permissions absent; dedicated federation no longer usable
+  or retired. Distinguish a permission denial from an authentication/managed-policy
+  failure and account for propagation before claiming completion.
+- Existing reader authentication and read-only VM inspection still work.
+- Public TLS succeeds; exact missing-challenge route returns receiver 400 and an
+  unrelated route returns 404, without unintended redirects.
+- Through approved owner/operator access, receiver and Caddy are active/enabled,
+  backup and age timers healthy, and one fresh nonce-bound pull plus encrypted GCS
+  upload advances the receipt with the current aggregate ledger counts.
+- The owner's separate restore-reader access remains usable. This need not include
+  another key-export ceremony or claim a measured RTO.
 
-If owner login/import fails, stop and resolve the approved owner access with the
-administrator. Do not grant broad roles or reuse the Codex deployer identity.
-The export helper checks both fixed VM IDs, obtains host keys from authenticated
-Compute serial output and requires strict pinned Ed25519 IAP SSH. Do not replace
-that with `ssh-keyscan`, trust-on-first-use or disabled host checking.
+Use an authorized owner/operator for private-host checks, not a lingering deployer
+SSH session or expanded reader permissions. Label independently observed versus
+owner-provided evidence. Keep the PR draft until the revised policy is accepted,
+removal is applied and these checks pass; then recommend ready/merge.
 
-### 4. Identify and mount two different physical devices
+## Next product task
 
-Connect two existing suitable removable devices. Do not format disks. In Windows
-PowerShell, substitute their actual drive letters for the example `E` and `F`:
-
-```powershell
-Get-Partition -DriveLetter E | Get-Disk | Select-Object Number,FriendlyName,BusType
-Get-Partition -DriveLetter F | Get-Disk | Select-Object Number,FriendlyName,BusType
-```
-
-Require different physical disk Numbers/devices, not two partitions on one disk.
-Use existing NTFS media supporting DrvFS metadata. Linux mode bits do not replace
-Windows ACLs or encryption; the recovery files themselves are encrypted. Back in
-the same Ubuntu terminal:
-
-```bash
-read -r -p 'First removable drive letter, without colon: ' recovery_drive_one
-read -r -p 'Second removable drive letter, without colon: ' recovery_drive_two
-[[ "$recovery_drive_one" =~ ^[D-Zd-z]$ ]]
-[[ "$recovery_drive_two" =~ ^[D-Zd-z]$ ]]
-test "${recovery_drive_one^^}" != "${recovery_drive_two^^}"
-sudo mkdir -p /mnt/tr-recovery-one /mnt/tr-recovery-two
-if mountpoint -q /mnt/tr-recovery-one || mountpoint -q /mnt/tr-recovery-two; then
-  printf '%s\n' 'Mount point already in use; stop and inspect.'
-  exit 1
-fi
-sudo mount -t drvfs "${recovery_drive_one^^}:" /mnt/tr-recovery-one \
-  -o "metadata,uid=$(id -u),gid=$(id -g),umask=077"
-sudo mount -t drvfs "${recovery_drive_two^^}:" /mnt/tr-recovery-two \
-  -o "metadata,uid=$(id -u),gid=$(id -g),umask=077"
-mountpoint -q /mnt/tr-recovery-one
-mountpoint -q /mnt/tr-recovery-two
-recovery_stamp=$(date -u +%Y%m%dT%H%M%SZ)
-recovery_one="/mnt/tr-recovery-one/TurquoiseRadar-$recovery_stamp"
-recovery_two="/mnt/tr-recovery-two/TurquoiseRadar-$recovery_stamp"
-mkdir -m 700 "$recovery_one" "$recovery_two"
-python3 - "$recovery_one" "$recovery_two" <<'PY'
-import os,pathlib,stat,sys,tempfile
-for folder in sys.argv[1:]:
-    fd,name=tempfile.mkstemp(prefix='nonsecret-permission-probe-',dir=folder)
-    p=pathlib.Path(name)
-    try:
-        with os.fdopen(fd,'wb') as f:
-            f.write(b'nonsecret removable-media readback probe\n')
-            f.flush(); os.fsync(f.fileno())
-        assert stat.S_IMODE(p.stat().st_mode)==0o600
-        assert p.stat().st_uid==os.getuid()
-        assert p.read_bytes()==b'nonsecret removable-media readback probe\n'
-    finally:
-        p.unlink()
-print('Both media passed private-file creation and readback probes')
-PY
-```
-
-Stop if either probe fails. Do not weaken permissions or silently redirect a copy
-to the internal disk. These checks cannot prove physical placement; that remains
-the owner's responsibility.
-
-### 5. Export and verify the two encrypted copies
-
-Run the existing reviewed helper from the owner computer only:
-
-```bash
-test -t 0
-test -t 2
-python3 deploy/ebay-deletion/export-recovery.py --owner-machine \
-  --ssh-key-file "$recovery_ssh" \
-  --copy-one "$recovery_one/turquoise-recovery.encrypted" \
-  --copy-two "$recovery_two/turquoise-recovery.encrypted"
-```
-
-Enter a distinct recovery passphrase of at least 20 characters through the hidden
-prompts. Arrange independent passphrase recovery; do not make its only recoverable
-copy depend on these encrypted files, the receiver, runner or this task. Never
-paste a passphrase or recovery key into chat, command arguments or environment
-variables. The helper writes only encrypted files and verifies each by authenticated
-decryption in memory. It refuses existing output files. A failure can leave one
-encrypted copy; a failure is not a successful two-copy custody receipt.
-
-Require the success JSON to report **encrypted_copies_verified: 2** and exactly:
-
-- HMAC identifier: `0eb6b203e7fe4ffd`
-- Encryption public-key SHA-256:
-  `042d38760c4e132e24a072539d8abfc52f90cf37d6e1ef019fd1a85459524e40`
-
-If either identifier differs, stop and report only the mismatch. Do not reveal
-the underlying keys. Keep the non-secret success receipt. The timing drill below
-can run while the first device is still mounted; it does not substitute for
-final physical custody.
-
-### 6. Optional new measured restore-reader drill
-
-This uses the approved separate restore reader and the previously qualified
-**synthetic** cloud object, not the writer or deployer. The source has a one-day
-lifecycle; if it is unavailable, the helper fails closed. Do not substitute an
-unreviewed source or create another object silently.
-
-```bash
-mkdir -p -m 700 "$recovery_work/drills"
-test -t 0
-test -t 2
-python3 deploy/ebay-deletion/time-recovery.py --owner-machine \
-  --recovery-copy "$recovery_one/turquoise-recovery.encrypted" \
-  --destination "$recovery_work/drills/download-quarantine-$(date -u +%Y%m%dT%H%M%SZ)"
-```
-
-The helper unlocks the offline bundle only in owner-process memory and recomputes
-both required key identifiers. It uses the approved owner login to impersonate
-`tr-ledger-restore-reader@turquoiseradar.iam.gserviceaccount.com` for the download,
-checks the known ciphertext checksum, and calls the existing protected-quarantine
-validator. Only encrypted download bytes and the private quarantined ledger/manifest
-are written; keys are not written as plaintext files. The destination must be new
-with a private 0700 Linux-filesystem parent, not a Windows drive.
-
-Its receipt records UTC start immediately before the cloud download, UTC completion
-after checksum/decryption/quarantine validation, and monotonic elapsed time. Unlock,
-setup and media retrieval are explicitly outside that interval. Success must retain
-`offline_copy_only=true`, `current_receiver_proof=false` and
-`operational_restore_performed=false`. Saved proofs never become current; future
-operations still require the existing fresh nonce-bound barrier. Report only this
-aggregate receipt. An untimed/failed run or the synthetic local tests do not
-demonstrate a four-hour RTO. Even a timed success measures download-through-quarantine,
-not restoration of live service or total disaster-response time.
-
-### 7. Remove temporary owner SSH access and place the media
-
-After export (and the optional timing drill), remove only the key created above:
-
-```bash
-gcloud compute os-login ssh-keys remove \
-  --key="$recovery_fingerprint" --project=turquoiseradar --quiet
-ssh-add -d "$recovery_ssh"
-rm -- "$recovery_ssh" "$recovery_ssh.pub"
-ssh-agent -k
-sync
-sudo umount /mnt/tr-recovery-one
-sudo umount /mnt/tr-recovery-two
-```
-
-Safely eject both devices in Windows and place them in separate physical locations.
-Do not erase the verified encrypted copies. Retain the private quarantine only
-under owner-controlled protection; it is not a live or current ledger.
-
-Send only this custody confirmation, after physical placement is complete:
-
-> Two encrypted copies were written and independently verified. HMAC identifier:
-> `0eb6b203e7fe4ffd`. Encryption public-key SHA-256:
-> `042d38760c4e132e24a072539d8abfc52f90cf37d6e1ef019fd1a85459524e40`.
-> The copies are on separate physical media in separate physical locations.
-> The passphrase is independently recoverable.
-
-Do not include locations, key values, passphrases, private keys or plaintext exports.
-Custody remains **pending** until the owner supplies this verification.
-
-## Administrator IAM handoff — gated on verified owner custody
-
-No IAM reduction is authorized to run ahead of the custody gate. After the receipt
-arrives, refresh effective grants and prepare the final exact removal diff using
-current policy etags. Have the authorized Google administrator apply it under
-their own administrator identity. The following is the removal scope, not a
-claim that fresh policies have already been inspected or reduced:
-
-| Resource | Exact removal scope |
-|---|---|
-| Project `turquoiseradar` | Only `serviceAccount:codex-radar-deployer@turquoiseradar.iam.gserviceaccount.com` from the nine temporary roles below |
-| `tr-ledger-runner@turquoiseradar.iam.gserviceaccount.com` IAM | Only that deployer's `roles/iam.serviceAccountUser` binding |
-| Deployer service-account IAM | Exact observed temporary WIF principal memberships granting deployer impersonation; inspect conditions and preserve unrelated members |
-| Dedicated `turquoise-radar-deploy` provider/connection | Disable/retire only its freshly resolved exact provider resource and dedicated connection; preserve the read-only provider and pool |
-
-The nine previously observed unconditioned project roles are:
-
-```text
-roles/compute.instanceAdmin.v1
-roles/compute.networkAdmin
-roles/compute.osAdminLogin
-roles/compute.securityAdmin
-roles/iam.securityReviewer
-roles/iap.tunnelResourceAccessor
-roles/orgpolicy.policyViewer
-roles/serviceusage.serviceUsageViewer
-roles/storage.admin
-```
-
-Fresh inspection must cover project ancestry/inherited grants, project policy,
-deployer/runner/restore-reader service-account policies, bucket policy, relevant
-resource-level policies, the exact WIF pool/provider, and tested effective
-permissions. Resolve conditions, custom roles or group-based grants before claiming
-the effective audit complete. Do not guess a pool ID or remove a shared principal
-at another resource. If the managed identity cannot read a policy, obtain that
-non-secret readback from the authorized administrator rather than widening access.
-
-The review must verify unchanged reader project roles/federation, runner bucket-only
-Object Creator, restore-reader bucket-only Object Viewer, the owner's narrowly
-scoped Token Creator, and the receiver's empty service-account attachment. Retain
-production VMs, disks, network, address, firewall and bucket resources. Do not change
-unrelated IAM, org policies or APIs. Provider disablement alone does not remove
-already issued credentials' privileges; resource-role removal and effective
-permission verification are required too.
-
-Use member-specific removals with the observed condition (or `--condition=None`
-only when confirmed unconditioned), then compare all policies to the reviewed
-diff. Do not apply a stale whole-policy replacement. Remove the runner actAs and
-project mutation grants, verify denial with non-mutating permission tests, then
-remove dedicated federation access and disable the exact provider. No destructive
-deployment request is needed to prove denial. Do not carry a deployer SSH session
-across reduction as a substitute for an authorized post-reduction operator path.
-
-The exact current WIF principal/provider resource names and reviewed administrator
-commands will be recorded after custody confirmation and fresh readback. They are
-not fabricated from earlier display names.
-
-## Required post-reduction evidence
-
-Independently inspect the reduced policy and effective deployer permissions:
-Compute instance/network/firewall/disk mutations, Storage writes/deletes and runner
-actAs must be absent; fresh deployer federation must fail or be retired. Confirm
-the unchanged `GCP` reader can still authenticate and read receiver/runner resource
-state. Record propagation/timing limits and distinguish authentication failure
-from a tested permission denial.
-
-Verify public HTTPS with normal TLS and exact missing-challenge route 400 plus
-unrelated-path 404. Through the approved owner/operator authenticated path, inspect
-receiver/Caddy active+enabled state, backup/age timers, and run a fresh nonce-bound
-private pull plus encrypted upload with advancing receipt and aggregate ledger
-counts. Use no deployer credentials. The existing reader is read-only cloud access,
-not an OS administrator; do not add SSH rights to it. If only owner-operated
-receipts are available for private-host checks, label their provenance and keep
-any unmet independent-verification gate open rather than silently upgrading them.
-
-Verify the owner's restore-reader download path still works. Inspect logging
-configuration and aggregate checks without exposing private journal content; scan
-Git and the final diff for secrets/payloads. Run the full repository suite and
-review the complete PR diff. Retain the real-event receipt and qualification limits.
-Only after custody, reduction and all post-reduction checks pass may the PR be
-recommended ready for review and merge. No Browse pilot or paid inference call is
-authorized here.
-
-## Reference and test scope
-
-The platform steps follow Microsoft's [WSL installation](https://learn.microsoft.com/en-us/windows/wsl/install)
-and [DrvFS permission](https://learn.microsoft.com/en-us/windows/wsl/file-permissions)
-documentation. The pinned CLI follows Google's [Linux installation guide](https://cloud.google.com/sdk/docs/install-sdk).
-Actual WSL/media authentication and the production custody/timed recovery results
-are owner operations. Local synthetic tests cannot complete those gates.
-
-Validation of this preparation: 975 repository tests passed, including 21 new
-synthetic custody/timing cases; those 21 also passed in an Ubuntu 24.04 container
-with networking disabled (Python 3.12.3, cryptography 41.0.7). Google CLI 591.0.0
-loaded successfully there, the source-only bundle extracted and verified, and
-all eight Bash blocks passed syntax checks. Ruff, formatting, whitespace and final
-PR-diff review passed. Windows/DrvFS and real owner execution remain untested here.
+Use the existing bounded [four-query sourcing pilot](JRI-011-NEXT-PILOT.md) as the
+next separately authorized task. This proposal authorizes no OAuth/Browse request,
+purchase, bid, paid vision call, recurring search or unrestricted scraping.
