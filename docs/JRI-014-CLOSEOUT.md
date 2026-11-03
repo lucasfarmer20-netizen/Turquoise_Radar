@@ -5,19 +5,20 @@ the owner explicitly selected **"Approve revised policy and IAM plan"** in respo
 to the reviewed recovery-limitation and scoped-removal question. The two-USB export
 gate is replaced by the accepted limitation below; no additional approval is needed
 for the reviewed removal scope. The owner reports executing the first removal
-block in Cloud Shell; no mutation timestamp was supplied. Effective project/bucket
-mutation and runner actAs checks now return no tested grants. Fresh literal-policy
-readback remains blocked by the attached identities' reduced read permissions, so
-Phase 1 is not yet fully verified. This verification made no IAM, resource, key or
-backup changes. Federation remains unchanged.
+block in Cloud Shell; no mutation timestamp was supplied. **PHASE 1 IAM REDUCTION
+VERIFIED:** independent permission/reader checks and the owner's administrator
+policy readback establish the first-block reduction. The readback's observation
+label is **2026-11-03T01:33:57Z**; it is not a mutation or exact read-completion
+timestamp. This verification made no IAM, resource, key or backup changes.
+Federation remains unchanged.
 
 ## Minimal closeout
 
 1. **Complete:** owner accepted the recovery limitation below instead of requiring
    the two-USB export or a timed recovery drill to close JRI-014.
-2. Complete the fresh administrator policy readback for the reported first-block
-   removal, then retire only the dedicated deployment federation binding. Provider
-   retirement still requires its exact verified mapping.
+2. **Phase 1 verified:** nine deployer project bindings and runner actAs removed.
+   Next, the authorized administrator retires only the dedicated deployment
+   federation binding. Provider retirement still requires its exact verified mapping.
 3. Verify the existing receiver, private backup path and preserved identities after
    reduction. Then recommend PR #26 ready for review/merge. Keep it draft meanwhile.
 
@@ -126,8 +127,9 @@ gcloud iam service-accounts remove-iam-policy-binding \
   --role=roles/iam.serviceAccountUser --condition=None --quiet
 ```
 
-After fresh policy readback and effective-permission verification pass, the
-authorized administrator's exact next step is the single-member removal below.
+Phase 1 policy readback and effective-permission verification have passed as
+documented below. The authorized administrator's exact next step is the
+single-member removal below.
 It is **not executed in this verification task**. Reread the deployer service-account
 policy first and confirm this unconditioned member/role pair still matches; do not
 change the reader service account or shared pool:
@@ -188,7 +190,7 @@ that removes its dedicated federation subject. Provider retirement still require
 the exact administrator-verified mapping. The subsequent owner report and fresh
 verification observations below supersede this earlier execution-pending status.
 
-## Phase 1 verification — effective checks pass; policy readback pending
+## Phase 1 IAM reduction verified
 
 The owner reports removing all nine project roles and the runner
 `roles/iam.serviceAccountUser` binding through the approved first block in Cloud
@@ -231,12 +233,28 @@ policy was changed and no existing resource or identity was modified. Narrow
 bucket/owner recovery grants remain required and were not changed by this task;
 their current binding lists were not independently reread here.
 
-**Do not mark Phase 1 fully verified yet.** Permission loss supports the owner's
-report but is not a substitute for the requested fresh literal-binding readback.
-The administrator has been asked to run these read-only commands and return their
-non-secret output. Both successful reads must show no matched deployer bindings
-(`[]`); any remaining binding or command failure requires inspection. No new IAM
-grant is needed, and the first removal block should not be repeated blindly.
+The owner supplied the requested administrator Cloud Shell readback in command
+order, resolving the literal-binding evidence gap:
+
+```text
+Observation UTC: 2026-11-03T01:33:57Z
+[]
+WARNING: The following filter keys were not present in any resource : bindings.members
+[]
+```
+
+The first `[]` is the project-policy result; the second is the runner-SA-policy
+result. No matching direct deployer membership remains in either returned policy,
+including all nine named project roles and the runner service-account-user grant.
+The warning is consistent with an empty binding list and does not invalidate the
+empty result. This is **owner-supplied administrator evidence**, distinct from the
+independent permission tests and working reader checks above. The printed UTC
+timestamp precedes the reads; exact read completion and IAM mutation times were
+not supplied and are not inferred. This filtered readback does not establish the
+state of unrelated bindings or replace final operational verification.
+
+**PHASE 1 IAM REDUCTION VERIFIED.** No additional read grant or repeated removal is
+required. The commands below are retained to identify the completed readback.
 The installed SDK's filter/flatten/projection was checked locally against synthetic
 present, absent, empty and lookalike members. Only the literal member matched;
 this is command validation, not production policy evidence.

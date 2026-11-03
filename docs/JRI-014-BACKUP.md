@@ -4,9 +4,10 @@
 The owner approved deferring mandatory independent offline custody in exchange for
 the explicit limitation: existing encrypted cloud backups are **not guaranteed
 recoverable after loss of the required on-host keys**. The reviewed IAM reduction
-is authorized; the owner reports the first removal block complete. Effective
-permission tests pass, with literal-policy readback, federation retirement and
-final operational verification pending. No four-hour RTO is demonstrated.
+is authorized. Phase 1 is verified by independent permission/reader checks plus
+owner-supplied administrator readback labeled **2026-11-03T01:33:57Z**. Federation
+retirement and final operational verification remain pending. No four-hour RTO
+is demonstrated.
 Backup operation, signature/deletion handling, HMAC binding and fresh nonce checks
 are unchanged; no production key or backup is deleted or rotated.
 
@@ -42,8 +43,8 @@ same-event retry and wire HTTP 204 receipt were not observed. The owner separate
 confirmed that the Production keyset is **enabled**; explicit portal validation
 details remain unavailable.
 Independent custody remains unverified. Under the accepted policy, its deferral
-does not block IAM closeout. First-block removal is owner-reported; fresh policy
-readback, final federation reduction and post-reduction operation remain pending.
+does not block IAM closeout. First-block removal is verified; final federation
+reduction and post-reduction operation remain pending.
 The current non-secret receipt and observation window are in
 [JRI-014](JRI-014.md). Keep PR #26 draft; no Browse pilot is authorized.
 
