@@ -145,6 +145,21 @@ workbench with visibly conditional maker-based comparable scenarios. Owner decis
 stay separate from source claims and do not train a model or alter listing finances.
 See the [owner workflow, local setup and persistence notes](docs/JRI-005.md).
 
+## Sourcing feed (JRI-015)
+
+Open **Sourcing feed** for inbox candidates and owner-reviewed listings in one view.
+Linked observations share a card; exact query history, current owner feedback,
+Alaska shipping and missing delivered-cost evidence remain visible. Real data is
+the default, with separate fixture/sandbox/mixed views and an explicit closed-item
+archive. Viewing the feed makes no marketplace requests.
+
+**Prepare searches** connects the existing 65-phrase catalog to new disabled
+Discovery groups and the source-specific saved-search assistant. It preserves
+current groups, budgets and owner setup. Review and enable a draft in Discovery,
+then preview the actual plan. The first real four-query Browse pilot retains its
+separate owner approval gate. See [JRI-015 workflow and next pilot](docs/JRI-015.md).
+This development is independent of the pending JRI-014 receiver closeout.
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
