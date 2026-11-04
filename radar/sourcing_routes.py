@@ -105,7 +105,7 @@ def sourcing_routes(app, render, preferences):
             def page_url(number):
                 return "/feed?" + urlencode({**filters, "page": number})
 
-            return render(
+            response = render(
                 request,
                 "sourcing_feed.html",
                 cards=results[(page - 1) * PAGE_SIZE : page * PAGE_SIZE],
@@ -127,6 +127,8 @@ def sourcing_routes(app, render, preferences):
                     for target in ("active", "needs_photos", "ended", "reviewed", "archive", "all")
                 },
             )
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
 
     @app.get("/feed/photos/{photo_id}")
     def compact_photo(photo_id: str):

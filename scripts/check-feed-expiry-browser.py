@@ -56,6 +56,7 @@ def check(browser, scenario, width):
                     )
             response = client.get('/feed?dataset=all&scope=all')
             assert len(response.context['cards']) == 1
+            assert response.headers['cache-control'] == 'private, no-store'
             html = response.text
             compact = response.context['cards'][0]['compact']
             if scenario in ('missing', 'invalid'):
@@ -82,6 +83,9 @@ def check(browser, scenario, width):
                 if target.path == '/feed':
                     route.fulfill(status=200, body=html, content_type='text/html')
                     return
+                if scenario == 'script-blocked' and target.path == '/static/compact-feed.js':
+                    route.fulfill(status=200, body='', content_type='application/javascript')
+                    return
                 result = client.get(target.path)
                 if result.status_code != 200:
                     failures.append((target.path, result.status_code))
@@ -89,26 +93,78 @@ def check(browser, scenario, width):
                               headers=dict(result.headers))
 
             page.route('**/*', serve)
-            page.clock.install(time=datetime.now(UTC))
+            if scenario != 'native':
+                initial_time = datetime.now(UTC)
+                if scenario in ('slow-behind', 'cached-behind'):
+                    initial_time -= timedelta(days=1)
+                page.clock.install(time=initial_time)
+                # Playwright's controlled performance implementation omits navigation
+                # entries. Supply explicit normal-delivery metadata for these tests.
+                page.add_init_script(('''
+                    const clockEntries = performance.getEntriesByType.bind(performance);
+                    performance.getEntriesByType = (type) => type === 'navigation'
+                      ? [{startTime:0, type:'navigate', transferSize:300, deliveryType:''}]
+                      : clockEntries(type);
+                ''').replace('transferSize:300',
+                             'transferSize:0' if scenario.startswith('cached')
+                             else 'transferSize:300'))
+                if scenario in ('slow-behind', 'slow-delivery'):
+                    page.add_init_script('''
+                        const actualNow = performance.now.bind(performance);
+                        performance.now = () => actualNow() + 120000;
+                    ''')
             page.goto('http://synthetic.local/feed')
-            page.clock.pause_at(datetime.now(UTC))
+            if scenario != 'native':
+                page.clock.pause_at(initial_time + timedelta(seconds=1))
             marked = page.locator('[data-source-expiry]')
-            if scenario in ('fixture', 'non-ebay'):
+            if scenario == 'script-blocked':
+                assert marked.count() == 1
+                assert not marked.is_visible()
+                page.clock.fast_forward(120000)
+                assert not marked.is_visible()
+            elif scenario == 'native':
+                assert marked.count() == 1
+                assert marked.is_visible()
+                assert page.locator('.compact-photo image').count() == 1
+            elif scenario in ('fixture', 'non-ebay'):
                 assert marked.count() == 0
                 page.clock.fast_forward(25 * 3600000)
                 assert page.locator('[data-feed-key]').count() == 1
-            elif scenario in ('missing', 'invalid'):
+            elif scenario in (
+                'missing', 'invalid', 'slow-behind', 'slow-delivery', 'cached-behind', 'cached'
+            ):
                 assert marked.count() == 0
                 assert page.locator('#feed-expiry-status').is_visible()
             else:
-                assert marked.count() == 1
+                assert marked.count() == 1, scenario
+                assert marked.is_visible()
                 if scenario != 'row':
                     assert page.locator('.compact-photo image').count() == 1
                 expiry_ms = datetime.fromisoformat(compact['source_expires_at']).timestamp() * 1000
                 if scenario == 'backwards-clock':
                     page.clock.set_system_time(datetime.now(UTC) - timedelta(days=1))
                     page.clock.fast_forward(120000)
-                elif scenario in ('pageshow', 'visibility', 'focus', 'interaction'):
+                elif scenario in ('frozen-restore', 'frozen-visibility', 'frozen-focus'):
+                    # Both clocks remain frozen, so expiry cannot be established locally.
+                    if scenario == 'frozen-restore':
+                        page.evaluate(
+                            "dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true}))"
+                        )
+                    elif scenario == 'frozen-focus':
+                        page.evaluate("dispatchEvent(new Event('blur'))")
+                        page.evaluate("dispatchEvent(new Event('focus'))")
+                    else:
+                        page.evaluate('''
+                            Object.defineProperty(document, 'hidden',
+                              {configurable:true, value:true});
+                            document.dispatchEvent(new Event('visibilitychange'));
+                            Object.defineProperty(document, 'hidden',
+                              {configurable:true, value:false});
+                            document.dispatchEvent(new Event('visibilitychange'));
+                        ''')
+                elif scenario in (
+                    'pageshow', 'visibility', 'focus', 'interaction', 'auxclick', 'contextmenu'
+                ):
                     # Simulate suspended timers with an advanced wall clock.
                     page.clock.set_system_time(datetime.fromtimestamp((expiry_ms + 1) / 1000, UTC))
                     assert marked.count() == 1
@@ -120,6 +176,13 @@ def check(browser, scenario, width):
                         page.evaluate("dispatchEvent(new Event('focus'))")
                     elif scenario == 'visibility':
                         page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+                    elif scenario in ('auxclick', 'contextmenu'):
+                        allowed = page.locator('.compact-card-links a').first.evaluate(
+                            '''(link, type) => link.dispatchEvent(new MouseEvent(type, {
+                                bubbles:true, cancelable:true, button:type === 'auxclick' ? 1 : 2
+                            }))''', scenario
+                        )
+                        assert allowed is False
                     else:
                         page.locator('[data-compact-review] button[value=GO]').evaluate(
                             '(button) => button.click()'
@@ -152,7 +215,9 @@ if __name__ == '__main__':
         )
         results = [check(browser, scenario, width) for width in (1440, 390) for scenario in (
             'listing', 'row', 'image', 'pageshow', 'visibility', 'focus', 'interaction',
-            'backwards-clock',
+            'script-blocked', 'native', 'backwards-clock', 'slow-behind', 'slow-delivery',
+            'cached-behind', 'cached',
+            'frozen-restore', 'frozen-visibility', 'frozen-focus', 'auxclick', 'contextmenu',
             'missing', 'invalid', 'fixture', 'non-ebay',
         )]
         browser.close()

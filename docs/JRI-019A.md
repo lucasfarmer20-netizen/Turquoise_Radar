@@ -176,7 +176,8 @@ without fetching or modifying anything. It checks on a deadline timer, page
 restoration, focus, visibility changes and before interaction. Missing or invalid
 deadline metadata on a marked card causes withdrawal. A monotonic elapsed-time
 floor prevents backwards wall-clock adjustment from prolonging display. The
-existing inclusive expiry boundary is preserved; withdrawal begins after it.
+server keeps its inclusive expiry boundary. Browser withdrawal may be earlier
+when delivery time or clock state cannot establish the remaining lifetime.
 
 A count-only notice reports items withdrawn from this page and offers a manual
 reload. Potentially outdated tab/pagination totals are hidden rather than
@@ -205,3 +206,48 @@ with the existing Starlette/AnyIO deprecation warning; Ruff, JavaScript syntax a
 whitespace checks passed. **24 Chromium scenarios** passed across 1440px and 390px
 widths, with zero external requests or mutations and unchanged synthetic stored
 bytes. The 57-test focused regression run also passed. No live pilot was executed.
+
+
+### Review follow-up: delivery time, sleep and alternate link gestures
+
+The monotonic floor now starts at navigation, so response delivery and delayed
+script execution consume the available display lifetime. A missing navigation
+entry, cache-only navigation (zero transfer size), history navigation or a client
+wall clock behind the server check causes conservative withdrawal. The feed HTML
+also returns `Cache-Control: private, no-store`; private image responses already
+had that policy. These controls do not grant access or refresh observations.
+
+A persisted page restoration, or return after visibility loss/window blur,
+withdraws the remaining marked eBay content even if both local clocks froze.
+This deliberately trades convenience for a verifiable display state: switching
+away and back may require a manual reload despite still-fresh server data.
+Ordinary first load remains usable, including native Chromium navigation without
+clock mocking. No automatic reload, polling or network revalidation is added.
+
+Capture-phase guards now include auxiliary clicks and context-menu events, as
+well as ordinary clicks and form submission. An expired event is cancelled before
+its link/default action. The browser cannot revoke a URL already copied, a native
+menu opened before expiry, another already-open tab, or bytes already delivered.
+If the OS freezes both clocks without any lifecycle/focus event, local code cannot
+measure that missing elapsed time; server checks remain authoritative on the next
+request. This patch does not claim a security boundary against disabled JavaScript,
+modified browser clocks/code, or stale content retained outside this page.
+
+The browser harness explicitly supplies navigation metadata when Playwright's
+clock mock omits it, and separately tests native navigation without mocking.
+Delivery, cache and frozen-clock cases are controlled simulations, not claims
+about actual OS sleep or a production cache. All requests remain locally
+fulfilled or blocked and synthetic stored bytes must remain unchanged.
+
+Timed cards/rows are initially hidden in HTML, with a scoped CSS rule preserving
+that state until JavaScript validates the deadline. Delayed or absent script
+execution cannot leave the card visible; a no-script notice explains the hidden
+eBay content. This does not claim that browser-prefetched image bytes are revoked.
+
+Review-follow-up validation: **46 final Chromium scenarios** passed at 1440px
+and 390px, including native navigation and blocked-script concealment. All had
+zero external requests/mutations, unchanged synthetic stored bytes and no browser
+errors/overflow. Serving the prior commit's JavaScript failed all eight targeted
+new delivery/sleep/alternate-gesture checks, confirming those checks detect the
+reported gaps. The final full suite passed **1,380 tests** (existing upstream
+warning); Ruff, JavaScript syntax and whitespace checks passed.

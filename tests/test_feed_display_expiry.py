@@ -41,9 +41,10 @@ def test_feed_emits_expiry_on_cards_and_needs_photo_rows(client, tmp_path, monke
         observed = session.scalar(select(DiscoveryObservation)).observed_at.replace(tzinfo=UTC)
     response = client.get('/feed?scope=all')
     assert response.status_code == 200
+    assert response.headers['cache-control'] == 'private, no-store'
     card = response.context['cards'][0]['compact']
     assert card['source_expiry_required'] is True
     assert datetime.fromisoformat(card['source_expires_at']) == observed + timedelta(hours=6)
-    assert ' data-source-expiry ' in response.text
+    assert ' hidden data-source-expiry ' in response.text
     assert 'data-source-checked-at=' in response.text
     assert ('class="compact-photo-row"' in response.text) is not with_photo

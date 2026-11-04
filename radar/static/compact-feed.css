@@ -6,3 +6,6 @@
 
 /* SVG viewports expose only reviewed native pixels; the link opens the full original. */
 .compact-photo .compact-photo-frame{display:block;width:auto;height:auto;max-width:100%;max-height:100%;overflow:hidden;flex:none}
+
+/* Keep timed content concealed until JavaScript verifies its display deadline. */
+[data-source-expiry][hidden] { display: none !important; }
