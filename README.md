@@ -199,6 +199,13 @@ the owner's current workspace, preserving existing feedback and database bytes;
 it never replaces that database with an earlier snapshot. See the
 [photo framing and code-only update guide](docs/JRI-018A.md).
 
+JRI-019 completed one authorized Production eBay pilot: one successful OAuth
+request and four successful Browse requests returned 12 observations and eight
+unique listings. Official image downloads are blocked by managed proxy CONNECT
+403 for `i.ebayimg.com`, so image-first end-to-end qualification remains incomplete.
+The email research workspace is unchanged and Discovery is disabled after the run.
+See the [actual pilot receipt and limitations](docs/JRI-019.md).
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,
