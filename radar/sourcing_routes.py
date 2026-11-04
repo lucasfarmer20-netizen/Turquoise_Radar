@@ -10,6 +10,7 @@ from sqlalchemy import select
 from radar.db import DiscoveryGroup, IntakeSource, SavedSourceSearch
 from radar.discovery.config import DiscoveryError
 from radar.discovery.service import budgets
+from radar.search_evaluation import evaluate_searches
 from radar.sourcing_catalog import MAX_STAGED_PHRASES, catalog_entries, stage_catalog_group
 from radar.sourcing_feed import build_feed
 from radar.workflow import STATES
@@ -20,6 +21,15 @@ CLOSED_STATES = {"PASSED", "PURCHASED", "IRRELEVANT"}
 
 
 def sourcing_routes(app, render, preferences):
+    @app.get("/feed/evaluation")
+    def evaluation(request: Request):
+        with app.state.sessions() as session:
+            return render(
+                request,
+                "search_evaluation.html",
+                evaluation=evaluate_searches(session, preferences(session)),
+            )
+
     @app.get("/feed")
     def feed(request: Request):
         q = request.query_params
