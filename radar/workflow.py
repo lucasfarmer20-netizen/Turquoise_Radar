@@ -28,7 +28,7 @@ def queue_state(row, analysis):
 def pattern_effectiveness(session):
     patterns = {p.id: p for p in session.scalars(select(SearchPattern))}
     decisions = defaultdict(list)
-    for feedback in session.scalars(select(Feedback).order_by(Feedback.id)):
+    for feedback in session.scalars(select(Feedback).order_by(Feedback.created_at, Feedback.id)):
         decisions[feedback.listing_id].append(feedback)
     groups = {}
     linked = defaultdict(list)
@@ -120,9 +120,15 @@ def pattern_effectiveness(session):
             )
             g["matches"] += 1
             history = decisions[row.id]
-            g["useful"] += int(any(f.action == "Interested" for f in history))
+            # An explicit neutral reversal resets provisional review signals, while
+            # purchase/profit milestones and every original audit row remain intact.
+            cleared = next(
+                (i for i in range(len(history) - 1, -1, -1) if history[i].action == "Cleared"), -1
+            )
+            review_history = history[cleared + 1 :]
+            g["useful"] += int(any(f.action == "Interested" for f in review_history))
             g["purchased"] += int(any(f.action == "Purchased" for f in history))
-            g["false_positives"] += int(any(f.action == "False positive" for f in history))
+            g["false_positives"] += int(any(f.action == "False positive" for f in review_history))
             latest_sold = next(
                 (
                     f

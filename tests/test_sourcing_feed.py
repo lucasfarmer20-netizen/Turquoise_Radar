@@ -129,9 +129,10 @@ def test_linked_candidates_share_owner_record_and_keep_manual_listings(session, 
     manual = owner_listing(session, item, "same-title-independent-manual")
     discovery(session, first)
     discovery(session, second, query="blue rock ring")
+    interested = Feedback(listing_id=owner.id, action="Interested", created_at=NOW)
     session.add_all(
         [
-            Feedback(listing_id=owner.id, action="Interested", created_at=NOW),
+            interested,
             Feedback(
                 listing_id=owner.id,
                 action="Passed",
@@ -151,7 +152,11 @@ def test_linked_candidates_share_owner_record_and_keep_manual_listings(session, 
     assert card["state"] == "WATCH"  # Owner state wins over stale intake rejection.
     assert card["observation_count"] == 2
     assert [e["query"] for e in card["query_evidence"]] == ["  turqoise ring  ", "blue rock ring"]
-    assert card["latest_feedback"] == {"action": "Interested", "created_at": NOW}
+    assert card["latest_feedback"] == {
+        "id": interested.id,
+        "action": "Interested",
+        "created_at": NOW,
+    }
     assert cards[manual.id]["observation_count"] == 0
     assert cards[manual.id]["candidate_ids"] == []
     assert cards[manual.id]["latest_feedback"] is None

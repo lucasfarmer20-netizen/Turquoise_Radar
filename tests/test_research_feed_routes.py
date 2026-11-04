@@ -65,7 +65,7 @@ def test_realized_result_is_archived_without_owner_pass_and_read_views_preserve_
     with client.app.state.sessions.begin() as session:
         listing_id = save(session, item)
         before = session.get(Listing, listing_id).data.copy()
-    active = client.get("/feed?dataset=fixture")
+    active = client.get("/feed?dataset=fixture&scope=needs_photos")
     assert active.status_code == 200
     assert active.context["cards"] == []
     archive = client.get("/feed?dataset=fixture&scope=archive")
@@ -74,14 +74,16 @@ def test_realized_result_is_archived_without_owner_pass_and_read_views_preserve_
     assert card["state"] == "RESEARCH"
     assert card["observation_count"] == 0
     assert card["research_observation_count"] == 1
-    assert "72.00 USD" in archive.text
-    assert "Known historical subtotal" in archive.text
-    assert "calculated from posted rate, not confirmed charged" in archive.text
-    assert "Final delivered total UNKNOWN" in archive.text
-    assert "Seller restrictions requiring review" in archive.text
-    assert "Final fulfillment: UNCONFIRMED" in archive.text
+    assert card["compact"]["assessment"] == "NEEDS INFO"
+    assert "Realized" in archive.text
     detail = client.get(f"/listings/{listing_id}")
     assert detail.status_code == 200
+    assert "72.00 USD" in detail.text
+    assert "Known historical subtotal" in detail.text
+    assert "calculated from posted rate, not confirmed charged" in detail.text
+    assert "Final delivered total UNKNOWN" in detail.text
+    assert "Seller restrictions requiring review" in detail.text
+    assert "Final fulfillment: UNCONFIRMED" in detail.text
     assert "Current acquisition quote: UNKNOWN · ended opportunity" in detail.text
     assert "Original alert & transaction history" in detail.text
     assert client.get("/feed/evaluation?dataset=fixture").status_code == 200
@@ -112,22 +114,32 @@ def test_quoted_costs_currency_provenance_and_deadline_conversions(client):
     )
     with client.app.state.sessions.begin() as session:
         listing_id = save(session, item)
-    response = client.get("/feed?dataset=fixture")
+    response = client.get("/feed?dataset=fixture&scope=needs_photos")
     assert response.status_code == 200
     assert response.context["cards"][0]["availability"] == "ACTIVE_AT_OBSERVATION"
-    for text in (
-        "30.00 XXX", "31.00 XXX", "ISO currency unverified",
-        "150.0% of observed item price", "60.0% of known quoted subtotal",
-        "ZIP-specific quote observed", "Final fulfillment: UNCONFIRMED",
-        "exact capture time and timezone UNKNOWN", "files have not been received",
-        "2026-11-04 21:00:00 PST", "2026-11-04 20:00:00 AKST",
-        "2026-11-05 05:00:00 UTC", "current availability unverified",
-        "Final delivered acquisition cost UNKNOWN",
-    ):
-        assert text in response.text
-    assert "$30.00" not in response.text
+    assert "currency unconfirmed" in response.text
+    assert response.context["cards"][0]["compact"]["assessment"] == "NEEDS INFO"
+    assert "Known quoted subtotal" not in response.text
     detail = client.get(f"/listings/{listing_id}")
     assert detail.status_code == 200
+    for text in (
+        "30.00 XXX",
+        "31.00 XXX",
+        "ISO currency unverified",
+        "150.0% of observed item price",
+        "60.0% of known quoted subtotal",
+        "ZIP-specific quote observed",
+        "Final fulfillment: UNCONFIRMED",
+        "exact capture time and timezone UNKNOWN",
+        "files have not been received",
+        "2026-11-04 21:00:00 PST",
+        "2026-11-04 20:00:00 AKST",
+        "2026-11-05 05:00:00 UTC",
+        "current availability unverified",
+        "Final delivered acquisition cost UNKNOWN",
+    ):
+        assert text in detail.text
+    assert "$30.00" not in detail.text
     assert "Seller material claims" in detail.text
     assert "Owner-reported visible marks" in detail.text
     assert "Seller-reported testing" in detail.text
@@ -138,19 +150,26 @@ def test_research_priority_and_history_remain_separate_from_model_decisions(clie
     with client.app.state.sessions.begin() as session:
         for key, priority in (("900000003", "LOW"), ("900000004", "HIGH")):
             item = research_item(
-                key, availability="ACTIVE_AT_OBSERVATION", priority=priority,
-                item_quote="10", shipping_quote="20", handling_quote="1",
+                key,
+                availability="ACTIVE_AT_OBSERVATION",
+                priority=priority,
+                item_quote="10",
+                shipping_quote="20",
+                handling_quote="1",
             )
             if priority == "HIGH":
                 earlier = item.research_observations[0].model_copy(
-                    update={"observation_id": "synthetic-previous", "item_quote": Decimal("8"),
-                            "recorded_at": datetime(2026, 11, 3, 17, tzinfo=UTC)}
+                    update={
+                        "observation_id": "synthetic-previous",
+                        "item_quote": Decimal("8"),
+                        "recorded_at": datetime(2026, 11, 3, 17, tzinfo=UTC),
+                    }
                 )
                 item = item.model_copy(
                     update={"research_observations": [earlier, *item.research_observations]}
                 )
             listing_id = save(session, item)
-    response = client.get("/feed?dataset=fixture&sort=priority")
+    response = client.get("/feed?dataset=fixture&scope=needs_photos&sort=priority")
     assert response.status_code == 200
     assert [c["research"]["priority"] for c in response.context["cards"]] == ["HIGH", "LOW"]
     assert all(c["state"] == "RESEARCH" for c in response.context["cards"])
@@ -212,16 +231,15 @@ def test_ended_strong_financial_model_shows_historical_badge_without_changing_an
     card = archive.context["cards"][0]
     assert card["a"].tier == "BUY CANDIDATE"
     assert card["state"] == "RESEARCH"
-    assert "<strong>HISTORICAL RESEARCH</strong>" in archive.text
+    assert card["compact"]["assessment"] == "NEEDS INFO"
     assert "<strong>BUY CANDIDATE</strong>" not in archive.text
-    assert '<span class="badge">RESEARCH</span>' in archive.text
     filtered = client.get("/feed?dataset=fixture&scope=archive&state=RESEARCH")
     assert len(filtered.context["cards"]) == 1
     detail = client.get(f"/listings/{listing_id}")
     assert detail.status_code == 200
     assert detail.context["v"]["a"].tier == "BUY CANDIDATE"
     assert '<span class="badge review">HISTORICAL RESEARCH' in detail.text
-    assert 'Review state: RESEARCH' in detail.text
+    assert "Review state: RESEARCH" in detail.text
     dashboard = client.get("/")
     assert dashboard.status_code == 200
     assert dashboard.context["candidate_count"] == 0
@@ -231,4 +249,4 @@ def test_ended_strong_financial_model_shows_historical_badge_without_changing_an
         assert '<span class="badge buy">BUY CANDIDATE</span>' not in page.text
         assert "Current acquisition quote: UNKNOWN" in page.text
     with client.app.state.sessions() as session:
-        assert session.get(Listing, listing_id).review_state == 'RESEARCH'
+        assert session.get(Listing, listing_id).review_state == "RESEARCH"

@@ -419,7 +419,7 @@ class ComparableInput(BaseModel):
 
 
 class FeedbackInput(BaseModel):
-    action: Literal["Interested", "Purchased", "Passed", "False positive", "Sold"]
+    action: Literal["Interested", "Purchased", "Passed", "False positive", "Sold", "Cleared"]
     note: str = Field(default="", max_length=2000)
     realized_profit: Annotated[Decimal, Field(max_digits=14, decimal_places=2)] | None = None
 

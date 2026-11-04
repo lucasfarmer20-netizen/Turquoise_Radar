@@ -1,6 +1,7 @@
 import json
 from contextlib import asynccontextmanager
 from decimal import Decimal, InvalidOperation
+from html import unescape
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -22,6 +23,7 @@ from radar.anomalies import (
 from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
 from radar.discovery.routes import discovery_routes
 from radar.discovery.service import discovery_history, seed_discovery
+from radar.feedback import record_feedback
 from radar.identification.routes import IdentificationBodyLimit, identification_routes
 from radar.identification.service import workbench_context
 from radar.intake.limits import AlertBodyLimit
@@ -42,6 +44,7 @@ ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "templates"))
 TEMPLATES.env.filters["usd"] = lambda v: "UNKNOWN" if v is None else f"${v:,.2f}"
 TEMPLATES.env.filters["pct"] = lambda v: "UNKNOWN" if v is None else f"{v:.1%}"
+TEMPLATES.env.filters["source_title"] = unescape
 
 
 def _zoned_time(value, zone):
@@ -236,7 +239,7 @@ def create_app(database_url=None, *, expected_scope=None):
                 s.scalars(
                     select(Feedback)
                     .where(Feedback.listing_id == listing_id)
-                    .order_by(Feedback.id.desc())
+                    .order_by(Feedback.created_at.desc(), Feedback.id.desc())
                 )
             )
             item = ListingInput.model_validate(row.data)
@@ -326,6 +329,8 @@ def create_app(database_url=None, *, expected_scope=None):
     @app.post("/listings/{listing_id}/feedback", response_class=HTMLResponse)
     async def feedback_route(request: Request, listing_id: int):
         form = await request.form()
+        if form.get("action") == "Cleared":
+            raise HTTPException(409, "Use the dedicated CLEAR button to clear a saved decision")
         try:
             data = FeedbackInput.model_validate({k: v for k, v in form.items() if v != ""})
         except ValidationError as e:
@@ -334,46 +339,10 @@ def create_app(database_url=None, *, expected_scope=None):
             listing = s.get(Listing, listing_id)
             if not listing:
                 raise HTTPException(404, "Listing not found")
-            prior = list(s.scalars(select(Feedback).where(Feedback.listing_id == listing_id)))
-            # Milestone counters apply once per listing. A repeated Sold edits profit by delta.
-            pattern = s.get(SearchPattern, listing.data.get("search_pattern_id") or "")
-            if (
-                pattern
-                and listing.data.get("raw_search_phrase") == pattern.phrase
-                and listing.data.get("query_attribution_verified") is not False
-            ):
-                if data.action == "Interested" and not any(f.action == "Interested" for f in prior):
-                    pattern.useful_matches += 1
-                if data.action == "Purchased" and not any(f.action == "Purchased" for f in prior):
-                    pattern.successful_purchases += 1
-                if data.action == "Sold" and data.realized_profit is not None:
-                    previous = next(
-                        (
-                            Decimal(f.realized_profit)
-                            for f in reversed(prior)
-                            if f.action == "Sold" and f.realized_profit is not None
-                        ),
-                        Decimal(0),
-                    )
-                    pattern.realized_profit = str(
-                        Decimal(pattern.realized_profit) + data.realized_profit - previous
-                    )
-            if data.action in ("Purchased", "Sold"):
-                listing.review_state = "PURCHASED"
-            elif data.action in ("Passed", "False positive"):
-                listing.review_state = "PASSED"
-            elif data.action == "Interested":
-                listing.review_state = "WATCH"
-            s.add(
-                Feedback(
-                    listing_id=listing_id,
-                    action=data.action,
-                    note=data.note,
-                    realized_profit=str(data.realized_profit)
-                    if data.realized_profit is not None
-                    else None,
-                )
-            )
+            try:
+                record_feedback(s, listing, data)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from None
         if request.headers.get("HX-Request"):
             return HTMLResponse("<p>Feedback recorded. Refresh to see history.</p>")
         return RedirectResponse(f"/listings/{listing_id}", status_code=303)

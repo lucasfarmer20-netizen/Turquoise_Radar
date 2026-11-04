@@ -149,8 +149,8 @@ See the [owner workflow, local setup and persistence notes](docs/JRI-005.md).
 
 Open **Sourcing feed** for inbox candidates and owner-reviewed listings in one view.
 Linked observations share a card; exact query history, current owner feedback,
-Alaska shipping and missing delivered-cost evidence remain visible. Real data is
-the default, with separate fixture/sandbox/mixed views and an explicit closed-item
+Alaska shipping and missing delivered-cost evidence remain available in research.
+Real data is the default, with separate fixture/sandbox/mixed views and an explicit closed-item
 archive. Viewing the feed makes no marketplace requests.
 
 **Prepare searches** connects the existing 65-phrase catalog to new disabled
@@ -180,6 +180,36 @@ seller claims do not become verified material or owner decisions. Later owner
 screenshots and terms attach through verified private receipts while preserving
 earlier reports; previews stay local and terms download as inert text. See
 [the actual import and manual trial receipt](docs/JRI-017.md).
+
+JRI-018 makes `/feed` a compact photo grid with dated prices, supported deadlines,
+one-line price assessments and direct **GO / NO GO** feedback. GO saves Interested;
+NO GO saves Passed in the existing reversible review history. **Needs Photos**
+retains items without verified local item photographs, and **Ended** retains
+closed auctions. Full costs, source evidence and research remain behind **Research**.
+Unknown fees, Alaska fulfillment, currency or valuation evidence prevent a deal
+label. Initial JRI-018 validation showed two open photo cards, one ended photo
+card and 24 items needing photos; JRI-018A refines which screenshots qualify as
+full-item images. See [compact-feed behavior and verification](docs/JRI-018.md).
+
+JRI-018A focuses card thumbnails on reviewed full-item regions of the existing
+private screenshots and adds **Clear** to return a saved sourcing decision to
+neutral review without erasing its history. Hallmark-only or document screenshots
+stay in Needs Photos. The private update installs code and framing metadata into
+the owner's current workspace, preserving existing feedback and database bytes;
+it never replaces that database with an earlier snapshot. See the
+[photo framing and code-only update guide](docs/JRI-018A.md).
+
+JRI-019 completed one authorized Production eBay pilot: one successful OAuth
+request and four successful Browse requests returned 12 observations and eight
+unique listings. The original pilot and official image references are recovered
+unchanged. JRI-019A qualifies exact-byte image storage and a separately approved,
+one-attempt-per-image continuation. The owner has published the image-host
+permission; execution still needs a runtime observing that policy and image-only
+approval. No new source requests have been made. Expired eBay observations are
+withheld from the feed; downloading images cannot refresh prices or availability.
+The email research workspace is unchanged and Discovery remains disabled.
+See the [actual pilot receipt](docs/JRI-019.md) and
+[image preparation, freshness limits and remaining gates](docs/JRI-019A.md).
 
 ## Multi-source inbox (Task 004)
 

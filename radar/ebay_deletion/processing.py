@@ -7,6 +7,7 @@ from pathlib import Path
 
 from radar.ebay_deletion.protocol import digest
 from radar.ebay_deletion.sync import maintenance_ledger
+from radar.jewelry.images import MAX_FILE_BYTES, photo_storage_metadata
 
 SOURCE = {"ebay", "ebay production"}
 REMOVED = "eBay account data removed"
@@ -434,18 +435,39 @@ def sanitize_database(path, identifiers, secret, aliases=None, photo_reviews=Non
         blocked = False
         for table, photo in photos:
             review = photo_reviews.get(table + ":" + photo["id"], {})
+            suffix, exact_source = ".png", False
+            if table == "vision_photos":
+                try:
+                    metadata = loads(photo["data"])
+                    suffix, _ = photo_storage_metadata(
+                        metadata, photo["original_hash"], photo["content_hash"]
+                    )
+                    exact_source = metadata.get("processing_version") == "ebay-primary-original-1"
+                except (ValueError, TypeError, AttributeError):
+                    blocked = True
+            if exact_source and review.get("kind") != "seller_copy":
+                # Downloaded official source bytes cannot be reclassified as an
+                # independently owned photograph to exempt them from removal.
+                blocked = True
             if review.get("kind") not in ("independent", "seller_copy") or not review.get(
                 "evidence"
             ):
                 blocked = True
             if review.get("kind") == "seller_copy":
                 file = Path(review.get("path", ""))
-                if file.name != photo["id"] + ".png" or file.is_symlink():
-                    blocked = True
-                elif (
-                    file.exists()
-                    and hashlib.sha256(file.read_bytes()).hexdigest() != photo["content_hash"]
-                ):
+                try:
+                    if (
+                        not file.is_absolute()
+                        or file.name != photo["id"] + suffix
+                        or any(part.is_symlink() for part in (file, *file.parents))
+                    ):
+                        blocked = True
+                    elif file.exists():
+                        if not file.is_file() or not 0 < file.stat().st_size <= MAX_FILE_BYTES:
+                            blocked = True
+                        elif hashlib.sha256(file.read_bytes()).hexdigest() != photo["content_hash"]:
+                            blocked = True
+                except OSError:
                     blocked = True
         if ambiguous or blocked:
             db.rollback()

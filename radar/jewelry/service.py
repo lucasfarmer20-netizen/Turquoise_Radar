@@ -21,7 +21,7 @@ from radar.db import (
 from radar.jewelry.budget import budget_state, profile_for, reserve_amount, usage_cost
 from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS
 from radar.jewelry.errors import classify_failure
-from radar.jewelry.images import private_path, read_photo, write_photo
+from radar.jewelry.images import ORIGINAL_PROCESSING_VERSION, private_path, read_photo, write_photo
 from radar.jewelry.schemas import OWNER, PROMPT_VERSION, SCHEMA_VERSION, Correction, VisionResult
 from radar.jewelry.scoring import visual_score
 from radar.schemas import utcnow
@@ -286,6 +286,8 @@ async def analyze(
         photos = [s.get(VisionPhoto, id_) for id_ in photo_ids]
         if any(not p or p.case_id != case_id or not p.active for p in photos):
             raise ValueError("Select active photos belonging to this review")
+        if any(p.data.get("processing_version") == ORIGINAL_PROCESSING_VERSION for p in photos):
+            raise ValueError("Official source images are display-only; inference is not authorized")
         data, _ = subject_data(s, case)
         context = provider_context(s, case, data)
         secret = config.api_key.get_secret_value()
