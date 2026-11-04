@@ -250,7 +250,7 @@ def test_browse_candidate_uses_discovery_promotion_and_preserves_provider_envelo
         assert linked.original_data == original
 
 
-@pytest.mark.parametrize("path", ["/feed", "/feed/prepare"])
+@pytest.mark.parametrize("path", ["/feed", "/feed/prepare", "/feed/evaluation"])
 def test_feed_get_is_read_only_private_and_never_executes_source_adapters(
     client, item, monkeypatch, path
 ):
@@ -287,6 +287,24 @@ def test_feed_get_is_read_only_private_and_never_executes_source_adapters(
     assert "https:" not in response.headers["content-security-policy"]
     assert not [attrs for tag, attrs in Tags(response.text).tags if tag == "img"]
     assert "tracker.png" not in response.text
+
+
+def test_evaluation_links_real_evidence_without_treating_title_cues_as_execution(client, item):
+    with client.app.state.sessions.begin() as session:
+        row = candidate(
+            session,
+            item.model_copy(update={"raw_title": "TEST sterling jewelry lot <script>"}),
+            "evaluation-evidence",
+        )
+        observation(session, row, "production", query="sterling jewelry lot")
+        candidate_id = row.id
+    response = client.get("/feed/evaluation")
+    assert response.status_code == 200
+    assert "OBSERVED SOURCE MATCH" in response.text
+    assert "UNTESTED SEARCH" in response.text
+    assert 'href="/discovery/items/' + str(candidate_id) + '"' in response.text
+    assert "TEST sterling jewelry lot &lt;script&gt;" in response.text
+    assert "No phrase is enabled or executed from this page" in response.text
 
 
 def test_pagination_preserves_dataset_scope_source_state_and_sort_filters(client, item):

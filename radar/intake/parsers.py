@@ -394,6 +394,14 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
         return parse_auction_email(
             message, platform, source, html_parts, texts, attachments, received_override
         )
+    if source_id in {"shopgoodwill", "hibid"}:
+        from radar.intake.search_email import parse_search_email
+
+        search = parse_search_email(
+            message, source_id, source, texts, attachments, received_override
+        )
+        if search is not None:
+            return search
     if html_parts:
         extractor = SafeEmailHTML()
         extractor.feed("\n".join(html_parts))

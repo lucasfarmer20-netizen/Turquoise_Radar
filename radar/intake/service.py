@@ -135,9 +135,30 @@ def add_candidate(session, message, candidate, verified=False):
             **found.normalized.get("cost_status", {}),
             **item.model_dump(mode="json")["cost_status"],
         }
-        if candidate.evidence.get("platform") in ("invaluable", "liveauctioneers"):
+        if candidate.evidence.get("platform") in (
+            "invaluable",
+            "liveauctioneers",
+            "shopgoodwill",
+            "hibid",
+        ):
             if item.item_price is not None:
                 updates["currency"] = item.currency
+                if candidate.evidence.get("format_id") in (
+                    "shopgoodwill-personal-shopper-v1",
+                    "hibid-saved-search-v1",
+                ) and item.currency != found.normalized.get("currency", "USD"):
+                    # Older fees/quotes cannot be relabelled in a newly observed
+                    # currency. Historical observations and owner Listings stay intact.
+                    for cost in COSTS:
+                        if cost not in updates:
+                            updates[cost] = None
+                            updates["cost_status"][cost] = "UNKNOWN"
+                    updates.update(
+                        buyer_profile=None,
+                        invoice_fee_allocation=None,
+                        invoice_allocation_confirmed=False,
+                        invoice_allocation_evidence=None,
+                    )
             if candidate.evidence.get("availability") == "ENDED":
                 updates["item_price"] = None
                 updates["cost_status"]["item_price"] = "UNKNOWN"
