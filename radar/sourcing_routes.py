@@ -144,9 +144,9 @@ def sourcing_routes(app, render, preferences):
         decision = form.get("decision")
         if kind not in ("listing", "candidate") or target_id < 1:
             raise HTTPException(404, "Review target unavailable")
-        if decision not in ("GO", "NO_GO"):
-            raise HTTPException(422, "Choose GO or NO GO")
-        action = "Interested" if decision == "GO" else "Passed"
+        if decision not in ("GO", "NO_GO", "CLEAR"):
+            raise HTTPException(422, "Choose GO, NO GO or CLEAR")
+        action = {"GO": "Interested", "NO_GO": "Passed", "CLEAR": "Cleared"}[decision]
         try:
             expected = (
                 int(form["expected_feedback_id"]) if form.get("expected_feedback_id") else None
@@ -170,9 +170,11 @@ def sourcing_routes(app, render, preferences):
             )
             if card is None:
                 raise HTTPException(404, "Review target unavailable")
+            if decision == "CLEAR" and card["listing_id"] is None:
+                raise HTTPException(409, "There is no saved review decision to clear")
             try:
-                if kind == "listing":
-                    listing = session.get(Listing, target_id)
+                if kind == "listing" or decision == "CLEAR":
+                    listing = session.get(Listing, card["listing_id"])
                 elif any(e["kind"] == "discovery" for e in card["query_evidence"]):
                     listing = promote(session, target_id)
                 else:
@@ -190,13 +192,22 @@ def sourcing_routes(app, render, preferences):
                 .limit(1)
             )
             if latest and latest.action == action:
-                receipt = latest
+                if decision == "CLEAR":
+                    try:
+                        receipt = record_feedback(session, listing, FeedbackInput(action=action))
+                    except ValueError as error:
+                        raise HTTPException(409, str(error)) from None
+                else:
+                    receipt = latest
             else:
                 if (latest.id if latest else None) != expected:
                     raise HTTPException(
                         409, "Feedback changed; reload before changing the decision"
                     )
-                receipt = record_feedback(session, listing, FeedbackInput(action=action))
+                try:
+                    receipt = record_feedback(session, listing, FeedbackInput(action=action))
+                except ValueError as error:
+                    raise HTTPException(409, str(error)) from None
                 session.flush()
             result = {
                 "saved": True,
@@ -212,7 +223,9 @@ def sourcing_routes(app, render, preferences):
         return_to = form.get("return_to", "/feed")
         try:
             parsed = urlsplit(return_to)
-            safe_return = parsed.path == "/feed" and not (parsed.scheme or parsed.netloc)
+            safe_return = parsed.path in ("/feed", f"/listings/{result['listing_id']}") and not (
+                parsed.scheme or parsed.netloc
+            )
         except (ValueError, TypeError):
             safe_return = False
         return RedirectResponse(return_to if safe_return else "/feed", status_code=303)

@@ -187,9 +187,17 @@ NO GO saves Passed in the existing reversible review history. **Needs Photos**
 retains items without verified local item photographs, and **Ended** retains
 closed auctions. Full costs, source evidence and research remain behind **Research**.
 Unknown fees, Alaska fulfillment, currency or valuation evidence prevent a deal
-label. The isolated real-data cohort has two open photo cards, one ended photo
-card and 24 items needing photos; all three photographed items need more pricing
-evidence. See [compact-feed behavior and verification](docs/JRI-018.md).
+label. Initial JRI-018 validation showed two open photo cards, one ended photo
+card and 24 items needing photos; JRI-018A refines which screenshots qualify as
+full-item images. See [compact-feed behavior and verification](docs/JRI-018.md).
+
+JRI-018A focuses card thumbnails on reviewed full-item regions of the existing
+private screenshots and adds **Clear** to return a saved sourcing decision to
+neutral review without erasing its history. Hallmark-only or document screenshots
+stay in Needs Photos. The private update installs code and framing metadata into
+the owner's current workspace, preserving existing feedback and database bytes;
+it never replaces that database with an earlier snapshot. See the
+[photo framing and code-only update guide](docs/JRI-018A.md).
 
 ## Multi-source inbox (Task 004)
 

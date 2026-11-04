@@ -611,17 +611,15 @@ def test_private_front_photo_wins_over_side_detail_without_remote_fallback(
     assert result["photo_role"] == "FRONT"
 
 
-def test_valid_local_fallback_is_selected_after_a_missing_front_photo(
-    session, item, prefs, photo_root
-):
+def test_detail_photo_does_not_replace_a_missing_front_photo(session, item, prefs, photo_root):
     row = listing(session, item)
     front, _ = photo(session, photo_root, listing_id=row.id, role="FRONT")
-    back, _ = photo(session, photo_root, listing_id=row.id, role="BACK_HALLMARK", color="silver")
+    photo(session, photo_root, listing_id=row.id, role="BACK_HALLMARK", color="silver")
     (photo_root / (front.id + ".png")).unlink()
     session.commit()
     result = compact_for(session, prefs, row, photo_root)
-    assert result["photo_id"] == back.id
-    assert result["photo_role"] == "BACK_HALLMARK"
+    assert result["photo_id"] is None
+    assert result["photo_frame"] is None
 
 
 def test_unpromoted_candidate_can_use_its_owned_private_product_photo(

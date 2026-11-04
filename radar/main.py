@@ -1,6 +1,7 @@
 import json
 from contextlib import asynccontextmanager
 from decimal import Decimal, InvalidOperation
+from html import unescape
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -43,6 +44,7 @@ ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "templates"))
 TEMPLATES.env.filters["usd"] = lambda v: "UNKNOWN" if v is None else f"${v:,.2f}"
 TEMPLATES.env.filters["pct"] = lambda v: "UNKNOWN" if v is None else f"{v:.1%}"
+TEMPLATES.env.filters["source_title"] = unescape
 
 
 def _zoned_time(value, zone):
@@ -237,7 +239,7 @@ def create_app(database_url=None, *, expected_scope=None):
                 s.scalars(
                     select(Feedback)
                     .where(Feedback.listing_id == listing_id)
-                    .order_by(Feedback.id.desc())
+                    .order_by(Feedback.created_at.desc(), Feedback.id.desc())
                 )
             )
             item = ListingInput.model_validate(row.data)
@@ -327,6 +329,8 @@ def create_app(database_url=None, *, expected_scope=None):
     @app.post("/listings/{listing_id}/feedback", response_class=HTMLResponse)
     async def feedback_route(request: Request, listing_id: int):
         form = await request.form()
+        if form.get("action") == "Cleared":
+            raise HTTPException(409, "Use the dedicated CLEAR button to clear a saved decision")
         try:
             data = FeedbackInput.model_validate({k: v for k, v in form.items() if v != ""})
         except ValidationError as e:
@@ -335,7 +339,10 @@ def create_app(database_url=None, *, expected_scope=None):
             listing = s.get(Listing, listing_id)
             if not listing:
                 raise HTTPException(404, "Listing not found")
-            record_feedback(s, listing, data)
+            try:
+                record_feedback(s, listing, data)
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from None
         if request.headers.get("HX-Request"):
             return HTMLResponse("<p>Feedback recorded. Refresh to see history.</p>")
         return RedirectResponse(f"/listings/{listing_id}", status_code=303)

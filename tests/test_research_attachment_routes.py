@@ -168,7 +168,9 @@ def test_unavailable_or_wrong_listing_terms_fail_closed(client, attachment_works
     assert str(originals) not in response.text
 
 
-def test_screenshot_uses_only_private_normalized_photo_path(client, attachment_workspace):
+def test_unreviewed_screenshot_stays_off_scan_feed_and_remains_private(
+    client, attachment_workspace
+):
     listing_id, originals, _, _ = attachment_workspace
     metadata = PngImagePlugin.PngInfo()
     metadata.add_text("SYNTHETIC_PRIVATE_METADATA", "not served in normalized preview")
@@ -189,7 +191,9 @@ def test_screenshot_uses_only_private_normalized_photo_path(client, attachment_w
         photo_id = photo.id
     attachment, _ = attach(client, listing_id, originals, raw, screenshot=True, photo_id=photo_id)
     feed = client.get("/feed?dataset=fixture&scope=all")
-    assert Images(feed.text).sources == [f"/feed/photos/{photo_id}"]
+    assert Images(feed.text).sources == []
+    detail = client.get(f"/listings/{listing_id}")
+    assert Images(detail.text).sources == [f"/vision/photos/{photo_id}"]
     normalized = client.get(f"/vision/photos/{photo_id}")
     assert normalized.status_code == 200
     assert normalized.headers["content-type"] == "image/png"

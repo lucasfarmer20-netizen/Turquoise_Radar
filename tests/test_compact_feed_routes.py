@@ -105,7 +105,8 @@ def test_go_no_go_are_immediate_idempotent_and_reversible_without_erasing_histor
     assert no_go.json()["state"] == "PASSED"
     viewed = client.get("/feed?dataset=fixture&scope=reviewed")
     assert viewed.context["cards"][0]["latest_feedback"]["action"] == "Passed"
-    assert "NO GO ✓" in viewed.text
+    assert f'href="/listings/{id_}"' in viewed.text
+    assert '<article class="compact-photo-row"' in viewed.text
     undo = decision(client, "listing", id_, "GO", no_go.json()["feedback_id"])
     assert undo.status_code == 200
     assert undo.json()["state"] == "WATCH"

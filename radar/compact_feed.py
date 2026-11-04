@@ -17,6 +17,11 @@ from radar.db import (
     VisionCase,
     VisionPhoto,
 )
+from radar.feed_photo_framing import (
+    framing_request,
+    load_photo_framing,
+    validated_photo_frame,
+)
 from radar.intake.service import observation_occurrences
 from radar.jewelry.schemas import OWNER
 from radar.research_assets import read_research_photo
@@ -262,6 +267,7 @@ def compact_projection(
         photo_id=None,
         photo_url=None,
         photo_role=None,
+        photo_frame=None,
     )
 
 
@@ -368,7 +374,7 @@ def _photo_choices(card, photos):
             or not matches
             or photo.role not in PHOTO_ORDER
             or attachment
-            and (photo.role == "SIDE_DETAIL" or photo.original_hash != attachment.original_sha256)
+            and photo.original_hash != attachment.original_sha256
         ):
             continue
         yield photo
@@ -383,12 +389,39 @@ def _photos(session):
     )
 
 
+def _framed_photo_choices(card, photos, root, manifest):
+    attached = {value.vision_photo_id for value in card["item"].research_attachments}
+    attached_hashes = {value.original_sha256 for value in card["item"].research_attachments}
+    requests = []
+    for photo in _photo_choices(card, photos):
+        request = framing_request(
+            manifest,
+            card["item"],
+            photo,
+            attached=photo.id in attached or photo.original_hash in attached_hashes,
+        )
+        if request is None:
+            continue
+        direct = request == "direct"
+        area = 0 if direct else request.bbox[2] * request.bbox[3]
+        requests.append((not direct, -area, PHOTO_ORDER[photo.role], photo.id, photo, request))
+    for _, _, _, _, photo, request in sorted(requests):
+        try:
+            raw = read_research_photo(root, photo)
+        except (ValueError, OSError):
+            continue
+        frame = validated_photo_frame(request, raw)
+        if frame is not None:
+            yield photo, frame, raw
+
+
 def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
     """Read-only decoration; dates come from source quotes, never import/owner activity."""
     with session.no_autoflush:
         quotes = _quote_times(session, {id_ for card in cards for id_ in card["candidate_ids"]})
         comps = {row.id: row for row in session.scalars(select(ComparableSale))}
         photos, root = _photos(session), _photo_root(session, photo_root)
+        manifest = load_photo_framing(root)
         result = []
         for card in cards:
             compact = compact_projection(
@@ -397,13 +430,12 @@ def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
                 source_quote=_latest_quote(card, quotes),
                 comparables_supported=_comparable_support(card["item"], comps, card["dataset"]),
             )
-            for photo in _photo_choices(card, photos):
-                try:
-                    read_research_photo(root, photo)
-                except (ValueError, OSError):
-                    continue
+            for photo, frame, _ in _framed_photo_choices(card, photos, root, manifest):
                 compact.update(
-                    photo_id=photo.id, photo_url=f"/feed/photos/{photo.id}", photo_role=photo.role
+                    photo_id=photo.id,
+                    photo_url=f"/feed/photos/{photo.id}",
+                    photo_role=photo.role,
+                    photo_frame=frame,
                 )
                 break
             result.append({**card, "compact": compact})
@@ -414,7 +446,9 @@ def read_compact_photo(session, prefs, photo_id, *, photo_root=None):
     """Recheck surviving source membership and ownership on every thumbnail/full-image GET."""
     with session.no_autoflush:
         photos = [(photo, case) for photo, case in _photos(session) if photo.id == photo_id]
+        root = _photo_root(session, photo_root)
+        manifest = load_photo_framing(root)
         for card in build_feed(session, prefs):
-            for photo in _photo_choices(card, photos):
-                return read_research_photo(_photo_root(session, photo_root), photo)
+            for _, _, raw in _framed_photo_choices(card, photos, root, manifest):
+                return raw
     raise ValueError("Private item photo unavailable")

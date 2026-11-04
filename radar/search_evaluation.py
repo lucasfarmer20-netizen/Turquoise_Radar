@@ -26,7 +26,9 @@ def _feedback(cards):
     latest = {
         card["listing_id"]: card["latest_feedback"]["action"]
         for card in cards
-        if card["listing_id"] is not None and card["latest_feedback"]
+        if card["listing_id"] is not None
+        and card["latest_feedback"]
+        and card["latest_feedback"]["action"] in ACTIONS
     }
     counts = Counter(latest.values())
     return dict(
@@ -174,7 +176,8 @@ def evaluate_searches(session, prefs):
             "profitability, HTTP attempt count or complete query yield is established.",
             "Failed bookkeeping and zero-result executions are outside this surviving-item view.",
             "Owner outcomes use one latest feedback action per distinct linked listing, separate "
-            "from automated screening. Per-query item counts must not be summed across queries.",
+            "from automated screening; cleared decisions are neutral. Per-query item counts "
+            "must not be summed across queries.",
             "Suggestions preserve the 65 catalog phrases plus up to 35 existing patterns; "
             "title overlap is vocabulary evidence only and never starts a search.",
         ],

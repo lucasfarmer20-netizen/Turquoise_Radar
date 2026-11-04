@@ -169,8 +169,8 @@ def test_linked_card_uses_owner_state_and_latest_feedback_without_merging_manual
     assert cards[owner.id]["state"] == "WATCH"
     assert cards[owner.id]["candidate_ids"] == [first.id, second.id]
     assert cards[manual.id]["candidate_ids"] == []
-    assert "GO ✓" in response.text
-    assert "NO GO ✓" not in response.text
+    assert cards[owner.id]["latest_feedback"]["action"] == "Interested"
+    assert f'href="/listings/{owner.id}"' in response.text
     assert cards[owner.id]["observation_count"] == 2
     assert cards[manual.id]["observation_count"] == 0
     assert "recorded observations" not in response.text
@@ -195,16 +195,17 @@ def test_exact_query_correction_currency_and_unknown_cost_render_separately(clie
     assert "15.00 CAD" in response.text
     assert card["a"].landed is None
     assert card["missing_costs"] == ["shipping_cost"]
-    assert "NEEDS INFO" in response.text
+    assert card["compact"]["assessment"] == "NEEDS INFO"
     assert "<code>" not in response.text
     assert "SYNTHETIC RAW DATA NEVER RENDER" not in response.text
 
 
-def test_candidate_promotion_and_existing_owner_feedback_actions_work_from_feed(client, item):
+def test_unpictured_candidates_link_to_existing_review_and_photo_workflows(client, item):
     with client.app.state.sessions.begin() as session:
         row = candidate(session, item, "promote")
     before = client.get("/feed?scope=needs_photos")
-    assert f'action="/feed/review/candidate/{row.id}"' in before.text
+    assert f'href="/inbox/candidates/{row.id}"' in before.text
+    assert f'href="/vision/for/candidate/{row.id}"' in before.text
     promoted = client.post(f"/inbox/candidates/{row.id}/review", follow_redirects=False)
     assert promoted.status_code == 303
     with client.app.state.sessions() as session:
@@ -212,7 +213,7 @@ def test_candidate_promotion_and_existing_owner_feedback_actions_work_from_feed(
     assert promoted.headers["location"] == f"/listings/{listing_id}"
     after = client.get("/feed?scope=needs_photos")
     assert len(after.context["cards"]) == 1
-    assert f'action="/feed/review/listing/{listing_id}"' in after.text
+    assert f'href="/listings/{listing_id}"' in after.text
     assert (
         client.post(f"/listings/{listing_id}/feedback", data={"action": "Interested"}).status_code
         == 200
@@ -239,7 +240,7 @@ def test_browse_candidate_uses_discovery_promotion_and_preserves_provider_envelo
         observation(session, row, "production")
     response = client.get("/feed?scope=needs_photos")
     action = f"/discovery/items/{row.id}/review"
-    assert f'action="/feed/review/candidate/{row.id}"' in response.text
+    assert f'href="/vision/for/candidate/{row.id}"' in response.text
     assert f'href="/discovery/items/{row.id}"' in response.text
     assert client.post(action, follow_redirects=False).status_code == 303
     with client.app.state.sessions() as session:

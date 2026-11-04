@@ -64,13 +64,21 @@
         const card = form.closest('.compact-card');
         const research = card.querySelector('[data-research-link]');
         if (research) research.href = result.research_url;
+        const cleared = result.decision === 'CLEAR';
+        form.dataset.canClear = String(!cleared);
         controls.forEach((control) => {
-          const selected = control.value === result.decision;
+          if (control.value === 'CLEAR') {
+            control.hidden = cleared;
+            return;
+          }
+          const selected = !cleared && control.value === result.decision;
           control.setAttribute('aria-pressed', String(selected));
           control.classList.toggle('is-selected', selected);
           control.textContent = `${control.value === 'GO' ? 'GO' : 'NO GO'}${selected ? ' ✓' : ''}`;
         });
-        announce(`${result.decision === 'GO' ? 'GO' : 'NO GO'} saved. Use the other button to change it.`);
+        announce(cleared
+          ? 'Decision cleared. Returned to review.'
+          : `${result.decision === 'GO' ? 'GO' : 'NO GO'} saved. Use Clear to return to review.`);
       } catch (error) {
         announce(error instanceof Error ? error.message : 'Could not confirm the save. Retry safely or reload.', true);
       } finally {

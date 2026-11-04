@@ -74,7 +74,7 @@ def test_realized_result_is_archived_without_owner_pass_and_read_views_preserve_
     assert card["state"] == "RESEARCH"
     assert card["observation_count"] == 0
     assert card["research_observation_count"] == 1
-    assert "NEEDS INFO" in archive.text
+    assert card["compact"]["assessment"] == "NEEDS INFO"
     assert "Realized" in archive.text
     detail = client.get(f"/listings/{listing_id}")
     assert detail.status_code == 200
@@ -118,7 +118,7 @@ def test_quoted_costs_currency_provenance_and_deadline_conversions(client):
     assert response.status_code == 200
     assert response.context["cards"][0]["availability"] == "ACTIVE_AT_OBSERVATION"
     assert "currency unconfirmed" in response.text
-    assert "NEEDS INFO" in response.text
+    assert response.context["cards"][0]["compact"]["assessment"] == "NEEDS INFO"
     assert "Known quoted subtotal" not in response.text
     detail = client.get(f"/listings/{listing_id}")
     assert detail.status_code == 200
@@ -231,7 +231,7 @@ def test_ended_strong_financial_model_shows_historical_badge_without_changing_an
     card = archive.context["cards"][0]
     assert card["a"].tier == "BUY CANDIDATE"
     assert card["state"] == "RESEARCH"
-    assert "NEEDS INFO" in archive.text
+    assert card["compact"]["assessment"] == "NEEDS INFO"
     assert "<strong>BUY CANDIDATE</strong>" not in archive.text
     filtered = client.get("/feed?dataset=fixture&scope=archive&state=RESEARCH")
     assert len(filtered.context["cards"]) == 1
