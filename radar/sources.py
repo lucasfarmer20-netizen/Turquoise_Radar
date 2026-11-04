@@ -115,6 +115,8 @@ def upsert_listing(session, item, original):
     row = session.scalar(select(Listing).where(Listing.dedup_key == key))
     is_new = row is None
     if row is None:
+        if item.research_attachments:
+            raise ValueError("Private research attachments require the validated append helper")
         row = Listing(dedup_key=key, original_data=original, data=item.model_dump(mode="json"))
         session.add(row)
         if matched and item.raw_search_phrase == matched.phrase:
@@ -123,7 +125,15 @@ def upsert_listing(session, item, original):
         merged = {**row.data, **original}
         # The supplied observed fields update; omitted owner evidence stays intact.
         merged["search_pattern_id"] = item.search_pattern_id or row.data.get("search_pattern_id")
-        row.data = ListingInput.model_validate(merged).model_dump(mode="json")
+        validated = ListingInput.model_validate(merged)
+        for field in ("research_observations", "research_attachments"):
+            if field in original and (
+                getattr(validated, field) != getattr(ListingInput.model_validate(row.data), field)
+            ):
+                raise ValueError(
+                    "Existing research history must change through the audited append helper"
+                )
+        row.data = validated.model_dump(mode="json")
         row.last_seen = utcnow()
     session.flush()
     return row, is_new

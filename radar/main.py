@@ -2,6 +2,7 @@ import json
 from contextlib import asynccontextmanager
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -29,7 +30,10 @@ from radar.intake.routes import intake_routes
 from radar.intake.views import alert_history
 from radar.jewelry.routes import VisionBodyLimit, vision_routes
 from radar.owner_routes import owner_routes
-from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping
+from radar.research_evidence import research_projection
+from radar.research_routes import research_routes
+from radar.research_scope import inspect_scope, mutation_allowed
+from radar.schemas import FeedbackInput, ListingInput, Preferences, Shipping, utcnow
 from radar.sources import import_rows, upsert_listing
 from radar.sourcing_routes import sourcing_routes
 from radar.workflow import attributed_patterns, queue_state
@@ -38,6 +42,17 @@ ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "templates"))
 TEMPLATES.env.filters["usd"] = lambda v: "UNKNOWN" if v is None else f"${v:,.2f}"
 TEMPLATES.env.filters["pct"] = lambda v: "UNKNOWN" if v is None else f"{v:.1%}"
+
+
+def _zoned_time(value, zone):
+    if value is None:
+        return "UNKNOWN"
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.isoformat() + " · timezone unrecorded"
+    return value.astimezone(ZoneInfo(zone)).strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+TEMPLATES.env.filters["zoned_time"] = _zoned_time
 CATEGORIES = ["RING RESTOCK", "STERLING / MELT", "WHATNOT FLIP", "COLLECTOR UPSIDE", "MULTI-LOT"]
 ACTIONS = ["Interested", "Purchased", "Passed", "False positive", "Sold"]
 
@@ -50,18 +65,30 @@ def preferences(session):
 def view(row, prefs, patterns):
     item = ListingInput.model_validate(row.data)
     analysis = analyze(item, prefs)
+    research = research_projection(item, analysis)
+    ended = bool(
+        (research and research["availability"] == "ENDED")
+        or (
+            item.item_end_time
+            and item.item_end_time.utcoffset() is not None
+            and item.item_end_time <= utcnow()
+        )
+    )
     return {
-        "state": queue_state(row, analysis),
+        "state": row.review_state if ended else queue_state(row, analysis),
+        "availability": "ENDED" if ended else research["availability"] if research else "UNKNOWN",
         "row": row,
         "item": item,
         "a": analysis,
+        "research": research,
         "pattern": patterns.get(item.search_pattern_id),
     }
 
 
-def create_app(database_url=None):
+def create_app(database_url=None, *, expected_scope=None):
     @asynccontextmanager
     async def lifespan(app):
+        app.state.research_scope = inspect_scope(database_url, expected_scope)
         app.state.engine, app.state.sessions = database(database_url)
         with app.state.sessions.begin() as session:
             seed_patterns(session)
@@ -86,15 +113,30 @@ def create_app(database_url=None):
             request.headers.get("sec-fetch-site") == "cross-site" or (origin and origin != expected)
         ):
             return HTMLResponse("Cross-origin mutation rejected", status_code=403)
-        response = await call_next(request)
+        scope = getattr(app.state, "research_scope", None)
+        if (
+            scope
+            and request.method not in ("GET", "HEAD", "OPTIONS")
+            and not mutation_allowed(request.url.path)
+        ):
+            response = HTMLResponse(
+                "NEW-ONLY, REAL-EMAIL RESEARCH: this action is outside the approved email "
+                "cohort. Local evidence, photo and owner-feedback review remain available.",
+                status_code=403,
+            )
+        else:
+            response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
-        response.headers["Content-Security-Policy"] = (
+        response.headers.setdefault(
+            "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; "
-            "base-uri 'self'; form-action 'self'"
+            "base-uri 'self'; form-action 'self'",
         )
-        if request.url.path.startswith(("/identify", "/feed")):
+        if scope:
+            response.headers["X-Radar-Research-Scope"] = scope.schema_version
+        if scope or request.url.path.startswith(("/identify", "/feed")):
             response.headers["Cache-Control"] = "private, no-store"
             response.headers["Content-Security-Policy"] = response.headers[
                 "Content-Security-Policy"
@@ -102,13 +144,17 @@ def create_app(database_url=None):
         return response
 
     def render(request, name, **context):
+        context["research_scope"] = getattr(app.state, "research_scope", None)
         return TEMPLATES.TemplateResponse(request=request, name=name, context=context)
 
     @app.get("/health")
     def health():
         with app.state.sessions() as s:
             s.execute(select(Setting).limit(1))
-        return {"status": "ok", "destination": "99669", "mode": "private"}
+        result = {"status": "ok", "destination": "99669", "mode": "private"}
+        if app.state.research_scope:
+            result["scope"] = app.state.research_scope.model_dump(by_alias=True)
+        return result
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request):
@@ -168,7 +214,10 @@ def create_app(database_url=None):
                 anomaly_classes=sorted({p.anomaly_category for p in patterns.values()}),
                 top_patterns=top_patterns,
                 review_count=sum(v["a"].tier == "RESEARCH NEEDED" for v in all_views),
-                candidate_count=sum(v["a"].tier == "BUY CANDIDATE" for v in all_views),
+                candidate_count=sum(
+                    v["a"].tier == "BUY CANDIDATE" and v["availability"] != "ENDED"
+                    for v in all_views
+                ),
             )
             return render(
                 request,
@@ -207,6 +256,16 @@ def create_app(database_url=None):
                 maker_cases=workbench_context(s, listing_id),
                 discovery_observations=discovery_history(s, listing_id),
                 alert_observations=alert_history(s, listing_id),
+                research_history=[
+                    research_projection(
+                        item.model_copy(update={"research_observations": [observation]})
+                    )
+                    for _, observation in sorted(
+                        enumerate(item.research_observations),
+                        key=lambda entry: (entry[1].recorded_at, entry[0]),
+                        reverse=True,
+                    )
+                ],
                 outcomes=list(
                     s.scalars(select(ComparableSale).where(ComparableSale.listing_id == listing_id))
                 ),
@@ -381,6 +440,7 @@ def create_app(database_url=None):
     discovery_routes(app, render, preferences)
     intake_routes(app, render, preferences)
     sourcing_routes(app, render, preferences)
+    research_routes(app)
     vision_routes(app, render)
     identification_routes(app, render, preferences)
     return app

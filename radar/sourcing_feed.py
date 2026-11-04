@@ -17,6 +17,7 @@ from radar.db import (
 )
 from radar.ebay_deletion.processing import REMOVED, is_ebay
 from radar.intake.service import observation_occurrences
+from radar.research_evidence import research_projection
 from radar.schemas import ListingInput, Shipping, utcnow
 from radar.workflow import queue_state
 
@@ -220,6 +221,7 @@ def _build_feed(session, prefs):
     for key, (listing, linked) in groups.items():
         item = ListingInput.model_validate(listing.data if listing else linked[0].normalized)
         analysis = analyze(item, prefs)
+        research = research_projection(item, analysis)
         modes = _item_datasets(item)
         history, observed = [], []
         for row in linked:
@@ -231,6 +233,8 @@ def _build_feed(session, prefs):
         # Only manual-only records use the owner's capture timestamp as freshness.
         if listing and not linked:
             observed.append(_utc(listing.last_seen))
+        if research:
+            observed.append(_utc(research["latest"].recorded_at))
         # A naive source end time has no trustworthy timezone and cannot establish expiry.
         expired = bool(
             item.item_end_time
@@ -238,9 +242,19 @@ def _build_feed(session, prefs):
             and item.item_end_time.utcoffset() is not None
             and item.item_end_time <= now
         )
-        availability = "ENDED" if expired or any(row.id in ended for row in linked) else "UNKNOWN"
+        availability = (
+            "ENDED"
+            if expired
+            or any(row.id in ended for row in linked)
+            or research and research["availability"] == "ENDED"
+            else "ACTIVE_AT_OBSERVATION"
+            if research and research["availability"] == "ACTIVE_AT_OBSERVATION"
+            else "UNKNOWN"
+        )
         state = (
-            queue_state(listing, analysis)
+            listing.review_state
+            if listing and availability == "ENDED"
+            else queue_state(listing, analysis)
             if listing
             else "IRRELEVANT"
             if linked[0].inbox_status == "IRRELEVANT"
@@ -253,12 +267,17 @@ def _build_feed(session, prefs):
                 candidate_ids=[row.id for row in linked],
                 item=item,
                 a=analysis,
+                research=research,
+                research_priority_weight=research["priority_weight"] if research else 0,
+                research_score=analysis.score - (research["burden_penalty"] if research else 0),
                 state=state,
                 last_seen=max(observed),
                 availability=availability,
                 dataset="mixed" if len(modes) > 1 else next(iter(modes), "real"),
                 query_evidence=history or _query_from_item(item),
                 observation_count=sum(counts[row.id] for row in linked),
+                research_observation_count=len(item.research_observations),
+                research_attachment_count=len(item.research_attachments),
                 latest_feedback=feedback.get(listing.id) if listing else None,
                 missing_costs=[k for k, value in analysis.costs.items() if value is None],
                 next_evidence=_next_evidence(item, analysis, availability),

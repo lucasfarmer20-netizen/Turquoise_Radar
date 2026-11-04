@@ -168,6 +168,19 @@ five-message batch contains 27 distinct items; this is separate from historical
 inventory, which is currently inaccessible. See [actual evidence and remaining
 gates](docs/JRI-016.md) and the [minimal private transfer](docs/JRI-016-PRIVATE-HANDOFF.md).
 
+JRI-017 adds a persistent **NEW-ONLY, REAL-EMAIL RESEARCH** scope for the separately
+approved five-message application. Its 27 genuine items and three research listings
+remain distinct from missing historical records. Scope checks preserve local
+evidence, photos and feedback while blocking new sourcing/analysis execution.
+Acquisition currency corrections explicitly clear older amounts instead of
+relabeling them. Dated owner research now separates observed bids, realized auction
+results, partial cost subtotals, Alaska quote/fulfillment evidence and shipping
+burden. Ended opportunities retain their research history in the closed view;
+seller claims do not become verified material or owner decisions. Later owner
+screenshots and terms attach through verified private receipts while preserving
+earlier reports; previews stay local and terms download as inert text. See
+[the actual import and manual trial receipt](docs/JRI-017.md).
+
 ## Multi-source inbox (Task 004)
 
 Open **Multi-Source Inbox → Import alerts** to upload owner-provided .eml files,

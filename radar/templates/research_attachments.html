@@ -1,0 +1,18 @@
+{% if attachments %}
+<section class="research-attachments" aria-label="Supporting files received later">
+<h3>Supporting files received later · {{ attachments|length }}</h3>
+<p class="muted">Separate from the original notification and research observations. Receiving files does not establish current availability, independently verified metal content or final delivered cost. Images below use private normalized copies; no marketplace images are fetched.</p>
+{% for attachment in attachments %}
+<article class="research-attachment">
+<h4>{{ attachment.display_name }}</h4>
+<p class="muted">{{ attachment.kind|replace('_',' ') }} · received {{ attachment.received_at|zoned_time('America/Anchorage') }} Alaska ({{ attachment.received_at|zoned_time('UTC') }}) · reviewed {% if attachment.reviewed_at %}{{ attachment.reviewed_at|zoned_time('America/Anchorage') }} Alaska ({{ attachment.reviewed_at|zoned_time('UTC') }}){% else %}NOT YET RECORDED{% endif %}.</p>
+{% if attachment.review_note %}<p class="vision-prose">{{ attachment.review_note }}</p>{% endif %}
+{% if attachment.kind=='SCREENSHOT' %}
+<a href="/vision/photos/{{ attachment.vision_photo_id }}"><img src="/vision/photos/{{ attachment.vision_photo_id }}" alt="{{ attachment.display_name }} · owner-provided screenshot" loading="lazy" width="240">Open private screenshot</a>
+{% else %}
+<a href="/listings/{{ attachment_listing_id }}/research-attachments/{{ attachment.artifact_id }}" download>Download auction terms as plain text</a>
+{% endif %}
+</article>
+{% endfor %}
+</section>
+{% endif %}
