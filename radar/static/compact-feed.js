@@ -1,5 +1,57 @@
 /* Local clock display and explicit owner POSTs only; no marketplace requests. */
 (() => {
+  // Only server-qualified production eBay content receives this marker. Withdrawal
+  // makes no request and cannot refresh evidence or grant server-side access.
+  const started = performance.now();
+  const expiryCards = [...document.querySelectorAll('[data-source-expiry]')].map((card) => ({
+    card,
+    checked: Date.parse(card.dataset.sourceCheckedAt),
+    expires: Date.parse(card.dataset.sourceExpiresAt),
+  }));
+  let withdrawn = 0;
+  let expiryTimer;
+  const withdrawExpired = () => {
+    window.clearTimeout(expiryTimer);
+    let next = 30000;
+    expiryCards.forEach(({ card, checked, expires }) => {
+      if (!card.isConnected) return;
+      // A backwards wall-clock adjustment must not extend display lifetime.
+      const now = Math.max(Date.now(), checked + Math.max(0, performance.now() - started));
+      if (!Number.isFinite(checked) || !Number.isFinite(expires) || expires < checked || now > expires) {
+        card.remove();
+        withdrawn += 1;
+      } else {
+        next = Math.min(next, Math.max(1, expires - now + 1));
+      }
+    });
+    if (withdrawn) {
+      const notice = document.querySelector('#feed-expiry-status');
+      if (notice) {
+        notice.hidden = false;
+        notice.querySelector('span').textContent = `${withdrawn} saved eBay ${withdrawn === 1 ? 'item on this page is' : 'items on this page are'} withheld because listing or photo freshness has expired or cannot be verified.`;
+      }
+      // Other pages were not inspected; do not invent replacement totals.
+      document.querySelectorAll('.compact-tabs span, .feed-pagination > span').forEach((count) => {
+        count.hidden = true;
+      });
+    }
+    if (expiryCards.some(({ card }) => card.isConnected)) {
+      expiryTimer = window.setTimeout(withdrawExpired, next);
+    }
+  };
+  withdrawExpired();
+  window.addEventListener('pageshow', withdrawExpired);
+  window.addEventListener('focus', withdrawExpired);
+  document.addEventListener('visibilitychange', withdrawExpired);
+  ['click', 'submit'].forEach((type) => document.addEventListener(type, (event) => {
+    const card = event.target.closest('[data-source-expiry]');
+    if (!card) return;
+    withdrawExpired();
+    if (!card.isConnected) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true));
   const status = document.querySelector('#feed-action-status');
   const announce = (message, error = false) => {
     if (!status) return;

@@ -31,6 +31,21 @@ def listing_is_fresh(observed_at, *, now=None):
     return _fresh(observed_at, LISTING_DISPLAY_AGE, now)
 
 
+def display_expires_at(observed_at, *, photo_data=None):
+    """Browser withdrawal deadline; never a substitute for server eligibility checks."""
+    observed = _aware(observed_at)
+    if observed is None:
+        return None
+    deadlines = [observed + LISTING_DISPLAY_AGE]
+    if photo_data is not None:
+        image_observed = _aware(photo_data.get("listing_observed_at"))
+        fetched = _aware(photo_data.get("fetched_at"))
+        if image_observed is None or fetched is None:
+            return None
+        deadlines.extend((image_observed + LISTING_DISPLAY_AGE, fetched + IMAGE_DISPLAY_AGE))
+    return min(deadlines).isoformat()
+
+
 def image_is_fresh(fetched_at, *, now=None):
     return _fresh(fetched_at, IMAGE_DISPLAY_AGE, now)
 

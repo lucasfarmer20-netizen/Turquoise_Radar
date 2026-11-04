@@ -18,7 +18,7 @@ from radar.db import (
     VisionCase,
     VisionPhoto,
 )
-from radar.discovery.image_freshness import listing_is_fresh
+from radar.discovery.image_freshness import display_expires_at, listing_is_fresh
 from radar.feed_photo_framing import (
     framing_request,
     load_photo_framing,
@@ -436,6 +436,7 @@ def _framed_photo_choices(card, photos, root, manifest):
 
 def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
     """Read-only decoration; dates come from source quotes, never import/owner activity."""
+    now = now or utcnow()
     with session.no_autoflush:
         quotes = _quote_times(session, {id_ for card in cards for id_ in card["candidate_ids"]})
         comps = {row.id: row for row in session.scalars(select(ComparableSale))}
@@ -461,7 +462,19 @@ def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
             compact["listing_fresh"] = not production_ebay or listing_is_fresh(
                 max(source_observations) if source_observations else None, now=now
             )
+            observed = max(source_observations) if source_observations else None
+            compact["source_expiry_required"] = production_ebay
+            if production_ebay:
+                compact["source_checked_at"] = now.isoformat()
+                compact["source_expires_at"] = display_expires_at(observed)
             for photo, frame, _ in _framed_photo_choices(card, photos, root, manifest):
+                if (
+                    production_ebay
+                    and photo.data.get("processing_version") == ORIGINAL_PROCESSING_VERSION
+                ):
+                    compact["source_expires_at"] = display_expires_at(
+                        observed, photo_data=photo.data
+                    )
                 compact.update(
                     photo_id=photo.id,
                     photo_url=f"/feed/photos/{photo.id}",

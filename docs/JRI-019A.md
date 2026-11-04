@@ -154,3 +154,54 @@ Remaining gates: separate owner image-only approval and an execution environment
 that observes the already-published image permission. Actual downloads and real
 photo rendering remain unperformed. No OAuth, Browse, image GET/HEAD, paid
 inference or recurring request was made during this qualification. PR #30 stays draft.
+
+## Follow-up: expiry while the feed stays open
+
+A synthetic Chromium reproduction at checkpoint
+`6e2429b84966484602288bef8f56be07613c6d80` loaded one production-shaped eBay
+photo card shortly before its six-hour boundary. Advancing the browser clock
+past that boundary left one card and one image visible; no external requests
+occurred. Server checks worked on subsequent requests but could not withdraw
+already-rendered content.
+
+The feed now supplies a display deadline only for production eBay cards and
+Needs Photos rows. It uses the six-hour listing limit and, for original source
+photos, the earlier of the photo's own listing-observation limit and its 24-hour
+fetch limit. Fetching a photo never extends a listing's lifetime. Existing
+server eligibility, private-photo authorization and deletion checks remain
+independent and authoritative.
+
+The browser removes expired content, including links and decision controls,
+without fetching or modifying anything. It checks on a deadline timer, page
+restoration, focus, visibility changes and before interaction. Missing or invalid
+deadline metadata on a marked card causes withdrawal. A monotonic elapsed-time
+floor prevents backwards wall-clock adjustment from prolonging display. The
+existing inclusive expiry boundary is preserved; withdrawal begins after it.
+
+A count-only notice reports items withdrawn from this page and offers a manual
+reload. Potentially outdated tab/pagination totals are hidden rather than
+inventing counts for uninspected pages. An image-only expiry withdraws the
+whole card conservatively; a manual reload can place the still-fresh listing
+in Needs Photos. Original evidence and feedback remain stored, and non-eBay,
+fixture and sandbox content retain their existing behavior.
+
+This is a browser usability safeguard, not revocation of bytes already delivered.
+It requires JavaScript execution; suspended pages recheck when the browser resumes
+events. It does not remotely detect later deletion events, replace maintenance,
+refresh marketplace observations, or change server-side review semantics.
+
+Qualification uses synthetic records only. Run
+`scripts/check-feed-expiry-browser.py` with the repository Python environment,
+optional Playwright installed, and `/usr/bin/chromium`. All browser requests are
+fulfilled locally through TestClient or blocked. Desktop/mobile scenarios cover
+listing/image boundaries, photo-less rows, resume events, pre-interaction expiry,
+invalid metadata, backwards clocks and unaffected fixture/non-eBay views. Each
+scenario requires zero external requests, zero mutations, unchanged database and
+photo-file bytes, no browser errors and no horizontal overflow. No production
+key, dataset, receiver connection or paid service is required.
+
+Final validation on November 4, 2026: **1,380 pytest tests passed in 58.85 seconds**,
+with the existing Starlette/AnyIO deprecation warning; Ruff, JavaScript syntax and
+whitespace checks passed. **24 Chromium scenarios** passed across 1440px and 390px
+widths, with zero external requests or mutations and unchanged synthetic stored
+bytes. The 57-test focused regression run also passed. No live pilot was executed.
