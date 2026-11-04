@@ -22,7 +22,11 @@ similarity = [
 ]
 
 [dependency-groups]
-dev = ["pytest==8.4.2", "ruff==0.14.2"]
+dev = [
+    "cryptography==50.0.2",
+    "pytest==8.4.2",
+    "ruff==0.14.2",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

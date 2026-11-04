@@ -1,0 +1,29 @@
+[Unit]
+Description=Fresh authenticated encrypted receiver-ledger backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tr-ledger-backup
+Group=tr-ledger-backup
+WorkingDirectory=/opt/tr-ledger-backup
+Environment=HOME=/var/lib/tr-ledger-backup
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -I /opt/tr-ledger-backup/deploy/ebay-deletion/cloud-backup.py cycle --config /etc/tr-ledger-backup/config.json
+UMask=0077
+StateDirectory=tr-ledger-backup
+StateDirectoryMode=0700
+TimeoutStartSec=300
+LimitCORE=0
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/tr-ledger-backup
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

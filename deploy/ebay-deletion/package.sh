@@ -21,6 +21,7 @@ set -- \
     pyproject.toml \
     uv.lock \
     deploy/ebay-deletion/Caddyfile \
+    deploy/ebay-deletion/caddy-no-environ.conf \
     deploy/ebay-deletion/inventory.example.json \
     deploy/ebay-deletion/package.sh \
     deploy/ebay-deletion/receiver.env.example \
