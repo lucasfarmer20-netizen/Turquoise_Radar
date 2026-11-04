@@ -1,4 +1,12 @@
-# JRI-019A — image-only continuation preflight
+# JRI-019A — recovered pilot and qualified image-only preparation
+
+The original pilot was recovered **in place**, with no transfer or replacement
+records, on November 4, 2026, at 8:10:47 a.m. AKST
+(`2026-11-04T17:10:47.266208Z`). Its database hash matches the frozen plan, all six
+preserved table hashes match, and its original eleven manifest/receipt hashes
+remain intact. The requested PR #30 head `e5e8406e1104af1fb7e42dd33daa63ce2b71fa69`
+was already checked out and was fetched from GitHub. No obsolete JRI-013 code or
+replacement data was used.
 
 The saved JRI-019 cohort contains **eight distinct primary image references**, all
 on `https://i.ebayimg.com`. Each matches the candidate's original Browse response
@@ -7,19 +15,19 @@ and a retained query observation. Read-only inspection at
 candidates, twelve observations, one discovery run, zero stored photos and zero
 feedback. Database integrity/foreign-key checks passed and its bytes were unchanged.
 
-## Minimum owner-operated policy change
+## Published policy and execution environment
 
-Add **`i.ebayimg.com`** to the Turquoise Radar environment's **Additional allowed
-domains**, then publish the updated environment using the supported settings.
-Only HTTPS/443 is needed for this continuation. No wildcard, additional image
-host, OAuth/Browse access change, direct connection, TLS exception, receiver or
-infrastructure change is required. Both the current runtime readiness response
-and executor policy omit this host; policy is enforced.
+The owner reports that **`i.ebayimg.com`** has been published in Additional allowed
+domains and independently verified in the newer environment. That exact host over
+HTTPS/443 remains the complete requirement. The older executor holding the original
+pilot still reports an enforced policy without this host. This mismatch does not
+require another owner allowlist edit: downloads must use the published environment
+when its current policy is available to the executor doing the work.
 
-The assistant has not changed the environment or contacted the image host again.
-After publication, verify current enforced policy in the environment actually
-used for execution. Publication and image-download authorization are separate.
-No connectivity HEAD/GET probe is part of this preflight.
+No environment, receiver or infrastructure change was made, and the image host was
+not probed. Publication and image-download authorization remain separate. The
+download path requires explicit current runtime readiness and also checks the
+executor's allowed-host snapshot before making any request.
 
 ## Proposed bounded continuation
 
@@ -40,7 +48,9 @@ authorization before dispatch:
   16–10,000 pixels and total pixels to 24 million. Use 15-second HTTP timeouts,
   a 30-second total deadline per image and one-second request spacing.
   Reject non-identity Content-Encoding and enforce byte caps before extending
-  retained buffers; failed downloads also consume the transfer budget.
+  retained buffers; failed downloads also consume the transfer budget. These
+  bound accepted bytes: streaming can receive one extra chunk (at most 64 KiB)
+  before aborting, and that excess is counted but not retained.
 - Record each attempt durably before dispatch. Preserve the previous failed
   image attempt and Browse authorization receipts. A new image-only receipt must
   not reset or reuse those consumed markers.
@@ -49,14 +59,32 @@ authorization before dispatch:
   Register seller-copy provenance before exposure; storage/registration failure
   must not leave an untracked image. No crop, retouch, invented pixels or upscale.
 - Preserve listing, observation, query, financial and feedback records. Keep
-  NEEDS INFO; failures remain in Needs Photos. Verify source-linked local image
-  reads, deletion suppression, hashes and desktop/mobile counts after download.
+  NEEDS INFO. Missing photos belong in Needs Photos only while the listing
+  observations remain fresh; stale listings are withheld in every feed view.
+  Verify source-linked local image reads, deletion suppression, hashes and
+  desktop/mobile counts after download.
 
-The previous private downloader is **not qualified for unchanged reuse**: it
-lacked strict MIME checking, exact-eight cohort binding, an aggregate byte cap,
-a total download deadline and failure-atomic provenance registration. Existing
-application photo serving assumes normalized PNGs; an exact-byte serving path
-must be qualified before downloading JPEG/WebP. No new downloader was executed.
+The previous private downloader remains historical and must not be rerun. The
+implementation now lives in `radar.discovery.image_pilot`: `prepare_preview`
+reads the existing database without migration/seeding; `execute_preview` requires
+the exact preview digest, approval and policy readiness. A fixed exclusive marker
+beside the database prevents replay even if a different receipt directory is
+provided. Attempts are fsynced before dispatch. Each attempt uses a new client to
+prevent cookie propagation, with no API credentials or OAuth/Browse capability.
+
+Private storage now supports validated `.jpg`, `.png` and `.webp` original bytes,
+the correct MIME, equal original/stored hashes and unchanged dimensions. It does
+not strip metadata, re-encode, crop or generate pixels. Descriptor-anchored file
+operations reject symlink paths. Full-photo and compact-photo routes recheck
+source ID/reference binding, surviving candidate membership, bytes and freshness.
+The source images are display-only; inference rejects them before provider use.
+
+The existing deletion inventory is registered before image bytes or photo rows
+become visible. Failed storage rolls back database changes and removes bytes;
+any retained unused inventory entry is conservative. Exact source copies cannot
+be classified as independent photos. Their correct suffix/hash is required for
+deletion, and expired images remain purgeable. Fresh authenticated ledger and
+identity-review requirements remain unchanged; no real deletion replay was run.
 
 ## Official use and retention constraints
 
@@ -83,10 +111,46 @@ The [official Browse schema](https://developer.ebay.com/develop/api/spec/browse_
 identifies item-summary `image` as the primary image; additional images are
 separate. Returned width/height fields are reserved, so validate downloaded bytes.
 
-## Pending gates
+## Recovery and qualification results
 
-Owner publication, observed policy readiness, the separate image-only approval,
-qualified byte-preserving storage/display, and actual image/feed verification
-remain pending. The current result remains **0 photos, 0 Open, 8 Needs Photos**.
-This task sent no OAuth, Browse or image request. The original pilot and the
-separate 27-item email application remain unchanged. PR #30 stays draft.
+All eight primary references match the saved raw responses and all twelve query
+observations. SQLite integrity and foreign keys pass. Original history remains
+one OAuth request, four Browse requests, and one failed image CONNECT attempt;
+there are still zero photos, zero feedback and no replacement records. Both email
+workspaces remain unchanged across their 215 and 211 inventoried files.
+
+At recovery, every listing observation was about 14 hours 45 minutes old. A real
+read-only browser check of the original database at 1440 and 390 pixels verified
+that Open, Needs Photos and All show a count-only stale-source notice, withholding
+all eight listing cards/titles. No database bytes changed and no external browser
+requests occurred. The prior **0 Open / 8 Needs Photos** screenshot is historical;
+current results are **0 displayed cards / 8 stale records retained**, not deletion
+of those records. Image retrieval cannot restore listing freshness.
+
+Synthetic qualification covers exact bytes/MIME/metadata, rejected formats and
+symlinks, source reassignment, hash failures, tombstones, listing/image expiry,
+all three formats' deletion, fixed execution limits, approval/policy gates,
+cookie/header isolation and storage failure cleanup. No synthetic items were
+inserted into the real pilot or represented as actual eBay opportunities.
+
+The full repository suite passes: **1,373 tests in 177.12 seconds**, with one
+existing upstream Starlette/AnyIO deprecation warning. Ruff and whitespace checks
+pass; independent code review found no blocking defect. Legacy maker-photo reads
+remain compatible. Final readback at `2026-11-04T17:28:43Z` confirms the database,
+exact preview and eleven original receipts are unchanged. At
+`2026-11-04T17:29:41Z`, both email workspaces still match all 215 and 211 baseline
+file hashes. The actual read-only browser checks occurred at
+`2026-11-04T17:18:07.797974Z`; these are stale-content suppression checks, not
+successful real-image rendering.
+
+A private exact eight-reference preview and a prepared deletion inventory are
+available outside Git. The prepared inventory extends the original inventory
+with this preview export; original manifests and receipts were not overwritten.
+Approval of this image-only preview would permit byte download/validation only;
+it would not authorize refresh of expired listing information or make eight
+current Open cards possible from stale observations.
+
+Remaining gates: separate owner image-only approval and an execution environment
+that observes the already-published image permission. Actual downloads and real
+photo rendering remain unperformed. No OAuth, Browse, image GET/HEAD, paid
+inference or recurring request was made during this qualification. PR #30 stays draft.

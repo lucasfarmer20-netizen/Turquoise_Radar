@@ -57,6 +57,8 @@ def sourcing_routes(app, render, preferences):
         source = q.get("source", "")
         with app.state.sessions() as session:
             cards = decorate_compact_cards(session, build_feed(session, preferences(session)))
+            stale_source_count = sum(not card["compact"]["listing_fresh"] for card in cards)
+            cards = [card for card in cards if card["compact"]["listing_fresh"]]
             counts = Counter(card["dataset"] for card in cards)
             sources = sorted({card["item"].source for card in cards})
             if source and source not in sources:
@@ -110,6 +112,7 @@ def sourcing_routes(app, render, preferences):
                 total=len(results),
                 counts=counts,
                 view_counts=view_counts,
+                stale_source_count=stale_source_count,
                 filters=filters,
                 datasets=DATASETS,
                 states=[*STATES, "IRRELEVANT"],
@@ -129,12 +132,14 @@ def sourcing_routes(app, render, preferences):
     def compact_photo(photo_id: str):
         with app.state.sessions() as session:
             try:
-                raw = read_compact_photo(session, preferences(session), photo_id)
+                raw, media_type = read_compact_photo(
+                    session, preferences(session), photo_id, include_media_type=True
+                )
             except (OSError, ValueError):
                 raise HTTPException(404, "Private photo unavailable") from None
         return Response(
             raw,
-            media_type="image/png",
+            media_type=media_type,
             headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         )
 

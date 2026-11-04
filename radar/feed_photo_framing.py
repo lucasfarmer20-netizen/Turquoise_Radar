@@ -130,8 +130,8 @@ def framing_request(manifest, item, photo, *, attached):
     return "direct" if photo.role == "FRONT" and not attached else None
 
 
-def validated_photo_frame(request, raw):
-    """Describe an in-bounds viewport in the same integrity-checked PNG bytes."""
+def validated_photo_frame(request, raw, *, allow_original=False):
+    """Describe original pixels; source JPEG/WebP permits only a full-image viewport."""
     if request is None:
         return None
     try:
@@ -140,7 +140,12 @@ def validated_photo_frame(request, raw):
             with Image.open(io.BytesIO(raw)) as source:
                 width, height = source.size
                 if (
-                    source.format != "PNG"
+                    source.format
+                    not in (
+                        {"PNG", "JPEG", "WEBP"}
+                        if allow_original and request == "direct"
+                        else {"PNG"}
+                    )
                     or not 16 <= min(width, height)
                     or max(width, height) > 10000
                     or width * height > 24_000_000

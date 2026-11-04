@@ -3,6 +3,7 @@
 import os
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from hashlib import sha256
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -17,12 +18,14 @@ from radar.db import (
     VisionCase,
     VisionPhoto,
 )
+from radar.discovery.image_freshness import listing_is_fresh
 from radar.feed_photo_framing import (
     framing_request,
     load_photo_framing,
     validated_photo_frame,
 )
 from radar.intake.service import observation_occurrences
+from radar.jewelry.images import ORIGINAL_PROCESSING_VERSION, photo_storage_metadata
 from radar.jewelry.schemas import OWNER
 from radar.research_assets import read_research_photo
 from radar.research_evidence import QUOTE_FIELDS
@@ -394,6 +397,18 @@ def _framed_photo_choices(card, photos, root, manifest):
     attached_hashes = {value.original_sha256 for value in card["item"].research_attachments}
     requests = []
     for photo in _photo_choices(card, photos):
+        if photo.data.get("processing_version") == ORIGINAL_PROCESSING_VERSION:
+            item = card["item"]
+            if (
+                item.source.casefold() != "ebay"
+                or item.discovery_mode != "production"
+                or photo.data.get("source_listing_id") != item.source_listing_id
+                or not any(
+                    sha256(str(url).encode()).hexdigest() == photo.data.get("source_url_sha256")
+                    for url in item.image_urls
+                )
+            ):
+                continue
         request = framing_request(
             manifest,
             card["item"],
@@ -410,7 +425,11 @@ def _framed_photo_choices(card, photos, root, manifest):
             raw = read_research_photo(root, photo)
         except (ValueError, OSError):
             continue
-        frame = validated_photo_frame(request, raw)
+        frame = validated_photo_frame(
+            request,
+            raw,
+            allow_original=photo.data.get("processing_version") == ORIGINAL_PROCESSING_VERSION,
+        )
         if frame is not None:
             yield photo, frame, raw
 
@@ -424,11 +443,23 @@ def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
         manifest = load_photo_framing(root)
         result = []
         for card in cards:
+            source_observations = [
+                observed_at
+                for candidate_id, _, _, observed_at in quotes
+                if candidate_id in card["candidate_ids"] and _aware(observed_at)
+            ]
+            production_ebay = (
+                card["item"].source.casefold() == "ebay"
+                and card["item"].discovery_mode == "production"
+            )
             compact = compact_projection(
                 card,
                 now=now,
                 source_quote=_latest_quote(card, quotes),
                 comparables_supported=_comparable_support(card["item"], comps, card["dataset"]),
+            )
+            compact["listing_fresh"] = not production_ebay or listing_is_fresh(
+                max(source_observations) if source_observations else None, now=now
             )
             for photo, frame, _ in _framed_photo_choices(card, photos, root, manifest):
                 compact.update(
@@ -442,13 +473,26 @@ def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
         return result
 
 
-def read_compact_photo(session, prefs, photo_id, *, photo_root=None):
+def read_compact_photo(session, prefs, photo_id, *, photo_root=None, include_media_type=False):
     """Recheck surviving source membership and ownership on every thumbnail/full-image GET."""
     with session.no_autoflush:
         photos = [(photo, case) for photo, case in _photos(session) if photo.id == photo_id]
         root = _photo_root(session, photo_root)
         manifest = load_photo_framing(root)
         for card in build_feed(session, prefs):
-            for _, _, raw in _framed_photo_choices(card, photos, root, manifest):
+            if (
+                card["item"].source.casefold() == "ebay"
+                and card["item"].discovery_mode == "production"
+            ):
+                observations = _quote_times(session, set(card["candidate_ids"]))
+                stamps = [stamp for _, _, _, stamp in observations if _aware(stamp)]
+                if not listing_is_fresh(max(stamps) if stamps else None):
+                    continue
+            for photo, _, raw in _framed_photo_choices(card, photos, root, manifest):
+                if include_media_type:
+                    _, media_type = photo_storage_metadata(
+                        photo.data, photo.original_hash, photo.content_hash
+                    )
+                    return raw, media_type
                 return raw
     raise ValueError("Private item photo unavailable")

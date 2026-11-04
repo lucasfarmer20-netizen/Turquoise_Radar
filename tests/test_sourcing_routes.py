@@ -238,6 +238,12 @@ def test_browse_candidate_uses_discovery_promotion_and_preserves_provider_envelo
         )
         row.original_data = original
         observation(session, row, "production")
+        # This test exercises a current candidate's promotion, not stale-display
+        # suppression. Freshness comes from the actual observation, not last_seen.
+        source_observation = session.scalar(
+            select(DiscoveryObservation).where(DiscoveryObservation.item_id == row.id)
+        )
+        source_observation.observed_at = datetime.now(UTC) - timedelta(minutes=1)
     response = client.get("/feed?scope=needs_photos")
     action = f"/discovery/items/{row.id}/review"
     assert f'href="/vision/for/candidate/{row.id}"' in response.text

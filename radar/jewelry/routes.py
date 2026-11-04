@@ -1,11 +1,12 @@
 import json
 
 from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import PlainTextResponse
 
+from radar.compact_feed import read_compact_photo
 from radar.db import (
     VisionBilling,
     VisionCase,
@@ -21,8 +22,8 @@ from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS, VisionConfig, image_roo
 from radar.jewelry.images import (
     MAX_BATCH_BYTES,
     MAX_FILE_BYTES,
+    ORIGINAL_PROCESSING_VERSION,
     clean_image,
-    private_path,
     read_photo,
 )
 from radar.jewelry.schemas import OWNER, Correction, PriceProfile
@@ -37,6 +38,7 @@ from radar.jewelry.service import (
     reconcile_bill,
     subject_data,
 )
+from radar.schemas import Preferences
 
 
 class VisionBodyLimit:
@@ -283,13 +285,17 @@ def vision_routes(app, render):
                 raise HTTPException(404, "Photo not found")
             try:
                 owned_case(s, photo.case_id)
-                read_photo(root(), photo)
-                path = private_path(root(), photo.id)
+                if photo.data.get("processing_version") == ORIGINAL_PROCESSING_VERSION:
+                    raw, media_type = read_compact_photo(
+                        s, Preferences(), photo.id, include_media_type=True
+                    )
+                else:
+                    raw, media_type = read_photo(root(), photo), "image/png"
             except (ValueError, OSError):
                 raise HTTPException(404, "Private photo unavailable") from None
-        return FileResponse(
-            path,
-            media_type="image/png",
+        return Response(
+            raw,
+            media_type=media_type,
             headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         )
 

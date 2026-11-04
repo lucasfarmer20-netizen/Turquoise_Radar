@@ -6,6 +6,12 @@ import re
 import stat
 from pathlib import Path
 
+from radar.discovery.image_freshness import source_image_is_fresh
+from radar.jewelry.images import (
+    ORIGINAL_PROCESSING_VERSION,
+    photo_storage_metadata,
+    validate_original_image,
+)
 from radar.schemas import ResearchAttachment
 
 
@@ -21,7 +27,7 @@ def _private_bytes(root, basename, size, digest, limit):
         part.is_symlink() for part in (root, *root.parents)
     ):
         raise ValueError("Unsafe private research storage")
-    if not re.fullmatch(r"[a-f0-9]{32}\.(png|txt)", basename):
+    if not re.fullmatch(r"[a-f0-9]{32}\.(png|jpg|webp|txt)", basename):
         raise ValueError("Invalid research artifact identifier")
     directory = None
     try:
@@ -53,10 +59,18 @@ def _private_bytes(root, basename, size, digest, limit):
 
 
 def read_research_photo(root, photo):
-    """Validate an existing sanitized photo with the same strict descriptor checks."""
-    return _private_bytes(
-        root, photo.id + ".png", photo.data.get("bytes"), photo.content_hash, 10_000_000
+    """Validate private pixels; original source media also needs fresh source evidence."""
+    suffix, media_type = photo_storage_metadata(photo.data, photo.original_hash, photo.content_hash)
+    raw = _private_bytes(
+        root, photo.id + suffix, photo.data.get("bytes"), photo.content_hash, 10_000_000
     )
+    if photo.data.get("processing_version") == ORIGINAL_PROCESSING_VERSION:
+        if not source_image_is_fresh(photo.data):
+            raise ValueError("Source image display evidence is stale or unavailable")
+        original = validate_original_image(raw, media_type)
+        if (original.width, original.height) != (photo.data["width"], photo.data["height"]):
+            raise ValueError("Source image dimensions differ from metadata")
+    return raw
 
 
 def read_research_asset(root, attachment):

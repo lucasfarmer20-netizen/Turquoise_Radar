@@ -201,10 +201,15 @@ it never replaces that database with an earlier snapshot. See the
 
 JRI-019 completed one authorized Production eBay pilot: one successful OAuth
 request and four successful Browse requests returned 12 observations and eight
-unique listings. Official image downloads are blocked by managed proxy CONNECT
-403 for `i.ebayimg.com`, so image-first end-to-end qualification remains incomplete.
-The email research workspace is unchanged and Discovery is disabled after the run.
-See the [actual pilot receipt and limitations](docs/JRI-019.md).
+unique listings. The original pilot and official image references are recovered
+unchanged. JRI-019A qualifies exact-byte image storage and a separately approved,
+one-attempt-per-image continuation. The owner has published the image-host
+permission; execution still needs a runtime observing that policy and image-only
+approval. No new source requests have been made. Expired eBay observations are
+withheld from the feed; downloading images cannot refresh prices or availability.
+The email research workspace is unchanged and Discovery remains disabled.
+See the [actual pilot receipt](docs/JRI-019.md) and
+[image preparation, freshness limits and remaining gates](docs/JRI-019A.md).
 
 ## Multi-source inbox (Task 004)
 
