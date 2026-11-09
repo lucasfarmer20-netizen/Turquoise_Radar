@@ -1,0 +1,24 @@
+[Unit]
+Description=Turquoise Radar web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/radar
+EnvironmentFile=/opt/radar/.env
+Environment=RADAR_DATABASE_URL=sqlite:////opt/radar/data/radar.db
+# Bind to all interfaces; the VM has no public firewall rule for 8000, so this is
+# reachable only over Tailscale (or an IAP tunnel).
+ExecStart=/opt/radar/.venv/bin/uvicorn radar.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/radar/data
+
+[Install]
+WantedBy=multi-user.target
