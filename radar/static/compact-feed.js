@@ -36,7 +36,7 @@
       const notice = document.querySelector('#feed-expiry-status');
       if (notice) {
         notice.hidden = false;
-        notice.querySelector('span').textContent = `${withdrawn} saved eBay ${withdrawn === 1 ? 'item on this page is' : 'items on this page are'} withheld because listing or photo freshness has expired or cannot be verified.`;
+        notice.querySelector('span').textContent = `${withdrawn} saved eBay ${withdrawn === 1 ? 'item on this page is' : 'items on this page are'} withheld because listing or photo freshness has expired or cannot be verified. Saved decisions are preserved; reload to recheck local evidence.`;
       }
       // Other pages were not inspected; do not invent replacement totals.
       document.querySelectorAll('.compact-tabs span, .feed-pagination > span').forEach((count) => {

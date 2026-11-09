@@ -499,3 +499,8 @@ prepared for deployment review. The workbench stays private; no endpoint is live
 and no keyset activation or discovery retry is claimed. Read the [deployment,
 data coverage and exact owner activation sequence](docs/JRI-012.md), including
 identity/copy-review holds, before any activation.
+
+JRI-020's [offline fresh-pilot qualification](docs/JRI-020.md) exercises a new
+isolated synthetic cohort, exact one-shot request limits and fresh deletion gates.
+It is not a live launcher: username-only seller identity remains quarantined, and
+real inventory/maintenance integration is still required before a sourcing beta.

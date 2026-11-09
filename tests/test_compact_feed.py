@@ -560,6 +560,47 @@ def test_countdown_never_guesses_missing_or_naive_deadline_timezone(session, ite
     assert "unknown" in result["countdown_label"].lower()
 
 
+@pytest.mark.parametrize("end", [None, datetime(2027, 2, 4, 14)])
+def test_fixed_price_without_trustworthy_deadline_is_buy_it_now(session, item, prefs, end):
+    row = listing(session, item, item_end_time=end, buying_options=["FIXED_PRICE"])
+    card = card_for(session, prefs, row)
+    result = compact_projection(card, now=NOW)
+    assert result["countdown_label"] == "Buy It Now"
+    assert "current availability requires confirmation" in result["deadline_text"]
+    assert result["deadline_iso"] is None
+    assert result["ended"] is False
+    comparison = deepcopy(card)
+    comparison["item"] = card["item"].model_copy(update={"buying_options": []})
+    unchanged = compact_projection(comparison, now=NOW)
+    assert {k: v for k, v in result.items() if k not in ("countdown_label", "deadline_text")} == {
+        k: v for k, v in unchanged.items() if k not in ("countdown_label", "deadline_text")
+    }
+
+
+@pytest.mark.parametrize("options", [[], ["AUCTION"], ["FIXED_PRICE", "AUCTION"]])
+def test_unknown_or_auction_format_keeps_unknown_close(session, item, prefs, options):
+    row = listing(session, item, item_end_time=None, buying_options=options)
+    result = compact_projection(card_for(session, prefs, row), now=NOW)
+    assert result["countdown_label"] == "Close time unknown"
+
+
+@pytest.mark.parametrize("end", [NOW - timedelta(seconds=1), NOW + timedelta(hours=1)])
+def test_fixed_price_preserves_recorded_deadline(session, item, prefs, end):
+    row = listing(session, item, item_end_time=end, buying_options=["FIXED_PRICE"])
+    result = compact_projection(card_for(session, prefs, row), now=NOW)
+    assert result["deadline_iso"] == end.isoformat()
+    assert result["countdown_label"].startswith("Recorded close")
+
+
+def test_fixed_price_explicitly_ended_without_deadline_is_not_buy_it_now(session, item, prefs):
+    row = listing(session, item, item_end_time=None, buying_options=["FIXED_PRICE"])
+    card = card_for(session, prefs, row)
+    card["availability"] = "ENDED"
+    result = compact_projection(card, now=NOW)
+    assert result["ended"] is True
+    assert result["countdown_label"] != "Buy It Now"
+
+
 def test_explicit_historical_hammer_is_not_a_current_offer(session, item, prefs):
     row = listing(
         session,

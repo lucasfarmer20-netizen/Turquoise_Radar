@@ -82,11 +82,13 @@ class SearchOptions(BaseModel):
     buying_format: Literal["FIXED_PRICE", "AUCTION", "BOTH"] = "FIXED_PRICE"
     min_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     max_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
-    sort: Literal["newlyListed", "price", "-price"] = "newlyListed"
+    sort: Literal["newlyListed", "price", "-price", "endingSoonest"] = "newlyListed"
     auto_correct: Literal["omit", "KEYWORD"] = "omit"
 
     @model_validator(mode="after")
     def range_order(self):
+        if self.sort == "endingSoonest" and self.buying_format != "AUCTION":
+            raise ValueError("Ending-soon option requires AUCTION format")
         if (
             self.min_price is not None
             and self.max_price is not None

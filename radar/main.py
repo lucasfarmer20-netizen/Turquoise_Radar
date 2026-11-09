@@ -1,4 +1,5 @@
 import json
+import os
 from contextlib import asynccontextmanager
 from decimal import Decimal, InvalidOperation
 from html import unescape
@@ -21,6 +22,7 @@ from radar.anomalies import (
     seed_patterns,
 )
 from radar.db import ComparableSale, Feedback, Listing, SearchPattern, Setting, database
+from radar.discovery.image_freshness import feed_only
 from radar.discovery.routes import discovery_routes
 from radar.discovery.service import discovery_history, seed_discovery
 from radar.feedback import record_feedback
@@ -88,7 +90,10 @@ def view(row, prefs, patterns):
     }
 
 
-def create_app(database_url=None, *, expected_scope=None):
+def create_app(database_url=None, *, expected_scope=None, pilot_gate=None):
+    if pilot_gate is not None:
+        pilot_gate.check_config(database_url)
+
     @asynccontextmanager
     async def lifespan(app):
         app.state.research_scope = inspect_scope(database_url, expected_scope)
@@ -101,6 +106,10 @@ def create_app(database_url=None, *, expected_scope=None):
         app.state.engine.dispose()
 
     app = FastAPI(title="Turquoise Radar", lifespan=lifespan)
+    if pilot_gate is not None:
+        from radar.discovery.pilot_route_gate import PilotRouteMiddleware
+
+        app.add_middleware(PilotRouteMiddleware, gate=pilot_gate)
     app.add_middleware(AlertBodyLimit)
     app.add_middleware(VisionBodyLimit)
     app.add_middleware(IdentificationBodyLimit)
@@ -127,6 +136,15 @@ def create_app(database_url=None, *, expected_scope=None):
                 "cohort. Local evidence, photo and owner-feedback review remain available.",
                 status_code=403,
             )
+        elif os.environ.get("RADAR_PILOT_VIEW_ONLY") == "true" and not (
+            request.url.path.startswith("/static/")
+            or request.url.path in ("/health", "/feed", "/opportunities", "/feed/evaluation")
+            or request.url.path.startswith(("/feed/photos/", "/feed/review/", "/sources"))
+        ):
+            response = HTMLResponse(
+                'This legacy route is unavailable in the protected pilot. '
+                '<a href="/opportunities">Open sourcing feed</a>.', status_code=403
+            )
         else:
             response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -139,7 +157,9 @@ def create_app(database_url=None, *, expected_scope=None):
         )
         if scope:
             response.headers["X-Radar-Research-Scope"] = scope.schema_version
-        if scope or request.url.path.startswith(("/identify", "/feed")):
+        if not request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "private, no-store"
+        if scope or request.url.path.startswith(("/identify", "/feed", "/opportunities")):
             response.headers["Cache-Control"] = "private, no-store"
             response.headers["Content-Security-Policy"] = response.headers[
                 "Content-Security-Policy"
@@ -172,7 +192,10 @@ def create_app(database_url=None, *, expected_scope=None):
         with app.state.sessions() as s:
             prefs = preferences(s)
             patterns = {p.id: p for p in attributed_patterns(s)}
-            all_views = [view(row, prefs, patterns) for row in s.scalars(select(Listing))]
+            all_views = [
+                view(row, prefs, patterns) for row in s.scalars(select(Listing))
+                if not feed_only(row.data)
+            ]
             sources = sorted({v["item"].source for v in all_views})
             results = []
             for v in all_views:
@@ -234,6 +257,8 @@ def create_app(database_url=None, *, expected_scope=None):
             row = s.get(Listing, listing_id)
             if not row:
                 raise HTTPException(404, "Listing not found")
+            if feed_only(row.data):
+                return RedirectResponse("/feed?scope=all", status_code=303)
             patterns = {p.id: p for p in attributed_patterns(s)}
             feedback = list(
                 s.scalars(
@@ -246,7 +271,7 @@ def create_app(database_url=None, *, expected_scope=None):
             related = [
                 r
                 for r in s.scalars(select(Listing))
-                if r.id != row.id
+                if not feed_only(r.data) and r.id != row.id
                 and item.seller_id
                 and r.data.get("seller_id") == item.seller_id
                 and r.data["source"] == item.source

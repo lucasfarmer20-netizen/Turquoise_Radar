@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -160,6 +161,32 @@ STARTER_PHRASES = (
 )
 
 
+class SourceQualification(BaseModel):
+    """Owner-recorded review, separate from parser approval and observed yield."""
+
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["UNTESTED", "NEEDS_REVIEW", "BLOCKED", "USEFUL", "REJECTED"] = "UNTESTED"
+    checked_at: datetime | None = None
+    access_evidence: str = Field(default="", max_length=2000)
+    test_evidence: str = Field(default="", max_length=2000)
+    freshness_notes: str = Field(default="", max_length=2000)
+    fee_notes: str = Field(default="", max_length=2000)
+    shipping_notes: str = Field(default="", max_length=2000)
+    next_step: str = Field(default="", max_length=2000)
+
+    @model_validator(mode="after")
+    def evidence_required(self):
+        if self.checked_at is not None and self.checked_at.utcoffset() is None:
+            raise ValueError("Review time requires a timezone")
+        if self.status != "UNTESTED" and (
+            self.checked_at is None or not self.test_evidence.strip()
+        ):
+            raise ValueError("Assessment requires dated test evidence")
+        if self.status == "USEFUL" and not self.access_evidence.strip():
+            raise ValueError("Useful source requires permitted-access evidence")
+        return self
+
+
 class SourceDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=100)
@@ -182,6 +209,7 @@ class SourceDefinition(BaseModel):
     sample_verified: bool = False
     sample_reference: str | None = None
     reviewed_email_formats: dict[str, str] = Field(default_factory=dict)
+    qualification: SourceQualification = Field(default_factory=SourceQualification)
     item_path_prefix: str | None = None
     field_labels: dict[str, list[str]] = Field(default_factory=dict)
     restrictions: str = (

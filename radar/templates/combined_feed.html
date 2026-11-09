@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}All sourcing leads · Turquoise Radar{% endblock %}
+{% block scripts %}<script src="/static/compact-feed.js" defer></script>{% endblock %}
+{% block content %}
+<h1>All sourcing leads</h1>
+{% if worker %}<aside class="panel" aria-label="Automatic discovery status">
+<strong>Discovery worker: {{ worker.status }}</strong>
+<p>Reserved attempts on {{ worker.day or 'activation day' }}: {{ worker.daily }}/32 · Seven-day total: {{ worker.total }}/224.</p>
+<p>Last successful collection: {{ worker.last_success }} · Next eligible run: {{ worker.next_due }} · Authorization expires: {{ worker.expires }}.</p>
+<p>Latest request stage: {{ worker.stage or 'None' }} · HTTP: {{ worker.http_status or 'unconfirmed' }}{% if worker.error_code %} · {{ worker.error_code }}{% endif %}.</p>
+<p>Reservations count attempts, not completed requests. A paused worker does not retry collection automatically. Deletion maintenance continues while the worker is running.</p>
+</aside>{% endif %}
+<p id="feed-expiry-status" class="compact-status" role="status" hidden><span></span> <a href="{{ request.url.path }}?{{ request.url.query }}">Reload this view</a>. Saved decisions are preserved.</p>
+<p>Existing eBay observations and permitted email snapshots in one view. Email snapshots are not live marketplace search. Only an explicitly enabled worker refreshes eBay results; no bids or purchases.</p>
+<p>{{ notice }} {% if withheld %}{{ withheld }} stale pilot item(s) withheld under the existing freshness rules.{% endif %}</p>
+<p><strong>Confirm current availability and delivered cost to 99669 before buying.</strong> Email prices and date-only closing text are not live bids or verified deadlines. A title's material or weight claim is not verified value.</p>
+<form method="get" action="/opportunities"><label>Source <select name="source"><option value="">All sources</option>{% for name in sources %}<option {% if name == source %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label><button>Filter</button></form>
+<p><a href="/feed">Photo feed</a> · <a href="/sources">Source qualification</a></p>
+{% for c in cards %}{% set i=c.item %}{% set d=c.compact %}
+<article class="panel compact-card" data-ended="{{ 'true' if d.ended else 'false' }}"{% if d.source_expiry_required %} hidden data-source-expiry data-source-checked-at="{{ d.source_checked_at }}" data-source-expires-at="{{ d.source_expires_at or '' }}"{% endif %}>
+<h2>{{ i.raw_title|source_title }}</h2>
+<p><strong>{{ i.source }}</strong> · {{ c.origin }} · {{ c.state }}</p>
+{% if d.photo_url %}<img src="{{ d.photo_url }}" alt="Retained listing photograph" loading="lazy" width="180">{% endif %}
+<p><strong>{{ d.price_text }}</strong> · {{ d.price_label }} · {{ d.observed_label }}</p>
+<p{% if d.deadline_iso %} data-deadline="{{ d.deadline_iso }}"{% endif %} title="{{ d.deadline_text }}">{{ 'ENDED' if d.ended else d.countdown_label }}</p>
+{% if c.email_snapshot is defined %}{% set e=c.email_snapshot %}
+<div class="panel" aria-label="Email snapshot evidence">
+<strong>What the email actually supplied</strong>
+<p>Quoted price: {{ e.price_quote or 'Not supplied' }} · Bid count: {{ e.bids or 'Not supplied' }}</p>
+{% if e.started %}<p>Reported start: {{ e.started }} — timezone unverified; not the closing time.</p>{% endif %}
+{% if e.closing_hint %}<p>Closing hint: {{ e.closing_hint }} — incomplete date/time; not a verified deadline or current availability.</p>{% endif %}
+<p>Photo: not retained locally. Current price, fees and delivery quote still require source evidence.</p>
+</div>{% endif %}
+<p>Observed shipping quote: {{ i.shipping_cost if i.shipping_cost is not none else 'UNKNOWN' }} {{ i.currency }} — not confirmation of delivery to 99669.</p>
+<p>Shipping: {{ i.shipping_status }} · Missing costs: {{ c.missing_costs|join(', ') or 'No absent amounts; evidence still requires review' }}</p>
+<p><strong data-assessment>{{ d.assessment }}</strong> · <span data-reason>{{ d.reason }}</span></p>
+<p>Recorded query: {% for q in c.query_evidence %}{% if q.query %}<code>{{ q.query }}</code> {% endif %}{% else %}Unknown{% endfor %}</p>
+{% if i.listing_url %}<a href="{{ i.listing_url }}" target="_blank" rel="noopener noreferrer">Check current source listing ↗</a>{% endif %}
+</article>
+{% else %}<p>No eligible retained leads. This page does not collect or refresh listings.</p>{% endfor %}
+{% endblock %}

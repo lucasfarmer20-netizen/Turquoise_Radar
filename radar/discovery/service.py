@@ -18,6 +18,7 @@ from radar.db import (
 )
 from radar.discovery.config import Budgets, Connection, DiscoveryError, GroupInput, SearchOptions
 from radar.discovery.ebay import SOURCE_NAMES, EbayAdapter, FixtureDiscoveryAdapter, normalize
+from radar.discovery.image_freshness import feed_only
 from radar.schemas import ListingInput, utcnow
 from radar.sources import dedup_key
 from radar.workflow import attributed_patterns
@@ -402,6 +403,8 @@ def overview(session, prefs):
         history[observation.item_id].append((observation, execution))
     cards = []
     for row in items:
+        if feed_only(row.normalized):
+            continue
         item = ListingInput.model_validate(row.normalized)
         a = analyze(item, prefs)
         cards.append(

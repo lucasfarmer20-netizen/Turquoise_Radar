@@ -108,6 +108,7 @@ def _shop_cards(text, source):
                 currency=currency,
                 price_quote=quote,
                 price_kind="OBSERVED_PRICE" if quote else "UNKNOWN",
+                bids_raw=field(block, ["Bids"]),
                 started_raw=field(block, ["Started"]),
                 time_raw=None,
                 role="SEARCH_SECTION" if search_section else "RECOMMENDED",
@@ -221,6 +222,7 @@ def _hibid_cards(text, source, search_start):
                         currency="XXX",
                         price_quote=None,
                         price_kind="UNKNOWN",
+                        bids_raw=None,
                         started_raw=None,
                         time_raw=None,
                         role=card_role,
@@ -233,6 +235,8 @@ def _hibid_cards(text, source, search_start):
                 if len(cards) > MAX_LINKS:
                     raise ValueError("Too many item references in one message")
         elif current and re.fullmatch(r"\s*\d{1,2}/\d{1,2}/\d{4}(?:\s+[^\n]{1,80})?\s*", line):
+            current["time_raw"] = line.strip()
+        elif current and re.fullmatch(r"\s*Ends \d{1,2}/\d{1,2}(?:/\d{4})?\s*", line, re.I):
             current["time_raw"] = line.strip()
         if line.strip():
             previous = line
@@ -320,6 +324,7 @@ def parse_search_email(message, source_id, source, texts, attachments, received_
                     quoted_price=card["price"],
                     price_quote=card["price_quote"],
                     price_kind=card["price_kind"],
+                    bid_count_quote=card["bids_raw"],
                     currency=card["currency"],
                     currency_note="A bare $ does not establish USD"
                     if card["currency"] == "XXX"
