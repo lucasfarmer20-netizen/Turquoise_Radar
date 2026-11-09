@@ -14,6 +14,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 
 from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
+from radar.scheduler import read_state, request_scan, trigger_path
 from radar.triage import thumb_url
 
 ALASKA = ZoneInfo("America/Anchorage")
@@ -231,9 +232,18 @@ def radar_routes(app, render):
                 if ledger and ledger.data.get("day") == now.strftime("%Y-%m-%d")
                 else 0
             )
+        sched = read_state()
+        sched_next = _parse_time(sched.get("next_at"))
         return render(
             request,
             "radar.html",
+            sched=sched,
+            sched_running=bool(sched.get("running")),
+            sched_requested=trigger_path().exists(),
+            sched_next_relative=_relative(sched_next, now) if sched_next else None,
+            sched_alive=bool(sched)
+            and (now - (_parse_time(sched.get("updated_at")) or now))
+            < timedelta(hours=max(2.0, 2 * float(sched.get("interval_hours") or 1))),
             cards=cards,
             total_matching=total_matching,
             page=page,
@@ -257,6 +267,13 @@ def radar_routes(app, render):
             else None,
             calls_today=calls_today,
         )
+
+    @app.post("/radar/scan")
+    def radar_scan(back: str = Form("/radar")):
+        request_scan()
+        if not back.startswith("/radar"):
+            back = "/radar"
+        return RedirectResponse(back, status_code=303)
 
     @app.post("/radar/{item_id}/decision")
     def radar_decision(

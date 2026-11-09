@@ -45,6 +45,50 @@ COUNTER_SETTING_ID = 91  # daily API call ledger (90 is used by buyer_worker)
 SEED_PREFIX = "seed-"
 
 
+# ---------------------------------------------------------------- data dir / state
+
+
+def data_dir():
+    """Directory holding the SQLite file; also used for the scan trigger and state file."""
+    url = os.environ.get("RADAR_DATABASE_URL", "sqlite:///./data/radar.db")
+    path = url.split("sqlite:///", 1)[1] if url.startswith("sqlite:///") else "./data/radar.db"
+    return Path(path).expanduser().resolve().parent
+
+
+def trigger_path():
+    return data_dir() / "scan-now"
+
+
+def state_path():
+    return data_dir() / "scheduler-state.json"
+
+
+def write_state(**fields):
+    try:
+        state_path().parent.mkdir(parents=True, exist_ok=True)
+        current = read_state()
+        current.update(fields)
+        current["updated_at"] = datetime.now(UTC).isoformat()
+        tmp = state_path().with_suffix(".tmp")
+        tmp.write_text(json.dumps(current), encoding="utf-8")
+        tmp.replace(state_path())
+    except OSError as e:  # state is advisory; never fail a cycle over it
+        log.debug("state write failed: %s", e)
+
+
+def read_state():
+    try:
+        return json.loads(state_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def request_scan():
+    """Called by the web app: ask the running scheduler for an immediate cycle."""
+    trigger_path().parent.mkdir(parents=True, exist_ok=True)
+    trigger_path().write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
+
+
 # ---------------------------------------------------------------- environment
 
 
@@ -235,21 +279,49 @@ def run_forever(sessions, connection, cfg, once=False):
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
     interval = cfg["hours"] * 3600
+    reason = "startup"
     while True:
+        write_state(running=True, reason=reason, started_at=datetime.now(UTC).isoformat())
         try:
-            asyncio.run(cycle(sessions, connection, cfg["mode"], cfg["daily_limit"]))
+            run = asyncio.run(cycle(sessions, connection, cfg["mode"], cfg["daily_limit"]))
+            summary = (
+                dict(run_id=run.id, status=run.status, new=run.new_count, dup=run.duplicate_count)
+                if run
+                else None
+            )
         except Exception:
             # Never let one bad cycle kill the schedule.
             log.exception("cycle failed; will retry next interval")
+            summary = dict(status="FAILED")
+        if trigger_path().exists():
+            trigger_path().unlink(missing_ok=True)
         if once or stop["flag"]:
+            write_state(running=False, last=summary, next_at=None)
             return
-        next_at = datetime.now().astimezone() + timedelta(seconds=interval)
-        log.info("sleeping %.1fh; next cycle at %s", cfg["hours"], next_at.strftime("%H:%M %Z"))
+        next_at = datetime.now(UTC) + timedelta(seconds=interval)
+        write_state(
+            running=False,
+            last=summary,
+            finished_at=datetime.now(UTC).isoformat(),
+            next_at=next_at.isoformat(),
+            interval_hours=cfg["hours"],
+        )
+        log.info(
+            "sleeping %.1fh; next cycle at %s",
+            cfg["hours"],
+            next_at.astimezone().strftime("%H:%M %Z"),
+        )
+        reason = "scheduled"
         slept = 0
         while slept < interval and not stop["flag"]:
             time.sleep(min(5, interval - slept))
             slept += 5
+            if trigger_path().exists():
+                log.info("scan requested from the web app; running now")
+                reason = "requested"
+                break
         if stop["flag"]:
+            write_state(running=False)
             return
 
 

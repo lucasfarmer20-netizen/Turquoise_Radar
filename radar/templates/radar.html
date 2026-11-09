@@ -20,6 +20,22 @@
     {% else %}
       <strong style="font-size:20px">never</strong><small class="muted">run <code>python -m radar.scheduler run --once</code></small>
     {% endif %}
+    <form method="post" action="/radar/scan" style="margin-top:8px">
+      <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+      {% if sched_running %}
+        <button type="submit" disabled>Scanning…</button>
+        <small class="muted">{{ sched.reason }} cycle in progress — refresh in a minute</small>
+      {% elif sched_requested %}
+        <button type="submit" disabled>Scan requested</button>
+        <small class="muted">scheduler picks it up within 5 s</small>
+      {% elif not sched_alive %}
+        <button type="submit" disabled>Scan now</button>
+        <small class="muted">scheduler not running</small>
+      {% else %}
+        <button type="submit">Scan now</button>
+        {% if sched_next_relative %}<small class="muted">next scheduled {{ sched_next_relative }}</small>{% endif %}
+      {% endif %}
+    </form>
   </div>
 </div>
 

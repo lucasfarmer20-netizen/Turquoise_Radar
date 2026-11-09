@@ -143,3 +143,24 @@ def test_auction_with_bids_shows_bid_count(client):
     _add(client, 22, item_price="52.00", bid_count=3)
     html = client.get("/radar").text
     assert "Current bid · 3 bids" in html
+
+
+def test_scan_button_writes_trigger_and_reflects_state(client, tmp_path, monkeypatch):
+    from radar import scheduler
+
+    monkeypatch.setenv("RADAR_DATABASE_URL", f"sqlite:///{tmp_path / 'x.db'}")
+    # no state file -> scheduler shown as not running, button disabled
+    html = client.get("/radar").text
+    assert "scheduler not running" in html
+    # live state -> button enabled with next-cycle hint
+    scheduler.write_state(running=False, next_at="2999-01-01T00:00:00+00:00", interval_hours=1)
+    html = client.get("/radar").text
+    assert ">Scan now</button>" in html and "next scheduled" in html
+    # click -> trigger file exists, page says requested
+    r = client.post("/radar/scan", data={"back": "/radar?status=new"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/radar?status=new"
+    assert scheduler.trigger_path().exists()
+    assert "Scan requested" in client.get("/radar").text
+    # running state wins
+    scheduler.write_state(running=True, reason="requested")
+    assert "Scanning…" in client.get("/radar").text
