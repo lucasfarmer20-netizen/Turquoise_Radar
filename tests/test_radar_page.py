@@ -164,3 +164,34 @@ def test_scan_button_writes_trigger_and_reflects_state(client, tmp_path, monkeyp
     # running state wins
     scheduler.write_state(running=True, reason="requested")
     assert "Scanning…" in client.get("/radar").text
+
+
+def test_same_origin_guard_is_proxy_aware(client, monkeypatch):
+    _add(client, 31)
+    # cross-site is always rejected
+    r = client.post(
+        "/radar/1/decision", data={"decision": "pass"}, headers={"Sec-Fetch-Site": "cross-site"}
+    )
+    assert r.status_code == 403
+    # foreign Origin with no fetch-site signal is rejected
+    r = client.post(
+        "/radar/1/decision", data={"decision": "pass"}, headers={"Origin": "https://evil.invalid"}
+    )
+    assert r.status_code == 403
+    # a tunnelled page: Origin differs from Host but the browser says same-origin -> allowed
+    r = client.post(
+        "/radar/1/decision",
+        data={"decision": "pass"},
+        headers={"Origin": "https://8080-abc.cloudshell.dev", "Sec-Fetch-Site": "same-origin"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    # explicitly trusted origin without the header is allowed
+    monkeypatch.setenv("RADAR_TRUSTED_ORIGINS", "https://radar.example")
+    r = client.post(
+        "/radar/1/decision",
+        data={"decision": "interested"},
+        headers={"Origin": "https://radar.example"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303

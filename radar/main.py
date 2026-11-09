@@ -120,12 +120,28 @@ def create_app(database_url=None, *, expected_scope=None, pilot_gate=None):
     async def private_mutations(request, call_next):
         # Browser same-origin guard for unauthenticated local/private deployment.
         # This is not authentication; the server must not be publicly exposed.
+        # Behind a tunnel or reverse proxy (Cloud Shell preview, IAP, Tailscale Serve) the
+        # Host the server sees differs from the Origin the browser sends, so trust the
+        # browser's own Sec-Fetch-Site=same-origin first, then explicit RADAR_TRUSTED_ORIGINS,
+        # then the plain Origin/Host comparison.
         origin = request.headers.get("origin")
+        fetch_site = request.headers.get("sec-fetch-site")
         expected = str(request.base_url).rstrip("/")
-        if request.method == "POST" and (
-            request.headers.get("sec-fetch-site") == "cross-site" or (origin and origin != expected)
-        ):
-            return HTMLResponse("Cross-origin mutation rejected", status_code=403)
+        trusted = {
+            o.strip().rstrip("/")
+            for o in os.environ.get("RADAR_TRUSTED_ORIGINS", "").split(",")
+            if o.strip()
+        }
+        if request.method == "POST":
+            if fetch_site == "cross-site":
+                return HTMLResponse("Cross-origin mutation rejected", status_code=403)
+            if (
+                fetch_site != "same-origin"
+                and origin
+                and origin != expected
+                and origin not in trusted
+            ):
+                return HTMLResponse("Cross-origin mutation rejected", status_code=403)
         scope = getattr(app.state, "research_scope", None)
         if (
             scope
@@ -143,8 +159,9 @@ def create_app(database_url=None, *, expected_scope=None, pilot_gate=None):
             or request.url.path.startswith(("/feed/photos/", "/feed/review/", "/sources"))
         ):
             response = HTMLResponse(
-                'This legacy route is unavailable in the protected pilot. '
-                '<a href="/opportunities">Open sourcing feed</a>.', status_code=403
+                "This legacy route is unavailable in the protected pilot. "
+                '<a href="/opportunities">Open sourcing feed</a>.',
+                status_code=403,
             )
         else:
             response = await call_next(request)
@@ -194,7 +211,8 @@ def create_app(database_url=None, *, expected_scope=None, pilot_gate=None):
             prefs = preferences(s)
             patterns = {p.id: p for p in attributed_patterns(s)}
             all_views = [
-                view(row, prefs, patterns) for row in s.scalars(select(Listing))
+                view(row, prefs, patterns)
+                for row in s.scalars(select(Listing))
                 if not feed_only(row.data)
             ]
             sources = sorted({v["item"].source for v in all_views})
@@ -272,7 +290,8 @@ def create_app(database_url=None, *, expected_scope=None, pilot_gate=None):
             related = [
                 r
                 for r in s.scalars(select(Listing))
-                if not feed_only(r.data) and r.id != row.id
+                if not feed_only(r.data)
+                and r.id != row.id
                 and item.seller_id
                 and r.data.get("seller_id") == item.seller_id
                 and r.data["source"] == item.source
