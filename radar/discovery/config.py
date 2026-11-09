@@ -113,10 +113,10 @@ class SearchOptions(BaseModel):
 class Budgets(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = True
-    max_queries: int = Field(default=4, ge=1, le=20)
-    max_results: int = Field(default=12, ge=1, le=200)
+    max_queries: int = Field(default=4, ge=1, le=200)
+    max_results: int = Field(default=12, ge=1, le=5000)
     max_pages_per_query: int = Field(default=2, ge=1, le=5)
-    page_size: int = Field(default=3, ge=1, le=50)
+    page_size: int = Field(default=3, ge=1, le=200)
 
 
 class GroupInput(BaseModel):

@@ -1,0 +1,46 @@
+{
+  "_comment": "Owner-supplied search terms, 2026-11-09. Verbatim strings are what the owner would type; 'variants' are deliberate misspellings/under-descriptions a careless seller might use. Every query runs against every enabled source adapter. Do not 'correct' the misspelled ones.",
+  "groups": [
+    {
+      "name": "Native American / Southwest",
+      "queries": [
+        "Native american jewelry",
+        "Nature American Jewelry",
+        "Native America Jewelry",
+        "Native American Jewlry",
+        "Navajo Jewelry",
+        "Navaho Jewelry",
+        "Old Pawn"
+      ]
+    },
+    {
+      "name": "Turquoise",
+      "queries": [
+        "Turquoise Jewelry",
+        "Turqoise Jewelry",
+        "old blue stone ring",
+        "Old blue stone bracelet"
+      ]
+    },
+    {
+      "name": "Sterling / vintage silver (under-described)",
+      "queries": [
+        "vintage sterling silver Jewelry",
+        "Vintage silver jewelry",
+        "Vintage silver-tone jewelry",
+        "Sterling Silver Ring Lot"
+      ]
+    },
+    {
+      "name": "Mexican silver",
+      "queries": [
+        "taxco"
+      ]
+    }
+  ],
+  "buying_options": ["FIXED_PRICE", "AUCTION"],
+  "sorts": {
+    "FIXED_PRICE": "newlyListed",
+    "AUCTION": "endingSoonest"
+  }
+}

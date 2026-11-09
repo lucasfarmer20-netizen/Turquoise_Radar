@@ -58,6 +58,26 @@ preserve listings, preferences, and feedback. Ordered SQLite migrations initiali
 or upgrade the schema; existing populated databases are backed up before v5.
 See [migration and calibration details](docs/CALIBRATION.md).
 
+## Unattended discovery scheduler
+
+`radar.scheduler` runs the owner's search terms against eBay on a timer with no
+receiver, cohort or per-run approval dependency. It reuses the existing adapter,
+normalization, dedup and `DiscoveredItem` storage from `run_discovery`.
+
+```bash
+cp .env.example .env            # fill in EBAY_* production values; chmod 600 .env
+.venv/bin/python -m radar.scheduler seed        # load fixtures/seed_queries.json
+.venv/bin/python -m radar.scheduler run --once  # one cycle
+.venv/bin/python -m radar.scheduler run         # every RADAR_SCHEDULE_HOURS until Ctrl-C
+.venv/bin/python -m radar.scheduler status      # runs, daily call ledger, newest finds
+```
+
+The scheduler loads `.env` from the repository root itself. Each seed group becomes two
+search groups (Buy It Now sorted newest-first, auctions sorted ending-soonest). A failed
+cycle is logged and the next one runs on schedule. The daily call ledger lives in
+`Setting` row 91 and resets at UTC midnight. `buyer_worker.py` and the deletion
+receiver are left in place but are not used by this path.
+
 ## Demo walkthrough
 
 1. `seed` imports **26 synthetic observations → 25 distinct listings**, including
