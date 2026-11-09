@@ -97,7 +97,9 @@
     </p>
     {% if c.triaged %}
     <p class="shipping" style="margin-top:6px">
-      <strong>{{ c.category }}</strong>{% if c.piece_type %} · {{ c.piece_type }}{% endif %}<br>
+      <strong>{{ c.category }}</strong>{% if c.piece_type %} · {{ c.piece_type }}{% endif %}
+      {% if c.value_read %} · <span class="{% if c.value_read == 'Underpriced' %}accent{% else %}muted{% endif %}">{{ c.value_read }}</span>{% endif %}
+      {% if c.resale %} · resale ~${{ c.resale[0] }}–{{ c.resale[1] }}{% endif %}<br>
       {{ c.reason }}
       {% if c.signals %}<br><span style="color:var(--teal)">+ {{ c.signals|join(" · ") }}</span>{% endif %}
       {% if c.concerns %}<br><span class="muted">− {{ c.concerns|join(" · ") }}</span>{% endif %}

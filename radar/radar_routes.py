@@ -106,6 +106,8 @@ def card(row, now, triage=None):
         signals=td.get("quality_signals") or [],
         concerns=td.get("concerns") or [],
         reason=td.get("reason"),
+        value_read=(td.get("value_read") or "").title() or None,
+        resale=td.get("resale_estimate_usd"),
     )
 
 

@@ -10,25 +10,33 @@
         "Native American Jewlry",
         "Navajo Jewelry",
         "Navaho Jewelry",
-        "Old Pawn"
+        "Old Pawn",
+        "navajo cuff",
+        "zuni inlay",
+        "concho belt",
+        "native american copper cuff",
+        "Fred Harvey era"
       ]
     },
     {
       "name": "Turquoise",
       "queries": [
-        "Turquoise Jewelry",
         "Turqoise Jewelry",
         "old blue stone ring",
-        "Old blue stone bracelet"
+        "Old blue stone bracelet",
+        "turquoise cuff sterling",
+        "squash blossom necklace",
+        "turquoise sterling lot"
       ]
     },
     {
       "name": "Sterling / vintage silver (under-described)",
       "queries": [
-        "vintage sterling silver Jewelry",
         "Vintage silver jewelry",
         "Vintage silver-tone jewelry",
-        "Sterling Silver Ring Lot"
+        "Sterling Silver Ring Lot",
+        "southwestern sterling lot",
+        "estate sterling jewelry lot"
       ]
     },
     {
