@@ -80,7 +80,7 @@ class PublicKeys:
             return key
 
 
-def create_receiver(*, endpoint, token, secret, queue, keys):
+def create_receiver(*, endpoint, token, secret, queue, keys, pilot_matcher=None):
     url = urlsplit(endpoint)
     if (
         url.scheme != "https"
@@ -96,6 +96,11 @@ def create_receiver(*, endpoint, token, secret, queue, keys):
         raise ValueError("Invalid deletion receiver configuration")
     queue.bind(secret)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+    if pilot_matcher is not None:
+        if pilot_matcher.queue.path != queue.path:
+            raise ValueError("Pilot matcher must use this receiver ledger")
+        pilot_matcher.install(app)
 
     @app.get("/ebay/account-deletion")
     async def endpoint_challenge(request: Request):
@@ -183,11 +188,26 @@ class ApplicationToken:
 
 def from_env():
     # Loaded only by this explicit factory, never by workbench startup.
+    queue = Queue(os.environ["EBAY_DELETION_QUEUE"])
+    secret = os.environ["EBAY_DELETION_HMAC_KEY"].encode()
+    matcher = None
+    if os.environ.get("PILOT_MATCH_ENABLED") == "true":
+        from radar.ebay_deletion.pilot_match import PilotMatcher
+
+        queue.bind(secret)
+        matcher = PilotMatcher(
+            queue,
+            secret,
+            os.environ["PILOT_MATCH_TOKEN_SHA256"],
+            queue.path.parent / "pilot-registration.db",
+            retained_enabled=os.environ.get("PILOT_RETAINED_ENABLED") == "true",
+        )
     return create_receiver(
         endpoint=os.environ["EBAY_DELETION_ENDPOINT"],
         token=os.environ["EBAY_DELETION_VERIFICATION_TOKEN"],
-        secret=os.environ["EBAY_DELETION_HMAC_KEY"].encode(),
-        queue=Queue(os.environ["EBAY_DELETION_QUEUE"]),
+        secret=secret,
+        queue=queue,
+        pilot_matcher=matcher,
         keys=PublicKeys(
             ApplicationToken(
                 os.environ["EBAY_NOTIFICATION_CLIENT_ID"],

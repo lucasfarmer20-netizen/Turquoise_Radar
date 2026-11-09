@@ -327,7 +327,7 @@ class FixtureDiscoveryAdapter(SourceAdapter):
             choices = item.get("buyingOptions", [])
             if options.buying_format != "BOTH" and options.buying_format not in choices:
                 return False
-            price = item.get("currentBidPrice") if choices == ["AUCTION"] else item.get("price")
+            price = item.get("currentBidPrice") if "AUCTION" in choices else item.get("price")
             from decimal import Decimal
 
             if options.min_price is not None or options.max_price is not None:
@@ -341,6 +341,20 @@ class FixtureDiscoveryAdapter(SourceAdapter):
             return True
 
         items = [i for i in items if wanted(i)]
+        if options.sort == "endingSoonest":
+
+            def end_key(item):
+                try:
+                    value = datetime.fromisoformat(
+                        item.get("itemEndDate", "").replace("Z", "+00:00")
+                    )
+                    return (
+                        value if value.utcoffset() is not None else datetime.max.replace(tzinfo=UTC)
+                    )
+                except (ValueError, TypeError, AttributeError):
+                    return datetime.max.replace(tzinfo=UTC)
+
+            items.sort(key=end_key)
         # Fixture order is deterministic; never presented as current marketplace ordering.
         result = SearchResult()
         for offset in range(0, min(len(items), limit), page_size):
@@ -381,7 +395,7 @@ def normalize(raw, mode, query, original_query, corrected=None, pattern_id=None)
         ):
             raise ValueError("Missing item identity/title")
         options = raw.get("buyingOptions", [])
-        price = raw.get("currentBidPrice") if options == ["AUCTION"] else raw.get("price")
+        price = raw.get("currentBidPrice") if "AUCTION" in options else raw.get("price")
         price = price or {}
         shipping = raw.get("shippingOptions") or []
         shipping_price = shipping[0].get("shippingCost", {}) if shipping else {}

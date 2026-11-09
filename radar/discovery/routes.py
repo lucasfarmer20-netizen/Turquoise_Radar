@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from radar.db import DiscoveredItem, DiscoveryGroup, DiscoveryRun, Setting
 from radar.discovery.config import Budgets, Connection, DiscoveryError, GroupInput
+from radar.discovery.image_freshness import feed_only
 from radar.discovery.service import (
     budgets,
     overview,
@@ -138,6 +139,9 @@ def discovery_routes(app, render, preferences):
     @app.post("/discovery/items/{item_id}/review")
     def review_item(item_id: int):
         with app.state.sessions.begin() as s:
+            candidate = s.get(DiscoveredItem, item_id)
+            if candidate and feed_only(candidate.normalized):
+                raise HTTPException(409, "Review production eBay records in the qualified feed")
             try:
                 listing = promote(s, item_id)
             except DiscoveryError as e:
@@ -150,6 +154,8 @@ def discovery_routes(app, render, preferences):
             row = s.get(DiscoveredItem, item_id)
             if not row:
                 raise HTTPException(404, "Discovered item not found")
+            if feed_only(row.normalized):
+                return RedirectResponse("/feed?scope=all", status_code=303)
             from radar.db import DiscoveryObservation, SearchExecution
 
             observations = list(

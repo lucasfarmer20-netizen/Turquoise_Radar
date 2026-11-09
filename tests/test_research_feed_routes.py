@@ -93,7 +93,10 @@ def test_realized_result_is_archived_without_owner_pass_and_read_views_preserve_
         assert list(session.scalars(select(Feedback))) == []
 
 
-def test_quoted_costs_currency_provenance_and_deadline_conversions(client):
+def test_quoted_costs_currency_provenance_and_deadline_conversions(client, monkeypatch):
+    # This fixed-date active-lot scenario must not become ended as wall time advances.
+    monkeypatch.setattr("radar.compact_feed.utcnow", lambda: NOW)
+    monkeypatch.setattr("radar.sourcing_feed.utcnow", lambda: NOW)
     item = research_item(
         "900000002",
         availability="ACTIVE_AT_OBSERVATION",

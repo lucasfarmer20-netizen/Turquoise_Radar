@@ -175,7 +175,7 @@ def compact_projection(
         price, currency, label = (
             (None if ended else item.item_price),
             item.currency,
-            "Last observed price",
+            "Last observed bid" if "AUCTION" in item.buying_options else "Last observed price",
         )
         if source_quote and not ended:
             price, currency, observed_at = (
@@ -217,6 +217,14 @@ def compact_projection(
         observed_label = "Observation date unknown"
     deadline_text, deadline_iso = "Close time unknown", None
     countdown = "Close time unknown"
+    if (
+        not deadline
+        and not ended
+        and "FIXED_PRICE" in item.buying_options
+        and "AUCTION" not in item.buying_options
+    ):
+        countdown = "Buy It Now"
+        deadline_text = "Buy It Now listing; current availability requires confirmation."
     if deadline:
         deadline_text = deadline.astimezone(ALASKA).strftime("%Y-%m-%d %H:%M %Z")
         deadline_iso = deadline.astimezone(UTC).isoformat()
@@ -456,6 +464,7 @@ def decorate_compact_cards(session, cards, *, now=None, photo_root=None):
             compact = compact_projection(
                 card,
                 now=now,
+                observed_at=max(source_observations) if source_observations else None,
                 source_quote=_latest_quote(card, quotes),
                 comparables_supported=_comparable_support(card["item"], comps, card["dataset"]),
             )

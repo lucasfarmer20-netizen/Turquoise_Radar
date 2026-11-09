@@ -26,6 +26,7 @@ from radar.intake.parsers import (
 from radar.intake.registry import (
     STARTER_PHRASES,
     SourceDefinition,
+    SourceQualification,
     duplicate_auction_platform,
     seed_searches,
 )
@@ -40,6 +41,7 @@ from radar.intake.service import (
     source_definition,
 )
 from radar.intake.views import auction_research, estate_groups, inbox_cards, search_status
+from radar.search_evaluation import evaluate_searches
 
 
 def intake_routes(app, render, preferences):
@@ -249,8 +251,34 @@ def intake_routes(app, render, preferences):
     def sources(request: Request):
         with app.state.sessions() as s:
             return render(
-                request, "source_registry.html", sources=list(s.scalars(select(IntakeSource)))
+                request,
+                "source_registry.html",
+                sources=list(s.scalars(select(IntakeSource))),
+                observed={
+                    row["source"]: row for row in evaluate_searches(s, preferences(s))["sources"]
+                },
             )
+
+    @app.post("/sources/{source_id}/qualification")
+    async def qualify_source(request: Request, source_id: str):
+        form = await request.form()
+        try:
+            qualification = SourceQualification.model_validate(
+                {
+                    key: (form.get(key) or None) if key == "checked_at" else form.get(key, "")
+                    for key in SourceQualification.model_fields
+                }
+            )
+        except ValueError:
+            raise HTTPException(
+                422, "Use a valid status, dated evidence with timezone, and bounded notes"
+            ) from None
+        with app.state.sessions.begin() as s:
+            row = s.get(IntakeSource, source_id)
+            if not row:
+                raise HTTPException(404, "Source not found")
+            row.data = {**row.data, "qualification": qualification.model_dump(mode="json")}
+        return RedirectResponse("/sources", status_code=303)
 
     @app.post("/sources")
     async def add_source(request: Request):

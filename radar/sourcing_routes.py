@@ -1,5 +1,6 @@
 """Private sourcing feed and explicit, local-only search preparation."""
 
+import os
 from collections import Counter
 from urllib.parse import urlencode, urlsplit
 
@@ -7,10 +8,12 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import select
 
+from radar.combined_feed import combined_cards
 from radar.compact_feed import decorate_compact_cards, read_compact_photo
 from radar.db import DiscoveryGroup, Feedback, IntakeSource, Listing, SavedSourceSearch
 from radar.discovery.config import DiscoveryError
 from radar.discovery.service import budgets, promote
+from radar.discovery.worker_budget import projection as worker_projection
 from radar.feedback import record_feedback
 from radar.intake.service import promote_candidate
 from radar.schemas import FeedbackInput
@@ -25,6 +28,29 @@ CLOSED_STATES = {"PASSED", "PURCHASED", "IRRELEVANT"}
 
 
 def sourcing_routes(app, render, preferences):
+    @app.get("/opportunities")
+    def opportunities(request: Request):
+        with app.state.sessions() as session:
+            cards, withheld, notice = combined_cards(
+                session, preferences(session), os.environ.get("RADAR_EMAIL_REVIEW_DB")
+            )
+            source = request.query_params.get("source", "")
+            sources = sorted({c["item"].source for c in cards})
+            if source:
+                cards = [c for c in cards if c["item"].source == source]
+            response = render(
+                request,
+                "combined_feed.html",
+                worker=worker_projection(session),
+                cards=cards,
+                sources=sources,
+                source=source,
+                withheld=withheld,
+                notice=notice,
+            )
+            response.headers["Cache-Control"] = "private, no-store"
+            return response
+
     @app.get("/feed/evaluation")
     def evaluation(request: Request):
         with app.state.sessions() as session:
@@ -177,6 +203,9 @@ def sourcing_routes(app, render, preferences):
             )
             if card is None:
                 raise HTTPException(404, "Review target unavailable")
+            checked = decorate_compact_cards(session, [card])[0]
+            if not checked["compact"]["listing_fresh"]:
+                raise HTTPException(409, "Source observation expired; decision was not saved")
             if decision == "CLEAR" and card["listing_id"] is None:
                 raise HTTPException(409, "There is no saved review decision to clear")
             try:

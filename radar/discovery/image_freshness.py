@@ -59,3 +59,15 @@ def source_image_is_fresh(data, *, now=None):
     return isinstance(data, dict) and photo_display_is_fresh(
         data.get("listing_observed_at"), data.get("fetched_at"), now=now
     )
+
+
+def feed_only(data):
+    """Legacy research views lack source-expiry/deletion display guards.
+
+    Production eBay evidence is displayed only through the qualified feed/photo
+    routes. Preserve ordinary manual, fixture and email workbench behavior.
+    """
+    return isinstance(data, dict) and (
+        str(data.get("source", "")).casefold() == "ebay"
+        and data.get("discovery_mode") == "production"
+    )
