@@ -114,3 +114,35 @@ def test_no_key_is_a_noop(tmp_path):
     )
     assert asyncio.run(triage.run_triage(sessions, cfg)) == 0
     engine.dispose()
+
+
+def test_errored_items_are_retried(tmp_path, monkeypatch):
+    engine, sessions = _db(tmp_path)
+    attempts = {"n": 0}
+
+    async def flaky(anthropic, http, model, item):
+        attempts["n"] += 1
+        if attempts["n"] <= 3:
+            return dict(status="ERROR", data={"error": "boom"}, usage={})
+        return dict(
+            status="OK",
+            data={"relevant": True, "score": 60, "category": "UNCLEAR"},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    monkeypatch.setattr(triage, "screen_one", flaky)
+    monkeypatch.setattr("anthropic.AsyncAnthropic", lambda **kw: SimpleNamespace(), raising=False)
+    cfg = dict(
+        api_key="k",
+        model="claude-haiku-5-5",
+        daily_budget=Decimal("1"),
+        enabled=True,
+        concurrency=1,
+    )
+    asyncio.run(triage.run_triage(sessions, cfg))  # all three error
+    with sessions() as s:
+        assert {r.status for r in s.query(TriageResult)} == {"ERROR"}
+    asyncio.run(triage.run_triage(sessions, cfg))  # retried, now OK
+    with sessions() as s:
+        assert {r.status for r in s.query(TriageResult)} == {"OK"}
+    engine.dispose()

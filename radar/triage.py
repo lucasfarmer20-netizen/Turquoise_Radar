@@ -81,14 +81,16 @@ class Verdict(BaseModel):
     piece_type: str = Field(description="e.g. cuff, ring, squash blossom necklace, mixed lot")
     quality_signals: list[str] = Field(
         default_factory=list,
-        description="Visible signals only: hallmark/signature visible, natural-looking stone, "
-        "hand construction, stampwork, old wear, etc. Max 5.",
+        max_length=5,
+        description="Visible signals only, 2-5 words each: hallmark visible, natural-looking "
+        "stone, hand construction, stampwork, old wear. Max 5.",
     )
     concerns: list[str] = Field(
         default_factory=list,
-        description="Visible problems: damage, plating wear, blurry photo, etc.",
+        max_length=4,
+        description="Visible problems, 2-5 words each: damage, plating wear, blurry photo. Max 4.",
     )
-    reason: str = Field(description="One sentence")
+    reason: str = Field(max_length=300, description="One sentence, under 30 words")
 
 
 def settings():
@@ -167,7 +169,7 @@ async def screen_one(anthropic, http, model, item):
     try:
         response = await anthropic.messages.parse(
             model=model,
-            max_tokens=400,
+            max_tokens=1500,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": content}],
             output_format=Verdict,
@@ -178,7 +180,9 @@ async def screen_one(anthropic, http, model, item):
         )
     if response.parsed_output is None:
         return dict(
-            status="ERROR", data={"error": "no parsed output"}, usage=response.usage.model_dump()
+            status="ERROR",
+            data={"error": f"no parsed output (stop_reason={response.stop_reason})"},
+            usage=response.usage.model_dump(),
         )
     v = response.parsed_output
     if v.category not in CATEGORIES:
@@ -196,6 +200,10 @@ async def run_triage(sessions, cfg, limit=None):
         return 0
     from anthropic import AsyncAnthropic
 
+    with sessions.begin() as s:
+        # Errored verdicts (network, truncation) are cleared so they are retried this pass.
+        for row in s.scalars(select(TriageResult).where(TriageResult.status == "ERROR")):
+            s.delete(row)
     with sessions() as s:
         done = select(TriageResult.item_id)
         query = (
