@@ -78,6 +78,22 @@ cycle is logged and the next one runs on schedule. The daily call ledger lives i
 `Setting` row 91 and resets at UTC midnight. `buyer_worker.py` and the deletion
 receiver are left in place but are not used by this path.
 
+### Vision triage
+
+After each cycle, `radar.triage` screens every new item with a small vision model
+(default `claude-haiku-5-5`): first photo at 500px plus the seller's title/price/condition,
+returning relevant yes/no, a category, a 0–100 score, visible quality signals and a
+one-line reason. Results land in `triage_results`; `/radar` shows relevant + unscreened
+items by default, sorted by score, with screened-out items one filter away. Cost is about
+$0.0001 per listing on Haiku; `VISION_DAILY_BUDGET_USD` caps the daily spend and leftover
+items are picked up next cycle. Set `ANTHROPIC_API_KEY` in `.env`; without it, triage is
+skipped and discovery runs unchanged.
+
+```bash
+.venv/bin/python -m radar.triage run --limit 50   # screen a batch now
+.venv/bin/python -m radar.triage status           # counts, spend, top scored
+```
+
 ## Demo walkthrough
 
 1. `seed` imports **26 synthetic observations → 25 distinct listings**, including

@@ -5,14 +5,14 @@
   <div>
     <div class="eyebrow">SCHEDULED DISCOVERY</div>
     <h1>Radar finds</h1>
-    <p class="muted">Everything the scheduler has pulled in, newest first. Mark Interested or Pass; decisions stick across later cycles.</p>
+    <p class="muted">Everything the scheduler has pulled in, screened by vision and sorted by score. Mark Interested or Pass; decisions stick across later cycles.</p>
   </div>
 </div>
 
 <div class="stats">
   <div><span>NEW (UNREVIEWED)</span><strong>{{ counts.get("NEW", 0) }}</strong><small class="muted">{{ new_24h }} found in last 24h</small></div>
   <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
-  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed</small></div>
+  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant</small></div>
   <div><span>LAST CYCLE</span>
     {% if last_run %}
       <strong style="font-size:20px">{{ last_run_relative }}</strong>
@@ -24,6 +24,16 @@
 </div>
 
 <form class="filters" method="get" action="/radar">
+  <label>Screening
+    <select name="show">
+      {% for v, l in [("relevant","Relevant + unscreened"),("all","Everything"),("irrelevant","Screened out"),("untriaged","Unscreened only")] %}
+      <option value="{{ v }}" {% if show == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Min score
+    <select name="min_score">
+      {% for v in [0, 40, 60, 75, 90] %}
+      <option value="{{ v }}" {% if min_score == v %}selected{% endif %}>{{ "Any" if v == 0 else v ~ "+" }}</option>{% endfor %}
+    </select></label>
   <label>Status
     <select name="status">
       {% for v, l in [("new","New"),("interested","Interested"),("passed","Passed"),("all","All")] %}
@@ -36,7 +46,7 @@
     </select></label>
   <label>Sort
     <select name="sort">
-      {% for v, l in [("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low")] %}
+      {% for v, l in [("score","Score"),("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low")] %}
       <option value="{{ v }}" {% if sort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select></label>
   <label>Search term
@@ -67,6 +77,7 @@
     <div class="card-top">
       <span class="source">{{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
+        {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
         {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
         {% if c.status == "IRRELEVANT" %}<span class="badge">PASSED</span>{% endif %}
         {% if c.is_auction and c.ends_relative and not c.ended %}<span class="badge review">ENDS {{ c.ends_relative|upper }}</span>{% endif %}
@@ -84,6 +95,14 @@
       {% if c.condition %} · {{ c.condition }}{% endif %}
       {% if c.seller %} · {{ c.seller }}{% endif %}
     </p>
+    {% if c.triaged %}
+    <p class="shipping" style="margin-top:6px">
+      <strong>{{ c.category }}</strong>{% if c.piece_type %} · {{ c.piece_type }}{% endif %}<br>
+      {{ c.reason }}
+      {% if c.signals %}<br><span style="color:var(--teal)">+ {{ c.signals|join(" · ") }}</span>{% endif %}
+      {% if c.concerns %}<br><span class="muted">− {{ c.concerns|join(" · ") }}</span>{% endif %}
+    </p>
+    {% endif %}
     <dl class="metrics">
       <div><dt>{{ "Current bid" if c.is_auction else "Price" }}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
       <div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>
@@ -104,8 +123,8 @@
 
 {% if pages > 1 %}
 <div class="feed-pagination">
-  {% if page > 1 %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&page={{ page - 1 }}">← Newer</a>{% endif %}
-  {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&page={{ page + 1 }}">Older →</a>{% endif %}
+  {% if page > 1 %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&page={{ page - 1 }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&page={{ page + 1 }}">Older →</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

@@ -13,7 +13,8 @@ from fastapi import Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 
-from radar.db import DiscoveredItem, DiscoveryRun, Setting
+from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
+from radar.triage import thumb_url
 
 ALASKA = ZoneInfo("America/Anchorage")
 DECISIONS = {"interested": "INTERESTED", "pass": "IRRELEVANT", "reset": "NEW"}
@@ -64,8 +65,9 @@ def _relative(when, now):
     return f"{text} ago" if past else f"in {text}"
 
 
-def card(row, now):
+def card(row, now, triage=None):
     n = row.normalized or {}
+    td = (triage.data if triage and triage.status == "OK" else None) or {}
     price = _dec(n.get("item_price"))
     ship = _dec(n.get("shipping_cost"))
     ends = _parse_time(n.get("item_end_time"))
@@ -77,7 +79,7 @@ def card(row, now):
         status=row.inbox_status,
         title=n.get("raw_title") or "(untitled)",
         url=n.get("listing_url"),
-        image=images[0] if images else None,
+        image=thumb_url(images[0]) if images else None,
         price=price,
         ship=ship,
         landed=(price + ship) if price is not None and ship is not None else None,
@@ -96,6 +98,14 @@ def card(row, now):
         last_seen=_aware(row.last_seen),
         synthetic=bool(n.get("synthetic")),
         mode=n.get("discovery_mode"),
+        triaged=triage is not None and triage.status == "OK",
+        relevant=triage.relevant if triage and triage.status == "OK" else None,
+        score=triage.score if triage and triage.status == "OK" else None,
+        category=(td.get("category") or "").replace("_", " ").title() or None,
+        piece_type=td.get("piece_type"),
+        signals=td.get("quality_signals") or [],
+        concerns=td.get("concerns") or [],
+        reason=td.get("reason"),
     )
 
 
@@ -105,14 +115,17 @@ def radar_routes(app, render):
         request: Request,
         status: str = "new",
         kind: str = "all",
-        sort: str = "newest",
+        sort: str = "score",
         phrase: str = "",
         hours: int = 0,
         page: int = 1,
+        show: str = "relevant",
+        min_score: int = 0,
     ):
         status = status if status in STATUS_FILTERS else "new"
         kind = kind if kind in ("all", "auction", "bin") else "all"
-        sort = sort if sort in ("newest", "ending", "price", "price_desc") else "newest"
+        sort = sort if sort in ("score", "newest", "ending", "price", "price_desc") else "score"
+        show = show if show in ("relevant", "all", "irrelevant", "untriaged") else "relevant"
         page = max(1, page)
         per_page = 48
         now = datetime.now(UTC)
@@ -125,14 +138,36 @@ def radar_routes(app, render):
                 since = (now - timedelta(hours=hours)).replace(tzinfo=None)
                 query = query.where(DiscoveredItem.first_seen >= since)
             rows = list(s.scalars(query))
-            cards = [card(r, now) for r in rows]
+            triage = {
+                tr.item_id: tr
+                for tr in s.scalars(
+                    select(TriageResult).where(TriageResult.item_id.in_([r.id for r in rows]))
+                )
+            }
+            cards = [card(r, now, triage.get(r.id)) for r in rows]
+            if show == "relevant":
+                cards = [c for c in cards if c["relevant"] is True or not c["triaged"]]
+            elif show == "irrelevant":
+                cards = [c for c in cards if c["relevant"] is False]
+            elif show == "untriaged":
+                cards = [c for c in cards if not c["triaged"]]
+            if min_score > 0:
+                cards = [c for c in cards if (c["score"] or 0) >= min_score]
             if kind == "auction":
                 cards = [c for c in cards if c["is_auction"]]
             elif kind == "bin":
                 cards = [c for c in cards if not c["is_auction"]]
             if phrase:
                 cards = [c for c in cards if c["phrase"] == phrase]
-            if sort == "ending":
+            if sort == "score":
+                cards.sort(
+                    key=lambda c: (
+                        c["score"] if c["score"] is not None else -1,
+                        c["first_seen"] or now,
+                    ),
+                    reverse=True,
+                )
+            elif sort == "ending":
                 far = datetime.max.replace(tzinfo=UTC)
                 cards.sort(key=lambda c: (c["ended"], c["ends"] or far))
             elif sort == "price":
@@ -168,6 +203,14 @@ def radar_routes(app, render):
                 or 0
             )
             last_run = s.scalar(select(DiscoveryRun).order_by(DiscoveryRun.id.desc()))
+            triaged_total = (
+                s.scalar(select(func.count(TriageResult.id)).where(TriageResult.status == "OK"))
+                or 0
+            )
+            relevant_total = (
+                s.scalar(select(func.count(TriageResult.id)).where(TriageResult.relevant.is_(True)))
+                or 0
+            )
             ledger = s.get(Setting, 91)
             calls_today = (
                 ledger.data.get("calls", 0)
@@ -186,6 +229,10 @@ def radar_routes(app, render):
             sort=sort,
             phrase=phrase,
             hours=hours,
+            show=show,
+            min_score=min_score,
+            triaged_total=triaged_total,
+            relevant_total=relevant_total,
             phrases=phrases,
             counts=counts,
             total=sum(counts.values()),

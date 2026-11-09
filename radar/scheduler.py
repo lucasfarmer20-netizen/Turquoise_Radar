@@ -198,6 +198,14 @@ async def cycle(sessions, connection, mode, daily_limit):
     if run.errors:
         for err in run.errors[:5]:
             log.warning("  %s", err)
+    if run.new_count:
+        from radar.triage import run_triage
+        from radar.triage import settings as triage_settings
+
+        try:
+            await run_triage(sessions, triage_settings())
+        except Exception:
+            log.exception("triage failed; discovery results are kept")
     return run
 
 

@@ -79,3 +79,46 @@ def test_external_back_url_is_not_followed(client):
         follow_redirects=False,
     )
     assert r.headers["location"] == "/radar"
+
+
+def _triage(client, item_id, relevant, score, category="NATIVE_AMERICAN_STYLE"):
+    from radar.db import TriageResult
+
+    with client.app.state.sessions.begin() as s:
+        s.add(
+            TriageResult(
+                item_id=item_id,
+                model="test",
+                status="OK",
+                relevant=relevant,
+                score=score,
+                category=category,
+                data={
+                    "relevant": relevant,
+                    "score": score,
+                    "category": category,
+                    "piece_type": "cuff",
+                    "quality_signals": ["stampwork visible"],
+                    "concerns": [],
+                    "reason": f"synthetic reason {item_id}",
+                },
+                cost_usd="0.0001",
+            )
+        )
+
+
+def test_screening_filters_and_score_sort(client):
+    _add(client, 11)
+    _add(client, 12)
+    _add(client, 13)  # unscreened
+    _triage(client, 1, True, 82)
+    _triage(client, 2, False, 15, "COSTUME_OR_PLATED")
+    default = client.get("/radar").text
+    assert "navaho cuff 11" in default and "navaho cuff 13" in default
+    assert "navaho cuff 12" not in default  # screened out hidden by default
+    assert default.index("navaho cuff 11") < default.index("navaho cuff 13")  # score sort
+    assert "synthetic reason 1" in default and "stampwork visible" in default
+    assert "navaho cuff 12" in client.get("/radar?show=irrelevant").text
+    assert "navaho cuff 11" not in client.get("/radar?show=untriaged").text
+    assert "navaho cuff 13" not in client.get("/radar?min_score=60").text
+    assert "navaho cuff 11" in client.get("/radar?min_score=60").text
