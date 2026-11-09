@@ -106,9 +106,9 @@
     </p>
     {% endif %}
     <dl class="metrics">
-      <div><dt>{{ "Current bid" if c.is_auction else "Price" }}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
-      <div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>
-      <div><dt>Landed (before tax)</dt><dd>{{ c.landed|usd }}</dd></div>
+      <div><dt>{% if c.is_auction %}{{ "Current bid" if c.bid_count else "Starting bid" }}{% if c.bid_count %} · {{ c.bid_count }} bid{{ "" if c.bid_count == 1 else "s" }}{% endif %}{% else %}Price{% endif %}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
+      {% if c.bin_price %}<div><dt>Buy It Now</dt><dd>{{ c.bin_price|usd }}</dd></div>{% else %}<div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>{% endif %}
+      <div><dt>Landed{% if c.bin_price %} at bid{% endif %} (before tax)</dt><dd>{{ c.landed|usd }}{% if c.bin_price %} <small class="muted">+{{ c.ship|usd }} ship</small>{% endif %}</dd></div>
       <div><dt>{{ "Ends" if c.is_auction else "Listed end" }}</dt><dd class="small">{{ c.ends_local or "unknown" }}</dd></div>
     </dl>
     <div class="query"><span>FOUND BY</span><code>{{ c.phrase }}</code><span>{{ c.first_seen_relative }}</span></div>

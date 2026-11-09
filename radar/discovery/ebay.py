@@ -397,6 +397,10 @@ def normalize(raw, mode, query, original_query, corrected=None, pattern_id=None)
         options = raw.get("buyingOptions", [])
         price = raw.get("currentBidPrice") if "AUCTION" in options else raw.get("price")
         price = price or {}
+        bin_price = None
+        if "AUCTION" in options and "FIXED_PRICE" in options:
+            bin_price = (raw.get("price") or {}).get("value")
+        bid_count = raw.get("bidCount") if "AUCTION" in options else None
         shipping = raw.get("shippingOptions") or []
         shipping_price = shipping[0].get("shippingCost", {}) if shipping else {}
         shipping_value = (
@@ -422,6 +426,8 @@ def normalize(raw, mode, query, original_query, corrected=None, pattern_id=None)
             currency=price.get("currency", "XXX"),
             seller_id=seller.get("username"),
             buying_options=options,
+            buy_it_now_price=bin_price,
+            bid_count=bid_count if isinstance(bid_count, int) and bid_count >= 0 else None,
             condition=raw.get("condition"),
             category=category,
             image_urls=[image["imageUrl"]] if image.get("imageUrl") else [],

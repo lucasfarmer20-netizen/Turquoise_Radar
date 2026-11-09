@@ -336,6 +336,8 @@ class ListingInput(BaseModel):
     query_attribution_verified: bool | None = None
     combined_shipping_evidence: str | None = None
     buying_options: list[str] = Field(default_factory=list)
+    buy_it_now_price: Money | None = None  # set when an auction also offers Buy It Now
+    bid_count: int | None = Field(default=None, ge=0)
     item_end_time: datetime | None = None
     shipping_evidence: str | None = None
     discovery_mode: Literal["fixture", "sandbox", "production"] | None = None

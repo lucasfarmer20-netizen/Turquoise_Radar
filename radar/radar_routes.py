@@ -72,7 +72,9 @@ def card(row, now, triage=None):
     ship = _dec(n.get("shipping_cost"))
     ends = _parse_time(n.get("item_end_time"))
     options = n.get("buying_options") or []
-    is_auction = "AUCTION" in options and "FIXED_PRICE" not in options
+    is_auction = "AUCTION" in options
+    has_bin = "FIXED_PRICE" in options
+    bin_price = _dec(n.get("buy_it_now_price"))
     images = n.get("image_urls") or []
     return dict(
         id=row.id,
@@ -84,8 +86,18 @@ def card(row, now, triage=None):
         ship=ship,
         landed=(price + ship) if price is not None and ship is not None else None,
         ship_status=n.get("shipping_status") or "UNKNOWN",
-        kind="Auction" if is_auction else "Buy It Now" if "FIXED_PRICE" in options else "Listing",
+        kind=(
+            "Auction + BIN"
+            if is_auction and has_bin
+            else "Auction"
+            if is_auction
+            else "Buy It Now"
+            if has_bin
+            else "Listing"
+        ),
         is_auction=is_auction,
+        bin_price=bin_price,
+        bid_count=n.get("bid_count"),
         ends=ends,
         ends_local=ends.astimezone(ALASKA).strftime("%a %b %d %I:%M %p AKT") if ends else None,
         ends_relative=_relative(ends, now),

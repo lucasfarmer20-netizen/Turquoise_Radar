@@ -122,3 +122,24 @@ def test_screening_filters_and_score_sort(client):
     assert "navaho cuff 11" not in client.get("/radar?show=untriaged").text
     assert "navaho cuff 13" not in client.get("/radar?min_score=60").text
     assert "navaho cuff 11" in client.get("/radar?min_score=60").text
+
+
+def test_auction_with_bin_shows_both_prices(client):
+    _add(
+        client,
+        21,
+        buying_options=["FIXED_PRICE", "AUCTION"],
+        item_price="39.00",
+        buy_it_now_price="89.00",
+        bid_count=0,
+    )
+    html = client.get("/radar").text
+    assert "Auction + BIN" in html
+    assert "Starting bid" in html and "$39.00" in html
+    assert "Buy It Now" in html and "$89.00" in html
+
+
+def test_auction_with_bids_shows_bid_count(client):
+    _add(client, 22, item_price="52.00", bid_count=3)
+    html = client.get("/radar").text
+    assert "Current bid · 3 bids" in html

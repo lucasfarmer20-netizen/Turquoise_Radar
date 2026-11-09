@@ -161,6 +161,11 @@ def listing_context(n):
     return {
         "title": n.get("raw_title"),
         "price": n.get("item_price"),
+        "price_is": "current or starting bid"
+        if "AUCTION" in (n.get("buying_options") or [])
+        else "asking price",
+        "buy_it_now_price": n.get("buy_it_now_price"),
+        "bid_count": n.get("bid_count"),
         "shipping": n.get("shipping_cost"),
         "condition": n.get("condition"),
         "buying_options": n.get("buying_options"),
