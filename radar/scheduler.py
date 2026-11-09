@@ -68,7 +68,7 @@ def load_env(path=None):
 def settings():
     return dict(
         mode=os.environ.get("EBAY_MODE", "fixture"),
-        hours=float(os.environ.get("RADAR_SCHEDULE_HOURS", "3")),
+        hours=float(os.environ.get("RADAR_SCHEDULE_HOURS", "1")),
         daily_limit=int(os.environ.get("RADAR_DAILY_CALL_LIMIT", "4000")),
         queries=Path(os.environ.get("RADAR_QUERIES", ROOT / "fixtures" / "seed_queries.json")),
         page_size=int(os.environ.get("RADAR_PAGE_SIZE", "50")),

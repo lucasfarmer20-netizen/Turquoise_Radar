@@ -1,5 +1,5 @@
 {
-  "_comment": "Owner-supplied search terms, 2026-11-09. Verbatim strings are what the owner would type; 'variants' are deliberate misspellings/under-descriptions a careless seller might use. Every query runs against every enabled source adapter. Do not 'correct' the misspelled ones.",
+  "_comment": "Owner-supplied search terms, 2026-11-09. Verbatim strings are what the owner would type; 'variants' are deliberate misspellings/under-descriptions a careless seller might use. Every query runs against every enabled source adapter. Do not 'correct' the misspelled ones. Auctions are sorted newlyListed (not endingSoonest) so they are captured with time to spare; the /radar page sorts stored auctions by end time.",
   "groups": [
     {
       "name": "Native American / Southwest",
@@ -38,9 +38,12 @@
       ]
     }
   ],
-  "buying_options": ["FIXED_PRICE", "AUCTION"],
+  "buying_options": [
+    "FIXED_PRICE",
+    "AUCTION"
+  ],
   "sorts": {
     "FIXED_PRICE": "newlyListed",
-    "AUCTION": "endingSoonest"
+    "AUCTION": "newlyListed"
   }
 }
