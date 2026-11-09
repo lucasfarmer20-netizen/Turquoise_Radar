@@ -84,6 +84,7 @@ class SearchOptions(BaseModel):
     max_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     sort: Literal["newlyListed", "price", "-price", "endingSoonest"] = "newlyListed"
     auto_correct: Literal["omit", "KEYWORD"] = "omit"
+    item_location_country: str | None = "US"
 
     @model_validator(mode="after")
     def range_order(self):
@@ -100,6 +101,8 @@ class SearchOptions(BaseModel):
     def params(self, query, limit, offset=0):
         modes = "FIXED_PRICE|AUCTION" if self.buying_format == "BOTH" else self.buying_format
         filters = [f"buyingOptions:{{{modes}}}"]
+        if self.item_location_country:
+            filters.append(f"itemLocationCountry:{self.item_location_country}")
         if self.min_price is not None or self.max_price is not None:
             low = "" if self.min_price is None else str(self.min_price)
             high = "" if self.max_price is None else str(self.max_price)

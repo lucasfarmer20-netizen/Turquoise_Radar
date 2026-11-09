@@ -4,6 +4,7 @@
     python -m radar.scheduler run --once      # one discovery cycle, then exit
     python -m radar.scheduler run             # cycle every RADAR_SCHEDULE_HOURS until Ctrl-C
     python -m radar.scheduler status          # recent runs, daily call count, newest finds
+    python -m radar.scheduler prune-foreign   # mark stored items located outside the US as passed
 
 Reads .env from the repository root (or RADAR_ENV_FILE) so credentials never pass
 through a shell history. Reuses the existing eBay adapter, normalization, dedup and
@@ -287,6 +288,22 @@ def status(sessions, cfg):
         print(f"           via {n.get('raw_search_phrase', '')!r}  {n.get('listing_url', '')}")
 
 
+# ---------------------------------------------------------------- cleanup
+
+
+def prune_foreign(sessions, country="US"):
+    """Mark stored items whose eBay itemLocation is outside `country` as IRRELEVANT.
+    Searches now filter by itemLocationCountry; this handles items found before that."""
+    changed = 0
+    with sessions.begin() as s:
+        for item in s.scalars(select(DiscoveredItem).where(DiscoveredItem.inbox_status == "NEW")):
+            loc = ((item.original_data or {}).get("itemLocation") or {}).get("country")
+            if loc and loc != country:
+                item.inbox_status = "IRRELEVANT"
+                changed += 1
+    return changed
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -294,7 +311,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["seed", "run", "status"])
+    parser.add_argument("command", choices=["seed", "run", "status", "prune-foreign"])
     parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
     parser.add_argument("--env", help="path to .env (default: repo root .env)")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -318,6 +335,8 @@ def main(argv=None):
             )
         elif args.command == "status":
             status(sessions, cfg)
+        elif args.command == "prune-foreign":
+            print(f"marked {prune_foreign(sessions)} non-US items as passed")
         else:
             connection = Connection.from_env()
             try:

@@ -27,7 +27,7 @@ def test_ending_soon_requires_explicit_auction():
         "limit": 3,
         "offset": 0,
         "sort": "endingSoonest",
-        "filter": "buyingOptions:{AUCTION}",
+        "filter": "buyingOptions:{AUCTION},itemLocationCountry:US",
     }
 
 
@@ -45,7 +45,7 @@ def test_real_adapter_wire_is_bounded_and_fields_remain_factual():
         if request.url.path.endswith("/token"):
             return httpx.Response(200, json={"access_token": "SYNTHETIC-token", "expires_in": 3600})
         assert request.url.params["sort"] == "endingSoonest"
-        assert request.url.params["filter"] == "buyingOptions:{AUCTION}"
+        assert request.url.params["filter"] == "buyingOptions:{AUCTION},itemLocationCountry:US"
         assert request.url.params["limit"] == "3"
         assert "99669" in request.headers["X-EBAY-C-ENDUSERCTX"]
         return httpx.Response(200, json={"itemSummaries": [raw], "total": 1})

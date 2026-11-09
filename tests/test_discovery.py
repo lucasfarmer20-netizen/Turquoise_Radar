@@ -289,6 +289,11 @@ def test_search_filters_and_sort(buying_format, expected):
     )
     assert expected in p["filter"] and "price:[5..25]" in p["filter"]
     assert "priceCurrency:USD" in p["filter"] and p["sort"] == "newlyListed" and p["q"] == "Navaho"
+    assert "itemLocationCountry:US" in p["filter"]
+    assert (
+        "itemLocationCountry"
+        not in SearchOptions(item_location_country=None).params("x", 1)["filter"]
+    )
 
 
 def test_normalization_no_fabricated_shipping_weight_or_resale():
@@ -706,7 +711,7 @@ def test_jri011_exact_broad_plan_and_observation_budget_with_mocked_production(c
     assert all(
         p["limit"] == "3"
         and p["offset"] == "0"
-        and p["filter"] == "buyingOptions:{FIXED_PRICE|AUCTION}"
+        and p["filter"] == "buyingOptions:{FIXED_PRICE|AUCTION},itemLocationCountry:US"
         and "auto_correct" not in p
         for p in calls
     )
