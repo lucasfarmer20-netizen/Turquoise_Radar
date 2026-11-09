@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Radar finds{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">SCHEDULED DISCOVERY</div>
+    <h1>Radar finds</h1>
+    <p class="muted">Everything the scheduler has pulled in, newest first. Mark Interested or Pass; decisions stick across later cycles.</p>
+  </div>
+</div>
+
+<div class="stats">
+  <div><span>NEW (UNREVIEWED)</span><strong>{{ counts.get("NEW", 0) }}</strong><small class="muted">{{ new_24h }} found in last 24h</small></div>
+  <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
+  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed</small></div>
+  <div><span>LAST CYCLE</span>
+    {% if last_run %}
+      <strong style="font-size:20px">{{ last_run_relative }}</strong>
+      <small class="muted">{{ last_run.mode }} · {{ last_run.status }} · {{ last_run.new_count }} new · {{ calls_today }} API calls today</small>
+    {% else %}
+      <strong style="font-size:20px">never</strong><small class="muted">run <code>python -m radar.scheduler run --once</code></small>
+    {% endif %}
+  </div>
+</div>
+
+<form class="filters" method="get" action="/radar">
+  <label>Status
+    <select name="status">
+      {% for v, l in [("new","New"),("interested","Interested"),("passed","Passed"),("all","All")] %}
+      <option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Type
+    <select name="kind">
+      {% for v, l in [("all","Auctions + BIN"),("auction","Auctions only"),("bin","Buy It Now only")] %}
+      <option value="{{ v }}" {% if kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Sort
+    <select name="sort">
+      {% for v, l in [("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low")] %}
+      <option value="{{ v }}" {% if sort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Search term
+    <select name="phrase">
+      <option value="">All terms</option>
+      {% for p in phrases %}<option value="{{ p }}" {% if phrase == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select></label>
+  <label>Found within
+    <select name="hours">
+      {% for v, l in [(0,"Any time"),(6,"6 hours"),(24,"24 hours"),(72,"3 days"),(168,"7 days")] %}
+      <option value="{{ v }}" {% if hours == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <button type="submit">Apply</button>
+</form>
+
+<div class="section-heading">
+  <h2>{{ total_matching }} item{{ "" if total_matching == 1 else "s" }}</h2>
+  {% if pages > 1 %}<span class="muted">page {{ page }} of {{ pages }}</span>{% endif %}
+</div>
+
+{% if not cards %}
+<div class="panel empty muted">Nothing here yet. {% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
+{% endif %}
+
+<div class="listing-grid">
+{% for c in cards %}
+  <article class="listing-card" id="item-{{ c.id }}">
+    <div class="card-top">
+      <span class="source">{{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
+      <div class="labels">
+        {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
+        {% if c.status == "IRRELEVANT" %}<span class="badge">PASSED</span>{% endif %}
+        {% if c.is_auction and c.ends_relative and not c.ended %}<span class="badge review">ENDS {{ c.ends_relative|upper }}</span>{% endif %}
+        {% if c.ended %}<span class="badge">RECORDED END PASSED</span>{% endif %}
+      </div>
+    </div>
+    {% if c.image %}
+    <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">
+      <img src="{{ c.image }}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#0b141b">
+    </a>
+    {% endif %}
+    <h3><a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a></h3>
+    <p class="shipping">
+      {% if c.ship_status == "CONFIRMED_TO_ALASKA" %}Ships to 99669{% elif c.ship_status == "UNKNOWN" %}Alaska shipping unconfirmed{% else %}{{ c.ship_status|replace("_"," ")|lower }}{% endif %}
+      {% if c.condition %} · {{ c.condition }}{% endif %}
+      {% if c.seller %} · {{ c.seller }}{% endif %}
+    </p>
+    <dl class="metrics">
+      <div><dt>{{ "Current bid" if c.is_auction else "Price" }}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
+      <div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>
+      <div><dt>Landed (before tax)</dt><dd>{{ c.landed|usd }}</dd></div>
+      <div><dt>{{ "Ends" if c.is_auction else "Listed end" }}</dt><dd class="small">{{ c.ends_local or "unknown" }}</dd></div>
+    </dl>
+    <div class="query"><span>FOUND BY</span><code>{{ c.phrase }}</code><span>{{ c.first_seen_relative }}</span></div>
+    <form class="feed-actions" method="post" action="/radar/{{ c.id }}/decision">
+      <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}#item-{{ c.id }}">
+      {% if c.status != "INTERESTED" %}<button name="decision" value="interested">Interested</button>{% endif %}
+      {% if c.status != "IRRELEVANT" %}<button class="secondary" name="decision" value="pass">Pass</button>{% endif %}
+      {% if c.status != "NEW" %}<button class="secondary" name="decision" value="reset">Undo</button>{% endif %}
+      <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer">Open on eBay</a>
+    </form>
+  </article>
+{% endfor %}
+</div>
+
+{% if pages > 1 %}
+<div class="feed-pagination">
+  {% if page > 1 %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&page={{ page - 1 }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&page={{ page + 1 }}">Older →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

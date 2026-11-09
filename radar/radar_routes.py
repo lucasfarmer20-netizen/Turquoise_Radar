@@ -1,0 +1,213 @@
+"""Plain results page for scheduler finds: /radar.
+
+Reads DiscoveredItem rows directly. No freshness withdrawal, no receiver gate, no
+view-only child process. Owner decisions (Interested / Pass) are stored on the row's
+inbox_status so they survive re-observation by later cycles.
+"""
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
+
+from fastapi import Form, HTTPException, Request
+from fastapi.responses import RedirectResponse
+from sqlalchemy import func, select
+
+from radar.db import DiscoveredItem, DiscoveryRun, Setting
+
+ALASKA = ZoneInfo("America/Anchorage")
+DECISIONS = {"interested": "INTERESTED", "pass": "IRRELEVANT", "reset": "NEW"}
+STATUS_FILTERS = {
+    "new": ["NEW"],
+    "interested": ["INTERESTED"],
+    "passed": ["IRRELEVANT"],
+    "all": None,
+}
+
+
+def _dec(value):
+    try:
+        return Decimal(str(value)) if value not in (None, "") else None
+    except InvalidOperation:
+        return None
+
+
+def _parse_time(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _aware(value):
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def _relative(when, now):
+    when = _aware(when)
+    if when is None:
+        return None
+    delta = when - now
+    seconds = int(delta.total_seconds())
+    past = seconds < 0
+    seconds = abs(seconds)
+    if seconds < 3600:
+        text = f"{max(1, seconds // 60)}m"
+    elif seconds < 86400:
+        text = f"{seconds // 3600}h {(seconds % 3600) // 60:02d}m"
+    else:
+        text = f"{seconds // 86400}d {(seconds % 86400) // 3600}h"
+    return f"{text} ago" if past else f"in {text}"
+
+
+def card(row, now):
+    n = row.normalized or {}
+    price = _dec(n.get("item_price"))
+    ship = _dec(n.get("shipping_cost"))
+    ends = _parse_time(n.get("item_end_time"))
+    options = n.get("buying_options") or []
+    is_auction = "AUCTION" in options and "FIXED_PRICE" not in options
+    images = n.get("image_urls") or []
+    return dict(
+        id=row.id,
+        status=row.inbox_status,
+        title=n.get("raw_title") or "(untitled)",
+        url=n.get("listing_url"),
+        image=images[0] if images else None,
+        price=price,
+        ship=ship,
+        landed=(price + ship) if price is not None and ship is not None else None,
+        ship_status=n.get("shipping_status") or "UNKNOWN",
+        kind="Auction" if is_auction else "Buy It Now" if "FIXED_PRICE" in options else "Listing",
+        is_auction=is_auction,
+        ends=ends,
+        ends_local=ends.astimezone(ALASKA).strftime("%a %b %d %I:%M %p AKT") if ends else None,
+        ends_relative=_relative(ends, now),
+        ended=bool(ends and ends < now),
+        condition=n.get("condition"),
+        seller=n.get("seller_id"),
+        phrase=n.get("raw_search_phrase") or n.get("original_search_phrase"),
+        first_seen=_aware(row.first_seen),
+        first_seen_relative=_relative(row.first_seen, now) if row.first_seen else None,
+        last_seen=_aware(row.last_seen),
+        synthetic=bool(n.get("synthetic")),
+        mode=n.get("discovery_mode"),
+    )
+
+
+def radar_routes(app, render):
+    @app.get("/radar")
+    def radar_page(
+        request: Request,
+        status: str = "new",
+        kind: str = "all",
+        sort: str = "newest",
+        phrase: str = "",
+        hours: int = 0,
+        page: int = 1,
+    ):
+        status = status if status in STATUS_FILTERS else "new"
+        kind = kind if kind in ("all", "auction", "bin") else "all"
+        sort = sort if sort in ("newest", "ending", "price", "price_desc") else "newest"
+        page = max(1, page)
+        per_page = 48
+        now = datetime.now(UTC)
+        with app.state.sessions() as s:
+            query = select(DiscoveredItem)
+            wanted = STATUS_FILTERS[status]
+            if wanted:
+                query = query.where(DiscoveredItem.inbox_status.in_(wanted))
+            if hours > 0:
+                since = (now - timedelta(hours=hours)).replace(tzinfo=None)
+                query = query.where(DiscoveredItem.first_seen >= since)
+            rows = list(s.scalars(query))
+            cards = [card(r, now) for r in rows]
+            if kind == "auction":
+                cards = [c for c in cards if c["is_auction"]]
+            elif kind == "bin":
+                cards = [c for c in cards if not c["is_auction"]]
+            if phrase:
+                cards = [c for c in cards if c["phrase"] == phrase]
+            if sort == "ending":
+                far = datetime.max.replace(tzinfo=UTC)
+                cards.sort(key=lambda c: (c["ended"], c["ends"] or far))
+            elif sort == "price":
+                cards.sort(key=lambda c: (c["price"] is None, c["price"] or 0))
+            elif sort == "price_desc":
+                cards.sort(key=lambda c: (c["price"] is None, -(c["price"] or 0)))
+            else:
+                cards.sort(key=lambda c: c["first_seen"] or now, reverse=True)
+            total_matching = len(cards)
+            cards = cards[(page - 1) * per_page : page * per_page]
+
+            phrases = sorted(
+                {
+                    (r.normalized or {}).get("raw_search_phrase")
+                    for r in s.scalars(select(DiscoveredItem))
+                }
+                - {None}
+            )
+            counts = dict(
+                s.execute(
+                    select(DiscoveredItem.inbox_status, func.count()).group_by(
+                        DiscoveredItem.inbox_status
+                    )
+                ).all()
+            )
+            day_ago = now - timedelta(hours=24)
+            new_24h = (
+                s.scalar(
+                    select(func.count(DiscoveredItem.id)).where(
+                        DiscoveredItem.first_seen >= day_ago.replace(tzinfo=None)
+                    )
+                )
+                or 0
+            )
+            last_run = s.scalar(select(DiscoveryRun).order_by(DiscoveryRun.id.desc()))
+            ledger = s.get(Setting, 91)
+            calls_today = (
+                ledger.data.get("calls", 0)
+                if ledger and ledger.data.get("day") == now.strftime("%Y-%m-%d")
+                else 0
+            )
+        return render(
+            request,
+            "radar.html",
+            cards=cards,
+            total_matching=total_matching,
+            page=page,
+            pages=max(1, -(-total_matching // per_page)),
+            status=status,
+            kind=kind,
+            sort=sort,
+            phrase=phrase,
+            hours=hours,
+            phrases=phrases,
+            counts=counts,
+            total=sum(counts.values()),
+            new_24h=new_24h,
+            last_run=last_run,
+            last_run_relative=_relative(last_run.started_at, now)
+            if last_run and last_run.started_at
+            else None,
+            calls_today=calls_today,
+        )
+
+    @app.post("/radar/{item_id}/decision")
+    def radar_decision(
+        request: Request, item_id: int, decision: str = Form(...), back: str = Form("/radar")
+    ):
+        if decision not in DECISIONS:
+            raise HTTPException(400, "Unknown decision")
+        with app.state.sessions.begin() as s:
+            row = s.get(DiscoveredItem, item_id)
+            if row is None:
+                raise HTTPException(404, "Item not found")
+            row.inbox_status = DECISIONS[decision]
+        if not back.startswith("/radar"):
+            back = "/radar"
+        return RedirectResponse(back, status_code=303)

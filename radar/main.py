@@ -34,6 +34,7 @@ from radar.intake.routes import intake_routes
 from radar.intake.views import alert_history
 from radar.jewelry.routes import VisionBodyLimit, vision_routes
 from radar.owner_routes import owner_routes
+from radar.radar_routes import radar_routes
 from radar.research_evidence import research_projection
 from radar.research_routes import research_routes
 from radar.research_scope import inspect_scope, mutation_allowed
@@ -435,6 +436,7 @@ def create_app(database_url=None, *, expected_scope=None, pilot_gate=None):
     intake_routes(app, render, preferences)
     sourcing_routes(app, render, preferences)
     research_routes(app)
+    radar_routes(app, render)
     vision_routes(app, render)
     identification_routes(app, render, preferences)
     return app
