@@ -79,6 +79,22 @@ def _relative(when, now):
     return f"{text} ago" if past else f"in {text}"
 
 
+def comp_links(query):
+    q = quote_plus(query)
+    return [
+        ("eBay sold", f"https://www.ebay.com/sch/i.html?_nkw={q}&LH_Sold=1&LH_Complete=1"),
+        (
+            "LiveAuctioneers results",
+            f"https://www.liveauctioneers.com/auction-results/?keyword={q}",
+        ),
+        (
+            "Invaluable",
+            f"https://www.invaluable.com/search?keyword={q}&sort=price-desc&priceResult=1",
+        ),
+        ("WorthPoint", f"https://www.worthpoint.com/worthopedia?query={q}"),
+    ]
+
+
 def card(row, now, triage=None):
     n = row.normalized or {}
     td = (triage.data if triage and triage.status == "OK" else None) or {}
@@ -141,9 +157,12 @@ def card(row, now, triage=None):
             ship,
             (n.get("buyer_premium_rate") or 0),
         ),
-        comps_url="https://www.ebay.com/sch/i.html?_nkw="
-        + quote_plus((n.get("raw_title") or "")[:80])
-        + "&LH_Sold=1&LH_Complete=1",
+        comp_query=td.get("comp_query") or (n.get("raw_title") or "")[:80],
+        comps=comp_links(td.get("comp_query") or (n.get("raw_title") or "")[:80]),
+        hallmark_read=td.get("hallmark_read"),
+        deep=bool(td.get("deep")),
+        bought_for=n.get("bought_for"),
+        sold_for=n.get("sold_for"),
         lens_url=("https://lens.google.com/uploadbyurl?url=" + quote_plus(thumb_url(images[0])))
         if images
         else None,
@@ -339,6 +358,32 @@ def radar_routes(app, render):
         if not back.startswith("/radar"):
             back = "/radar"
         return RedirectResponse(back, status_code=303)
+
+    @app.post("/radar/{item_id}/outcome")
+    def radar_outcome(
+        item_id: int,
+        bought_for: str = Form(""),
+        sold_for: str = Form(""),
+        back: str = Form("/radar"),
+    ):
+        with app.state.sessions.begin() as s:
+            row = s.get(DiscoveredItem, item_id)
+            if row is None:
+                raise HTTPException(404, "Item not found")
+            n = dict(row.normalized or {})
+            for key, raw in (("bought_for", bought_for), ("sold_for", sold_for)):
+                raw = raw.strip().lstrip("$").replace(",", "")
+                if raw == "":
+                    continue
+                value = _dec(raw)
+                if value is None or value < 0:
+                    raise HTTPException(400, f"Bad {key}")
+                n[key] = str(value)
+                n[key + "_at"] = datetime.now(UTC).isoformat()
+            row.normalized = n
+        if not back.startswith("/radar"):
+            back = "/radar"
+        return RedirectResponse(f"{back}#item-{item_id}", status_code=303)
 
     @app.post("/radar/{item_id}/decision")
     def radar_decision(

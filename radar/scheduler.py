@@ -281,6 +281,13 @@ async def cycle(sessions, connection, mode, daily_limit):
         except Exception:
             log.exception("triage failed; discovery results are kept")
     try:
+        from radar.triage import run_deep
+        from radar.triage import settings as triage_settings
+
+        await run_deep(sessions, triage_settings())
+    except Exception:
+        log.exception("deep pass failed")
+    try:
         from radar.queue import purge, sweep
 
         sweep(sessions)

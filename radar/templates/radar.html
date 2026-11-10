@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Radar finds<style>
   .listing-card:focus-within, .listing-card.active { outline: 2px solid var(--teal); outline-offset: 2px; }
-  .links { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; align-items: baseline; }
+  .outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 8px; }
+  .outcome input { width: 6em; padding: 4px 6px; background: #0b141b; color: inherit; border: 1px solid #2a3942; border-radius: 4px; }
   .walk dd strong { color: var(--teal); }
   .walk.over dd strong { color: #e0a24a; }
   details.pass summary { list-style: none; cursor: pointer; display: inline-block; }
@@ -172,8 +174,11 @@
     </dl>
     <div class="query"><span>FOUND BY</span><code>{{ c.phrase }}</code><span>{{ c.first_seen_relative }}</span></div>
     <div class="links">
-      <a href="{{ c.comps_url }}" target="_blank" rel="noopener noreferrer">Sold comps</a>
+      <span class="muted">comps for <code>{{ c.comp_query }}</code>:</span>
+      {% for label, href in c.comps %}<a href="{{ href }}" target="_blank" rel="noopener noreferrer">{{ label }}</a>{% endfor %}
       {% if c.lens_url %}<a href="{{ c.lens_url }}" target="_blank" rel="noopener noreferrer">Google Lens</a>{% endif %}
+      {% if c.hallmark_read %}<span>hallmark read: <strong>{{ c.hallmark_read }}</strong></span>{% endif %}
+      {% if c.deep %}<span class="muted" title="all photos + description reviewed">deep-reviewed</span>{% endif %}
       {% if c.watched_at %}<span class="muted" title="{{ c.watched_at }}">watching · bid refreshed hourly</span>{% endif %}
       {% if c.pass_reason %}<span class="muted">passed: {{ c.pass_reason }}</span>{% endif %}
     </div>
@@ -206,6 +211,14 @@
       {% endif %}
       <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" data-key="o">Open on {{ c.source }}</a>
     </div>
+    {% if c.status == "INTERESTED" %}
+    <form method="post" action="/radar/{{ c.id }}/outcome" class="outcome">
+      <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+      <label>Bought for $<input name="bought_for" inputmode="decimal" size="7" value="{{ c.bought_for or '' }}" placeholder="landed"></label>
+      <label>Sold for $<input name="sold_for" inputmode="decimal" size="7" value="{{ c.sold_for or '' }}" placeholder="gross"></label>
+      <button class="secondary" type="submit">Save</button>
+    </form>
+    {% endif %}
   </article>
 {% endfor %}
 </div>
@@ -218,7 +231,9 @@
 {% endif %}
 <style>
   .listing-card:focus-within, .listing-card.active { outline: 2px solid var(--teal); outline-offset: 2px; }
-  .links { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; align-items: baseline; }
+  .outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 8px; }
+  .outcome input { width: 6em; padding: 4px 6px; background: #0b141b; color: inherit; border: 1px solid #2a3942; border-radius: 4px; }
   .walk dd strong { color: var(--teal); }
   .walk.over dd strong { color: #e0a24a; }
   details.pass summary { list-style: none; cursor: pointer; display: inline-block; }

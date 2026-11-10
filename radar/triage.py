@@ -117,6 +117,17 @@ class Verdict(BaseModel):
         default=None,
         description="[low, high] rough collector resale range in USD, or null if not estimable",
     )
+    comp_query: str = Field(
+        default="",
+        max_length=80,
+        description="3-7 word search for sold comparables from piece type, style, stone and any "
+        "legible maker name; no seller adjectives or sizes, e.g. 'navajo turquoise cluster cuff'",
+    )
+    hallmark_read: str | None = Field(
+        default=None,
+        max_length=60,
+        description="Hallmark or signature exactly as legible in the photos, else null",
+    )
     reason: str = Field(max_length=300, description="One sentence, under 30 words")
 
 
@@ -127,6 +138,10 @@ def settings():
         daily_budget=Decimal(os.environ.get("VISION_DAILY_BUDGET_USD", "1.00")),
         enabled=os.environ.get("VISION_TRIAGE_ENABLED", "true").lower() in ("1", "true", "yes"),
         concurrency=int(os.environ.get("VISION_CONCURRENCY", "4")),
+        deep_model=os.environ.get("VISION_DEEP_MODEL", "claude-sonnet-5-5"),
+        deep_budget=Decimal(os.environ.get("VISION_DEEP_DAILY_BUDGET_USD", "1.50")),
+        deep_enabled=os.environ.get("VISION_DEEP_ENABLED", "true").lower() in ("1", "true", "yes"),
+        deep_images=int(os.environ.get("VISION_DEEP_IMAGES", "6")),
     )
 
 
@@ -228,29 +243,46 @@ def reconcile_verdict(data, n):
     return out
 
 
-async def screen_one(anthropic, http, model, item):
+async def screen_one(anthropic, http, model, item, max_images=1, deep=False):
     n = item.normalized or {}
     images = n.get("image_urls") or []
     if not images:
         return dict(status="SKIPPED", data={"error": "no image"}, usage={})
-    try:
-        media, data = await fetch_image(http, images[0])
-    except Exception as e:  # network/HTTP; try again next cycle
-        return dict(status="ERROR", data={"error": f"image fetch: {e}"}, usage={})
     import json
 
-    content = [
-        {"type": "text", "text": "UNTRUSTED LISTING DATA:\n" + json.dumps(listing_context(n))},
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": media,
-                "data": base64.b64encode(data).decode(),
-            },
-        },
-        {"type": "text", "text": "Screen this listing. Return the schema."},
-    ]
+    blobs = []
+    for url in images[:max_images]:
+        try:
+            media, data = await fetch_image(http, url)
+            blobs.append((media, data))
+        except Exception as e:  # network/HTTP
+            if not blobs:
+                return dict(status="ERROR", data={"error": f"image fetch: {e}"}, usage={})
+            break
+    ctx = listing_context(n)
+    if deep:
+        ctx["description"] = (n.get("raw_description") or "")[:2500]
+        ctx["photo_count"] = len(images)
+    content = [{"type": "text", "text": "UNTRUSTED LISTING DATA:\n" + json.dumps(ctx)}]
+    for media, data in blobs:
+        content.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media,
+                    "data": base64.b64encode(data).decode(),
+                },
+            }
+        )
+    ask = (
+        "This listing passed a first screen. Look at every photo (backs, hallmarks, scale) and "
+        "the description; tighten the resale range, read any hallmark exactly, and write the "
+        "comp_query. Return the schema."
+        if deep
+        else "Screen this listing. Return the schema."
+    )
+    content.append({"type": "text", "text": ask})
     try:
         response = await anthropic.messages.parse(
             model=model,
@@ -385,6 +417,117 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
     return processed
 
 
+async def run_deep(sessions, cfg, limit=None):
+    """Second pass on queue items with every photo and the description, using the deep model.
+    Replaces the item's verdict (model recorded), keeps the first-pass read under 'quick_'."""
+    if not (cfg["enabled"] and cfg.get("deep_enabled", True) and cfg["api_key"]):
+        return 0
+    from anthropic import AsyncAnthropic
+
+    from radar.queue import in_queue
+    from radar.queue import settings as queue_settings
+
+    now = datetime.now(UTC)
+    qcfg = queue_settings()
+    with sessions() as s:
+        rows = s.execute(
+            select(DiscoveredItem, TriageResult)
+            .join(TriageResult, TriageResult.item_id == DiscoveredItem.id)
+            .where(DiscoveredItem.inbox_status == "NEW")
+        ).all()
+        todo = [
+            (it.id, tr.id)
+            for it, tr in rows
+            if in_queue(it, tr, now, qcfg) and not tr.data.get("deep")
+        ]
+        spent = sum(
+            (
+                Decimal(r)
+                for r in s.scalars(
+                    select(TriageResult.cost_usd)
+                    .where(TriageResult.model == cfg["deep_model"])
+                    .where(
+                        TriageResult.created_at
+                        >= now.replace(hour=0, minute=0, second=0, microsecond=0).replace(
+                            tzinfo=None
+                        )
+                    )
+                )
+            ),
+            Decimal(0),
+        )
+    if limit:
+        todo = todo[:limit]
+    if not todo:
+        return 0
+    if spent >= cfg["deep_budget"]:
+        log.warning("deep pass: daily budget reached ($%.2f); %d items wait", spent, len(todo))
+        return 0
+    log.info(
+        "deep pass: %d queue items with %s (spent today $%.3f)", len(todo), cfg["deep_model"], spent
+    )
+    anthropic = AsyncAnthropic(api_key=cfg["api_key"], max_retries=2, timeout=120)
+    sem = asyncio.Semaphore(max(1, cfg["concurrency"] // 2))
+    done = 0
+    stop = False
+    async with httpx.AsyncClient(
+        follow_redirects=True, headers={"User-Agent": "TurquoiseRadar/0.1"}
+    ) as http:
+
+        async def worker(item_id, triage_id):
+            nonlocal done, spent, stop
+            if stop:
+                return
+            with sessions() as s:
+                item = s.get(DiscoveredItem, item_id)
+            async with sem:
+                if stop:
+                    return
+                result = await screen_one(
+                    anthropic,
+                    http,
+                    cfg["deep_model"],
+                    item,
+                    max_images=cfg["deep_images"],
+                    deep=True,
+                )
+            if result["status"] != "OK":
+                log.debug("deep %d: %s", item_id, result["data"].get("error"))
+                return
+            cost = cost_usd(cfg["deep_model"], result["usage"])
+            with sessions.begin() as s:
+                t = s.get(TriageResult, triage_id)
+                if t is None:
+                    return
+                new = dict(result["data"])
+                new["deep"] = True
+                new["quick_score"] = t.data.get("model_score", t.data.get("score"))
+                new["quick_value_read"] = t.data.get("model_value_read", t.data.get("value_read"))
+                new["quick_resale_estimate_usd"] = t.data.get("resale_estimate_usd")
+                t.data = new
+                t.model = cfg["deep_model"]
+                t.score = new.get("score")
+                t.relevant = new.get("relevant")
+                t.category = new.get("category")
+                t.input_tokens += result["usage"].get("input_tokens", 0)
+                t.output_tokens += result["usage"].get("output_tokens", 0)
+                t.cost_usd = str(Decimal(t.cost_usd or "0") + cost)
+                t.created_at = datetime.now(UTC)
+            done += 1
+            spent += cost
+            if spent >= cfg["deep_budget"]:
+                stop = True
+                log.warning("deep pass: daily budget reached after %d items", done)
+
+        await asyncio.gather(*(worker(i, t) for i, t in todo))
+    try:
+        await anthropic.close()
+    except Exception:
+        pass
+    log.info("deep pass: refined %d items, spent today $%.3f", done, spent)
+    return done
+
+
 def reconcile(sessions):
     """Re-derive value_read/score for every stored OK verdict from its resale range and the
     item's current landed cost. No model calls."""
@@ -460,7 +603,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["run", "status", "reconcile"])
+    parser.add_argument("command", choices=["run", "deep", "status", "reconcile"])
     parser.add_argument("--limit", type=int)
     parser.add_argument(
         "--rescreen",
@@ -480,6 +623,8 @@ def main(argv=None):
     try:
         if args.command == "status":
             status(sessions)
+        elif args.command == "deep":
+            asyncio.run(run_deep(sessions, settings(), limit=args.limit))
         elif args.command == "reconcile":
             changed, total = reconcile(sessions)
             print(f"reconciled {total} verdicts; {changed} changed")

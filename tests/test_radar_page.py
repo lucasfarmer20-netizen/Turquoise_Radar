@@ -326,3 +326,36 @@ def test_card_shows_walk_away_and_links(client):
     assert "Walk away above" in html and "$156.77" in html  # 250 -> 35% tier, minus $8 ship
     assert "LH_Sold=1" in html and "lens.google.com/uploadbyurl" in html
     assert 'data-key="i"' in html and "Pass…" in html
+
+
+def test_comp_links_use_model_query_and_outcome_is_recorded(client):
+    from radar.db import DiscoveredItem, TriageResult
+
+    _add(client, 91, buying_options=["FIXED_PRICE"])
+    _triage(client, 1, True, 90)
+    with client.app.state.sessions.begin() as s:
+        t = s.get(TriageResult, 1)
+        t.data = {
+            **t.data,
+            "value_read": "UNDERPRICED",
+            "comp_query": "navajo cluster cuff",
+            "hallmark_read": "RW STERLING",
+            "deep": True,
+        }
+    html = client.get("/radar").text
+    assert "_nkw=navajo+cluster+cuff&amp;LH_Sold=1" in html
+    assert "liveauctioneers.com/auction-results/?keyword=navajo+cluster+cuff" in html
+    assert "worthpoint.com" in html and "invaluable.com" in html
+    assert "hallmark read: <strong>RW STERLING</strong>" in html and "deep-reviewed" in html
+    assert "Bought for" not in html  # only on Interested
+    client.post("/radar/1/decision", data={"decision": "interested"})
+    html = client.get("/radar?show=all&status=interested").text
+    assert "Bought for" in html
+    r = client.post(
+        "/radar/1/outcome", data={"bought_for": "$1,250.00", "sold_for": ""}, follow_redirects=False
+    )
+    assert r.status_code == 303 and r.headers["location"].endswith("#item-1")
+    with client.app.state.sessions() as s:
+        n = s.get(DiscoveredItem, 1).normalized
+        assert n["bought_for"] == "1250.00" and "sold_for" not in n and n["bought_for_at"]
+    assert client.post("/radar/1/outcome", data={"bought_for": "abc"}).status_code == 400
