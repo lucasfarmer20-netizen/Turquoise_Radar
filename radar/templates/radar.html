@@ -1,43 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Radar finds<style>
-  .listing-card:focus-within, .listing-card.active { outline: 2px solid var(--teal); outline-offset: 2px; }
-  .links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; align-items: baseline; }
-  details.adjust summary { cursor: pointer; margin-top: 6px; }
-  .outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 8px; }
-  .outcome input { width: 6em; padding: 4px 6px; background: #0b141b; color: inherit; border: 1px solid #2a3942; border-radius: 4px; }
-  .walk dd strong { color: var(--teal); }
-  .walk.over dd strong { color: #e0a24a; }
-  details.pass summary { list-style: none; cursor: pointer; display: inline-block; }
-  details.pass summary::-webkit-details-marker { display: none; }
-  details.pass .reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-  details.pass .reasons button { font-size: 0.8rem; padding: 4px 8px; }
-  kbd { font: inherit; font-size: 0.8em; padding: 0 4px; border: 1px solid #44525c; border-radius: 3px; }
-  @media (max-width: 700px) {
-    .actions { position: sticky; bottom: 0; background: var(--card, #0f1a22); padding: 8px 0 4px; border-top: 1px solid #1f2b34; z-index: 2; }
-    .actions button, .actions summary, .actions .button { min-height: 44px; }
-  }
-</style>
-<script>
-(() => {
-  const cards = Array.from(document.querySelectorAll('.listing-card'));
-  if (!cards.length) return;
-  let idx = Math.max(0, cards.findIndex(c => c.id === location.hash.slice(1)));
-  const mark = () => { cards.forEach(c => c.classList.remove('active')); const c = cards[idx]; if (c) { c.classList.add('active'); c.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
-  const act = (key) => { const c = cards[idx]; if (!c) return; const el = c.querySelector(`[data-key="${key}"]`); if (!el) return; if (el.tagName === 'SUMMARY') { el.parentElement.open = true; el.parentElement.querySelector('button')?.focus(); } else if (el.tagName === 'A') { window.open(el.href, '_blank'); } else { el.click(); } };
-  document.addEventListener('keydown', (e) => {
-    if (e.target.matches('input, select, textarea')) return;
-    const k = e.key.toLowerCase();
-    if (k === 'j') { idx = Math.min(cards.length - 1, idx + 1); mark(); }
-    else if (k === 'k') { idx = Math.max(0, idx - 1); mark(); }
-    else if (['i', 'p', 'u', 'o', '1', '2', '3', '4', '5', '6'].includes(k)) { e.preventDefault(); act(k); }
-    else if (k === 'escape') { cards[idx]?.querySelector('details.pass')?.removeAttribute('open'); }
-    else return;
-  });
-  cards.forEach((c, i) => c.addEventListener('click', () => { idx = i; cards.forEach(x => x.classList.remove('active')); c.classList.add('active'); }));
-  if (location.hash) mark();
-})();
-</script>
-{% endblock %}
+{% block title %}Radar finds{% endblock %}
 {% block content %}
 <div class="page-heading">
   <div>
@@ -123,12 +85,12 @@
 
 <div class="section-heading">
   <h2>{{ total_matching }} item{{ "" if total_matching == 1 else "s" }}</h2>
-  <span class="muted small">keys: <kbd>J</kbd>/<kbd>K</kbd> next/prev · <kbd>I</kbd> interested · <kbd>P</kbd> pass then <kbd>1</kbd>–<kbd>5</kbd> · <kbd>O</kbd> open{% if pass_stats %} · passes this week: {% for r, n in pass_stats %}{{ r }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</span>
+  <span class="muted small">keys: <kbd>J</kbd>/<kbd>K</kbd> next/prev · <kbd>I</kbd> interested · <kbd>P</kbd> pass then <kbd>1</kbd>–<kbd>6</kbd> · <kbd>O</kbd> open{% if pass_stats %} · passes this week: {% for r, n in pass_stats %}{{ r }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</span>
   {% if pages > 1 %}<span class="muted">page {{ page }} of {{ pages }}</span>{% endif %}
 </div>
 
 {% if not cards %}
-<div class="panel empty muted">{% if show == "queue" and total > 0 %}Queue is clear. Lower the min score in .env (RADAR_QUEUE_MIN_SCORE) if it stays empty for a day.{% else %}Nothing here yet. {% endif %}{% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
+<div class="panel empty muted">{% if show == "queue" and total > 0 %}Queue is clear. Lower the min score in .env (RADAR_QUEUE_MIN_SCORE) if it stays empty for a day. {% else %}Nothing here yet. {% endif %}{% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
 {% endif %}
 
 <div class="listing-grid">

@@ -425,3 +425,11 @@ def test_buy_now_badge_and_ordering(client):
         "navaho cuff 102"
     )  # BIN first despite lower score
     assert html.count("BUY NOW") == 1
+
+
+def test_interested_list_is_not_hidden_by_queue_default(client):
+    _add(client, 95)
+    client.post("/radar/1/decision", data={"decision": "interested"})
+    r = client.get("/radar?status=interested")
+    assert 'id="item-1"' in r.text
+    assert "<title>Radar finds</title>" in r.text

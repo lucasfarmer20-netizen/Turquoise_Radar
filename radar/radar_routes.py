@@ -211,6 +211,8 @@ def radar_routes(app, render):
         kind = kind if kind in ("all", "auction", "bin") else "all"
         sort = sort if sort in ("score", "newest", "ending", "price", "price_desc") else "score"
         show = show if show in ("queue", "relevant", "all", "irrelevant", "untriaged") else "queue"
+        if show == "queue" and status != "new":
+            show = "all"  # the queue only holds NEW items
         qcfg = queue_settings()
         page = max(1, page)
         per_page = 48
