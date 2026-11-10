@@ -195,13 +195,9 @@ def listing_context(n):
     }
 
 
-# Value-read thresholds, derived from the owner's economics: resale 25-50% over landed,
-# platform fees ~11.5% below $1,500. UNDERPRICED needs headroom even at the low end of
-# the model's resale range; FAIR needs it at the midpoint; otherwise OVERPRICED.
-UNDERPRICED_RATIO = Decimal(
-    os.environ.get("RADAR_UNDERPRICED_RATIO", "1.35")
-)  # resale_low / landed
-FAIR_RATIO = Decimal(os.environ.get("RADAR_FAIR_RATIO", "1.15"))  # resale_mid / landed
+# Value read is derived from the same economics as the walk-away price (radar.economics):
+# UNDERPRICED when landed cost <= walk-away landed at the resale LOW end; FAIR when <= the
+# walk-away landed at the resale MIDPOINT; otherwise OVERPRICED. Score caps keep the queue honest.
 SCORE_CAPS = {"OVERPRICED": 45, "FAIR": 70}
 
 
@@ -231,9 +227,12 @@ def live_verdict(data, n):
 
 
 def reconcile_verdict(data, n):
-    """Derive value_read and cap score from the model's own resale range and the landed
-    cost, so the one-word judgment can never contradict the numbers. Returns the adjusted
-    verdict dict; the model's original read and score are kept under 'model_'."""
+    """Derive value_read and cap score from the resale range (owner's override first) and the
+    item's current landed cost, using the walk-away economics, so the one-word judgment can
+    never contradict the number on the card. The model's original read and score are kept
+    under 'model_'."""
+    from radar.economics import walk_away
+
     out = dict(data)
     resale = n.get("owner_resale_usd") or out.get("resale_estimate_usd")
     out["resale_source"] = "owner" if n.get("owner_resale_usd") else "model"
@@ -242,9 +241,15 @@ def reconcile_verdict(data, n):
         return out
     low, high = (Decimal(str(resale[0])), Decimal(str(resale[1])))
     mid = (low + high) / 2
-    if low / landed >= UNDERPRICED_RATIO:
+    ship = n.get("shipping_cost")
+    premium = n.get("buyer_premium_rate") or 0
+    wa_low = walk_away(low, ship, premium)
+    wa_mid = walk_away(mid, ship, premium)
+    if wa_low is None or wa_mid is None:
+        return out
+    if landed <= wa_low["landed"]:
         read = "UNDERPRICED"
-    elif mid / landed >= FAIR_RATIO:
+    elif landed <= wa_mid["landed"]:
         read = "FAIR"
     else:
         read = "OVERPRICED"
@@ -252,6 +257,7 @@ def reconcile_verdict(data, n):
     out.setdefault("model_score", out.get("score"))
     out["value_read"] = read
     out["landed_usd"] = str(landed)
+    out["walk_away_landed_usd"] = str(wa_low["landed"])
     cap = SCORE_CAPS.get(read)
     if cap is not None and (out.get("score") or 0) > cap:
         out["score"] = cap

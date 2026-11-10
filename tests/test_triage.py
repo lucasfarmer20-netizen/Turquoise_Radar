@@ -168,6 +168,12 @@ def test_reconcile_verdict_derives_read_from_numbers():
         {"value_read": "UNDERPRICED", "score": 90, "resale_estimate_usd": [100, 150]},
         {"item_price": "39", "buy_it_now_price": "89", "shipping_cost": "0"},
     )
+    assert out["value_read"] == "OVERPRICED" and out["score"] == 45  # $89 BIN vs $66-82 walk-away
+    # the $55 + $8.95 ring with a $90-150 range: walk-away landed $53.26 < $63.95 -> not underpriced
+    out = triage.reconcile_verdict(
+        {"value_read": "UNDERPRICED", "score": 85, "resale_estimate_usd": [90, 150]},
+        {"item_price": "55", "shipping_cost": "8.95"},
+    )
     assert out["value_read"] == "FAIR" and out["score"] == 70
     # no range -> untouched
     assert triage.reconcile_verdict({"value_read": "FAIR", "score": 50}, n)["score"] == 50
