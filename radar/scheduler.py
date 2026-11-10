@@ -251,6 +251,12 @@ async def cycle(sessions, connection, mode, daily_limit):
             await run_triage(sessions, triage_settings())
         except Exception:
             log.exception("triage failed; discovery results are kept")
+    try:
+        from radar.notify import notify_pending
+
+        await notify_pending(sessions)
+    except Exception:
+        log.exception("notification failed; will retry next cycle")
     return run
 
 
