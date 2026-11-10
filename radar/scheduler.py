@@ -132,9 +132,15 @@ def seed(sessions, path, page_size, pages):
     sorts = spec.get("sorts", {"FIXED_PRICE": "newlyListed", "AUCTION": "endingSoonest"})
     created = 0
     with sessions.begin() as s:
+        from radar.discovery.service import DEFAULT_GROUPS
+
         for row in s.scalars(select(DiscoveryGroup)):
             if row.id.startswith(SEED_PREFIX):
                 s.delete(row)
+            elif row.id in DEFAULT_GROUPS and row.data.get("enabled", True):
+                # Built-in groups would otherwise outrank the owner's seed list and
+                # crowd it out of the per-cycle budget. Disable, don't delete.
+                row.data = {**row.data, "enabled": False}
         s.flush()
         for group in spec["groups"]:
             slug = "".join(c if c.isalnum() else "-" for c in group["name"].lower()).strip("-")
@@ -153,6 +159,13 @@ def seed(sessions, path, page_size, pages):
                 )
                 created += 1
         total_queries = sum(len(g["queries"]) for g in spec["groups"]) * len(modes)
+        s.flush()
+        enabled_total = sum(
+            len(g.data.get("queries") or [])
+            for g in s.scalars(select(DiscoveryGroup))
+            if g.data.get("enabled", True)
+        )
+        total_queries = max(total_queries, enabled_total)
         limits = Budgets(
             enabled=True,
             max_queries=min(200, total_queries),

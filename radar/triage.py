@@ -375,6 +375,12 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
                 log.warning("triage: daily budget reached after %d items", processed)
 
         await asyncio.gather(*(worker(i) for i in items))
+    # Close the SDK's own httpx client inside the loop; otherwise its finalizer runs after
+    # asyncio.run() has torn the loop down and logs "Event loop is closed".
+    try:
+        await anthropic.close()
+    except Exception:
+        pass
     log.info("triage: screened %d items, spent today $%.3f", processed, spent)
     return processed
 

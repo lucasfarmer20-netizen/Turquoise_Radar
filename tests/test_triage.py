@@ -4,6 +4,8 @@ import asyncio
 from decimal import Decimal
 from types import SimpleNamespace
 
+from sqlalchemy import select
+
 from radar import triage
 from radar.db import DiscoveredItem, TriageResult, database
 
@@ -199,4 +201,31 @@ def test_reconcile_command_updates_stored_rows(tmp_path):
         assert t.score == 45 and t.data["value_read"] == "OVERPRICED"
     # idempotent
     assert triage.reconcile(sessions) == (0, 1)
+    engine.dispose()
+
+
+def test_seed_disables_builtin_groups_and_sizes_budget(tmp_path):
+    from radar.db import DiscoveryGroup, Setting
+    from radar.discovery.service import DEFAULT_GROUPS, seed_discovery
+    from radar.scheduler import seed
+
+    engine, sessions = database(f"sqlite:///{tmp_path / 's.db'}")
+    with sessions.begin() as s:
+        seed_discovery(s)  # what the web app does on startup
+    created, total, limits = seed(sessions, "fixtures/seed_queries.json", 50, 1)
+    with sessions() as s:
+        builtin = [s.get(DiscoveryGroup, gid) for gid in DEFAULT_GROUPS]
+        assert all(g is not None and g.data["enabled"] is False for g in builtin)
+        seeded = [g for g in s.scalars(select(DiscoveryGroup)) if g.id.startswith("seed-")]
+        assert len(seeded) == created and all(g.data["enabled"] for g in seeded)
+        budget = s.get(Setting, 3).data
+        assert budget["max_queries"] >= sum(len(g.data["queries"]) for g in seeded)
+    # idempotent: re-seeding keeps built-ins disabled and doesn't duplicate seed groups
+    created2, _, _ = seed(sessions, "fixtures/seed_queries.json", 50, 1)
+    with sessions() as s:
+        assert created2 == created
+        assert (
+            len([g for g in s.scalars(select(DiscoveryGroup)) if g.id.startswith("seed-")])
+            == created
+        )
     engine.dispose()
