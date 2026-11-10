@@ -90,6 +90,13 @@ whenever you can; null only when the photo shows too little. Be honest about the
 buyer's downside is the low end. VALUE_READ is your one-word judgment of asking price vs that
 range; the system re-derives it from your numbers, so the range matters more than the word.
 
+CONDITION decides whether a deal is a deal. Read the description and the photo for cracked,
+chipped, missing, loose or replaced stones, broken or repaired findings, solder repairs, dents,
+heavy plating wear, and "as-is" / "for repair" language. Any of these goes in CONCERNS using the
+seller's own word (e.g. "stone cracked in half"), the resale range drops to what a damaged piece
+brings, and the score stays at or below 55 unless the price already reflects the damage. A
+listing that says "crack" or "chip" anywhere is never 85+.
+
 A maker's name in the title, tag or hallmark matters: signed work by a known Native, Southwest
 or Mexican silversmith sells for a premium over unsigned work of the same quality, and
 established names (Zuni needlepoint and inlay families, well-known Navajo and Hopi
@@ -177,6 +184,65 @@ async def fetch_image(client, url):
     if media not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
         media = "image/jpeg"
     return media, r.content
+
+
+CONDITION_WORDS = (
+    "crack",
+    "chip",
+    "broken",
+    "break",
+    "missing stone",
+    "stone missing",
+    "missing a stone",
+    "loose stone",
+    "replaced stone",
+    "repair",
+    "re-glued",
+    "reglued",
+    "glued",
+    "solder",
+    "dent",
+    "bent",
+    "as-is",
+    "as is",
+    "for parts",
+    "damage",
+)
+
+
+def condition_flags(n):
+    """Condition words the seller used in the title, condition note or description (lowercased,
+    deduplicated, in order of appearance). Cheap, no model; drives the CONDITION badge."""
+    import re
+
+    text = " ".join(
+        str(n.get(k) or "") for k in ("raw_title", "condition_description", "raw_description")
+    ).casefold()
+    found = []
+    for w in CONDITION_WORDS:
+        if w in text and w not in found:
+            if w == "glued" and ("re-glued" in found or "reglued" in found):
+                continue
+            if w == "as is" and "as-is" in found:
+                continue
+            if w == "break" and "broken" in found:
+                continue
+            found.append(w)
+    # "repair" also matches "no repairs"; keep it only when not negated nearby
+    if "repair" in found and re.search(r"\bno (?:visible |known )?repairs?\b", text):
+        found.remove("repair")
+    return found[:6]
+
+
+def strip_html(html):
+    import html as _html
+    import re
+
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html or "", flags=re.S | re.I)
+    text = re.sub(r"<br\s*/?>|</p>|</div>|</li>|</tr>", "\n", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = _html.unescape(text)
+    return re.sub(r"[ \t\r\f\v]+", " ", re.sub(r"\n\s*\n+", "\n", text)).strip()
 
 
 def listing_context(n):
@@ -281,8 +347,12 @@ async def screen_one(anthropic, http, model, item, max_images=1, deep=False):
                 return dict(status="ERROR", data={"error": f"image fetch: {e}"}, usage={})
             break
     ctx = listing_context(n)
+    desc = n.get("raw_description") or ""
+    ctx["description"] = desc[:4000] if deep else desc[:700]
+    flags = condition_flags(n)
+    if flags:
+        ctx["condition_words_in_listing"] = flags
     if deep:
-        ctx["description"] = (n.get("raw_description") or "")[:2500]
         ctx["photo_count"] = len(images)
     content = [{"type": "text", "text": "UNTRUSTED LISTING DATA:\n" + json.dumps(ctx)}]
     for media, data in blobs:
@@ -332,6 +402,8 @@ async def screen_one(anthropic, http, model, item, max_images=1, deep=False):
     ):
         v.resale_estimate_usd = None
     data = reconcile_verdict(v.model_dump(), n)
+    if flags:
+        data["condition_flags"] = flags
     return dict(status="OK", data=data, usage=response.usage.model_dump())
 
 
@@ -438,6 +510,52 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
     return processed
 
 
+def ebay_adapter():
+    """Production Browse adapter for the deep pass's description fetch, or None when eBay is not
+    in production mode or credentials are unusable (the pass then runs on what search returned)."""
+    if os.environ.get("EBAY_MODE", "fixture") != "production":
+        return None
+    try:
+        from radar.discovery.ebay import Connection, EbayAdapter
+
+        return EbayAdapter(Connection.from_env(), production_run_approved=True)
+    except Exception as e:  # noqa: BLE001 - any config problem just disables hydration
+        log.warning("deep pass: description fetch unavailable: %s", e)
+        return None
+
+
+async def hydrate_description(sessions, item_id, adapter):
+    """Fetch the full seller description for an eBay item once (Browse getItem) and store it
+    as raw_description, so the deep pass and the condition flags see what the buyer would."""
+    if adapter is None:
+        return False
+    with sessions() as s:
+        item = s.get(DiscoveredItem, item_id)
+        if item is None or item.source != "eBay" or not item.ebay_item_id:
+            return False
+        n = item.normalized or {}
+        if n.get("description_fetched_at"):
+            return False
+        ebay_id = item.ebay_item_id
+    try:
+        raw = await adapter.get_item(ebay_id)
+    except Exception as e:  # noqa: BLE001
+        log.debug("deep %d: description fetch failed: %s", item_id, e)
+        return False
+    text = strip_html(raw.get("description") or "")[:4000]
+    cond = (raw.get("conditionDescription") or "").strip()[:500]
+    with sessions.begin() as s:
+        item = s.get(DiscoveredItem, item_id)
+        n = dict(item.normalized or {})
+        if text and len(text) > len(n.get("raw_description") or ""):
+            n["raw_description"] = text
+        if cond:
+            n["condition_description"] = cond
+        n["description_fetched_at"] = datetime.now(UTC).isoformat()
+        item.normalized = n
+    return True
+
+
 async def run_deep(sessions, cfg, limit=None):
     """Second pass on queue items with every photo and the description, using the deep model.
     Replaces the item's verdict (model recorded), keeps the first-pass read under 'quick_'."""
@@ -491,6 +609,7 @@ async def run_deep(sessions, cfg, limit=None):
     sem = asyncio.Semaphore(max(1, cfg["concurrency"] // 2))
     done = 0
     stop = False
+    ebay = ebay_adapter()
     async with httpx.AsyncClient(
         follow_redirects=True, headers={"User-Agent": "TurquoiseRadar/0.1"}
     ) as http:
@@ -499,6 +618,7 @@ async def run_deep(sessions, cfg, limit=None):
             nonlocal done, spent, stop
             if stop:
                 return
+            await hydrate_description(sessions, item_id, ebay)
             with sessions() as s:
                 item = s.get(DiscoveredItem, item_id)
             async with sem:
@@ -545,6 +665,11 @@ async def run_deep(sessions, cfg, limit=None):
         await anthropic.close()
     except Exception:
         pass
+    if ebay is not None:
+        try:
+            await ebay.close()
+        except Exception:
+            pass
     log.info("deep pass: refined %d items, spent today $%.3f", done, spent)
     return done
 

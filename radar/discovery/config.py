@@ -107,7 +107,14 @@ class SearchOptions(BaseModel):
             low = "" if self.min_price is None else str(self.min_price)
             high = "" if self.max_price is None else str(self.max_price)
             filters += [f"price:[{low}..{high}]", "priceCurrency:USD"]
-        params = dict(q=query, limit=limit, offset=offset, sort=self.sort, filter=",".join(filters))
+        params = dict(
+            q=query,
+            limit=limit,
+            offset=offset,
+            sort=self.sort,
+            filter=",".join(filters),
+            fieldgroups="EXTENDED",  # adds shortDescription, so the screen can read condition
+        )
         if self.auto_correct == "KEYWORD":
             params["auto_correct"] = "KEYWORD"
         return params

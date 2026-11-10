@@ -20,7 +20,7 @@ from radar.economics import walk_away
 from radar.queue import in_queue
 from radar.queue import settings as queue_settings
 from radar.scheduler import read_state, request_scan, trigger_path
-from radar.triage import live_verdict, thumb_url
+from radar.triage import condition_flags, live_verdict, thumb_url
 
 ALASKA = ZoneInfo("America/Anchorage")
 DECISIONS = {"interested": "INTERESTED", "pass": "IRRELEVANT", "reset": "NEW"}
@@ -29,6 +29,7 @@ PASS_REASONS = {
     "price": "Overpriced",
     "authenticity": "Doubt it's real",
     "category": "Not Native / Southwest",
+    "condition": "Damaged / condition",
     "other": "Other",
 }
 STATUS_FILTERS = {
@@ -168,6 +169,8 @@ def card(row, now, triage=None):
         value_read=(td.get("value_read") or "").title() or None,
         archive_reason=n.get("archive_reason"),
         pass_reason=PASS_REASONS.get(n.get("pass_reason") or "", n.get("pass_reason")),
+        pass_note=n.get("pass_note"),
+        condition_flags=condition_flags(n) or td.get("condition_flags") or [],
         walk=walk_away(
             ((n.get("owner_resale_usd") or td.get("resale_estimate_usd") or [None])[0]),
             ship,
@@ -425,6 +428,7 @@ def radar_routes(app, render):
         decision: str = Form(...),
         back: str = Form("/radar"),
         reason: str = Form(""),
+        note: str = Form(""),
         next_id: int = Form(0),
     ):
         if decision not in DECISIONS:
@@ -438,8 +442,14 @@ def radar_routes(app, render):
             if decision == "pass":
                 n["pass_reason"] = reason if reason in PASS_REASONS else "other"
                 n["passed_at"] = datetime.now(UTC).isoformat()
+                note = " ".join(note.split())[:300]
+                if note:
+                    n["pass_note"] = note
+                else:
+                    n.pop("pass_note", None)
             elif decision == "reset":
                 n.pop("pass_reason", None)
+                n.pop("pass_note", None)
                 n.pop("archive_reason", None)
             elif decision == "interested":
                 n["interested_at"] = datetime.now(UTC).isoformat()

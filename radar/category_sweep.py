@@ -41,6 +41,7 @@ def params(style, buying, sort, limit):
         filter=f"buyingOptions:{{{buying}}},itemLocationCountry:US",
         sort=sort,
         limit=limit,
+        fieldgroups="EXTENDED",
     )
 
 

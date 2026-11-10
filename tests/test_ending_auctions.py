@@ -28,6 +28,7 @@ def test_ending_soon_requires_explicit_auction():
         "offset": 0,
         "sort": "endingSoonest",
         "filter": "buyingOptions:{AUCTION},itemLocationCountry:US",
+        "fieldgroups": "EXTENDED",
     }
 
 
@@ -96,9 +97,12 @@ def test_fixture_sorts_known_end_times_and_honors_page_cap(tmp_path):
 def test_buyer_analysis_keeps_existing_evidence_rules(item, prefs):
     # Source identity does not create a blanket ban or manufacture financial evidence.
     original = analyze(item, prefs)
-    buyer = analyze(item.model_copy(update={
-        "source": "eBay", "synthetic": False, "discovery_mode": "production"
-    }), prefs)
+    buyer = analyze(
+        item.model_copy(
+            update={"source": "eBay", "synthetic": False, "discovery_mode": "production"}
+        ),
+        prefs,
+    )
     assert buyer.model_dump() == original.model_dump()
 
 

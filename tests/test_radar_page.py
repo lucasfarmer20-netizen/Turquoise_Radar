@@ -307,11 +307,28 @@ def test_pass_records_reason_and_redirects_to_next(client):
         assert n["pass_reason"] == "price" and n["passed_at"]
     html = client.get("/radar?show=all&status=passed").text
     assert "passed: Overpriced" in html
-    # unknown reason -> other; reset clears it
+    # a note rides along with any reason and shows on the card
+    client.post(
+        "/radar/2/decision",
+        data={"decision": "pass", "reason": "condition", "note": "  stone cracked\n in half "},
+    )
+    with client.app.state.sessions() as s:
+        n = s.get(DiscoveredItem, 2).normalized
+        assert n["pass_reason"] == "condition" and n["pass_note"] == "stone cracked in half"
+    html = client.get("/radar?show=all&status=passed").text
+    assert "Damaged / condition" in html and "stone cracked in half" in html
+    # unknown reason -> other; reset clears reason and note
     client.post("/radar/2/decision", data={"decision": "pass", "reason": "zzz"})
     client.post("/radar/2/decision", data={"decision": "reset"})
     with client.app.state.sessions() as s:
-        assert "pass_reason" not in s.get(DiscoveredItem, 2).normalized
+        n = s.get(DiscoveredItem, 2).normalized
+        assert "pass_reason" not in n and "pass_note" not in n
+
+
+def test_condition_badge_from_seller_description(client):
+    _add(client, 91, raw_description="Nice old cuff, one stone has a chip. Sold as is.")
+    html = client.get("/radar?show=all").text
+    assert "CONDITION · CHIP" in html
 
 
 def test_card_shows_walk_away_and_links(client):

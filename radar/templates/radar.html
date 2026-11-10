@@ -29,7 +29,7 @@
     const k = e.key.toLowerCase();
     if (k === 'j') { idx = Math.min(cards.length - 1, idx + 1); mark(); }
     else if (k === 'k') { idx = Math.max(0, idx - 1); mark(); }
-    else if (['i', 'p', 'u', 'o', '1', '2', '3', '4', '5'].includes(k)) { e.preventDefault(); act(k); }
+    else if (['i', 'p', 'u', 'o', '1', '2', '3', '4', '5', '6'].includes(k)) { e.preventDefault(); act(k); }
     else if (k === 'escape') { cards[idx]?.querySelector('details.pass')?.removeAttribute('open'); }
     else return;
   });
@@ -138,6 +138,7 @@
       <span class="source">{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
         {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}
+        {% if c.condition_flags %}<span class="badge warn" title="seller's listing mentions: {{ c.condition_flags|join(', ') }}">CONDITION · {{ c.condition_flags[0]|upper }}</span>{% endif %}
         {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
         {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
         {% if c.status == "IRRELEVANT" %}<span class="badge">PASSED</span>{% endif %}
@@ -182,7 +183,7 @@
       {% if c.hallmark_read %}<span>hallmark read: <strong>{{ c.hallmark_read }}</strong></span>{% endif %}
       {% if c.deep %}<span class="muted" title="all photos + description reviewed">deep-reviewed</span>{% endif %}
       {% if c.watched_at %}<span class="muted" title="{{ c.watched_at }}">watching · bid refreshed hourly</span>{% endif %}
-      {% if c.pass_reason %}<span class="muted">passed: {{ c.pass_reason }}</span>{% endif %}
+      {% if c.pass_reason %}<span class="muted">passed: {{ c.pass_reason }}{% if c.pass_note %} — “{{ c.pass_note }}”{% endif %}</span>{% endif %}
     </div>
     <div class="feed-actions actions" data-item="{{ c.id }}">
       {% if c.status != "INTERESTED" %}
@@ -202,6 +203,7 @@
           {% for key, label in pass_reasons.items() %}
           <button name="reason" value="{{ key }}" class="secondary" data-key="{{ loop.index }}">{{ loop.index }} · {{ label }}</button>
           {% endfor %}
+          <input type="text" name="note" maxlength="300" placeholder="note (optional) — e.g. stone cracked in half" aria-label="pass note" style="flex:1 1 100%;min-width:0">
         </form>
       </details>
       {% endif %}
@@ -266,7 +268,7 @@
     const k = e.key.toLowerCase();
     if (k === 'j') { idx = Math.min(cards.length - 1, idx + 1); mark(); }
     else if (k === 'k') { idx = Math.max(0, idx - 1); mark(); }
-    else if (['i', 'p', 'u', 'o', '1', '2', '3', '4', '5'].includes(k)) { e.preventDefault(); act(k); }
+    else if (['i', 'p', 'u', 'o', '1', '2', '3', '4', '5', '6'].includes(k)) { e.preventDefault(); act(k); }
     else if (k === 'escape') { cards[idx]?.querySelector('details.pass')?.removeAttribute('open'); }
     else return;
   });

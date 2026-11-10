@@ -235,3 +235,44 @@ def test_seed_disables_builtin_groups_and_sizes_budget(tmp_path):
             == created
         )
     engine.dispose()
+
+
+def test_condition_flags_read_title_and_description():
+    n = {
+        "raw_title": "Zuni inlay ring",
+        "raw_description": "Beautiful piece. One stone is cracked in half, sold as-is. No repairs.",
+    }
+    assert triage.condition_flags(n) == ["crack", "as-is"]
+    clean = {"raw_title": "Navajo cuff", "raw_description": "excellent"}
+    assert triage.condition_flags(clean) == []
+    assert triage.condition_flags({"condition_description": "Small chip to coral"}) == ["chip"]
+
+
+def test_strip_html_keeps_text_only():
+    html = "<div><p>Lovely <b>cuff</b>.</p><br>Stone has a <i>chip</i>.<script>x()</script></div>"
+    assert triage.strip_html(html) == "Lovely cuff .\nStone has a chip ."
+
+
+def test_hydrate_description_stores_full_text_once(tmp_path):
+    engine, sessions = _db(tmp_path)
+
+    class FakeAdapter:
+        calls = 0
+
+        async def get_item(self, item_id):
+            FakeAdapter.calls += 1
+            return {
+                "description": "<p>Old pawn cuff.</p><p>One turquoise is cracked.</p>",
+                "conditionDescription": "Crack to center stone",
+            }
+
+    assert asyncio.run(triage.hydrate_description(sessions, 1, FakeAdapter())) is True
+    with sessions() as s:
+        n = s.get(DiscoveredItem, 1).normalized
+    assert "cracked" in n["raw_description"] and n["condition_description"].startswith("Crack")
+    assert triage.condition_flags(n) == ["crack"]
+    # second call is a no-op
+    assert asyncio.run(triage.hydrate_description(sessions, 1, FakeAdapter())) is False
+    assert FakeAdapter.calls == 1
+    assert asyncio.run(triage.hydrate_description(sessions, 1, None)) is False
+    engine.dispose()

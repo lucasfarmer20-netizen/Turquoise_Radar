@@ -124,7 +124,12 @@ def _find_line(t, i, cfg, slack):
     resale_s = f"resale ~${resale[0]}–{resale[1]}" if resale else "resale ?"
     card = f"{cfg['base_url']}/radar?show=all&status=all#item-{i.id}"
     ebay = n.get("listing_url") or ""
+    from radar.triage import condition_flags
+
     tag = "BUY NOW · " if _buy_now(i) else ""
+    flags = condition_flags(n) or d.get("condition_flags") or []
+    if flags:
+        tag += f"CONDITION ({flags[0]}) · "
     if slack:
         head = f"*{t.score}* · {tag}<{ebay}|{title}>"
         tail = f"<{card}|card>"
