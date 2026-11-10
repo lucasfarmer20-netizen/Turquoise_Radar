@@ -347,10 +347,10 @@ def test_comp_links_use_model_query_and_outcome_is_recorded(client):
     assert "liveauctioneers.com/auction-results/?keyword=navajo+cluster+cuff" in html
     assert "worthpoint.com" in html and "invaluable.com" in html
     assert "hallmark read: <strong>RW STERLING</strong>" in html and "deep-reviewed" in html
-    assert "Bought for" not in html  # only on Interested
+    assert 'name="bought_for"' not in html  # only on Interested
     client.post("/radar/1/decision", data={"decision": "interested"})
     html = client.get("/radar?show=all&status=interested").text
-    assert "Bought for" in html
+    assert 'name="bought_for"' in html
     r = client.post(
         "/radar/1/outcome", data={"bought_for": "$1,250.00", "sold_for": ""}, follow_redirects=False
     )
@@ -359,3 +359,31 @@ def test_comp_links_use_model_query_and_outcome_is_recorded(client):
         n = s.get(DiscoveredItem, 1).normalized
         assert n["bought_for"] == "1250.00" and "sold_for" not in n and n["bought_for_at"]
     assert client.post("/radar/1/outcome", data={"bought_for": "abc"}).status_code == 400
+
+
+def test_live_verdict_follows_current_price_and_owner_resale_overrides(client):
+    from radar.db import DiscoveredItem, TriageResult
+
+    _add(client, 95, item_price="290", shipping_cost="13.65", bid_count=17)
+    _triage(client, 1, True, 88)
+    with client.app.state.sessions.begin() as s:
+        t = s.get(TriageResult, 1)
+        t.data = {**t.data, "value_read": "UNDERPRICED", "resale_estimate_usd": [550, 1000]}
+    assert "navaho cuff 95" in client.get("/radar").text  # 290+13.65 vs 550 low -> underpriced
+    # the watch moves the bid to $460: same stored verdict, live read is FAIR -> out of the queue
+    with client.app.state.sessions.begin() as s:
+        it = s.get(DiscoveredItem, 1)
+        it.normalized = {**it.normalized, "item_price": "460", "bid_count": 26}
+    assert "navaho cuff 95" not in client.get("/radar").text
+    html = client.get("/radar?show=all").text
+    assert "Fair" in html and ">70<" in html  # capped score shown live
+    # owner says it's really an $900-1,500 piece -> underpriced again, walk-away from their number
+    r = client.post(
+        "/radar/1/outcome",
+        data={"resale_low": "900", "resale_high": "1500"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    html = client.get("/radar").text
+    assert "navaho cuff 95" in html and "(yours)" in html and "resale ~$900–1500" in html
+    assert client.post("/radar/1/outcome", data={"resale_low": "900"}).status_code == 400

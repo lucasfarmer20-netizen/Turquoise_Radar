@@ -2,6 +2,7 @@
 {% block title %}Radar finds<style>
   .listing-card:focus-within, .listing-card.active { outline: 2px solid var(--teal); outline-offset: 2px; }
   .links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; align-items: baseline; }
+  details.adjust summary { cursor: pointer; margin-top: 6px; }
   .outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 8px; }
   .outcome input { width: 6em; padding: 4px 6px; background: #0b141b; color: inherit; border: 1px solid #2a3942; border-radius: 4px; }
   .walk dd strong { color: var(--teal); }
@@ -159,7 +160,7 @@
     <p class="shipping" style="margin-top:6px">
       <strong>{{ c.category }}</strong>{% if c.piece_type %} · {{ c.piece_type }}{% endif %}
       {% if c.value_read %} · <span class="{% if c.value_read == 'Underpriced' %}accent{% else %}muted{% endif %}">{{ c.value_read }}</span>{% endif %}
-      {% if c.resale %} · resale ~${{ c.resale[0] }}–{{ c.resale[1] }}{% endif %}<br>
+      {% if c.resale %} · resale ~${{ c.resale[0] }}–{{ c.resale[1] }}{% if c.resale_source == "owner" %} <span class="accent">(yours)</span>{% endif %}{% endif %}<br>
       {{ c.reason }}
       {% if c.signals %}<br><span style="color:var(--teal)">+ {{ c.signals|join(" · ") }}</span>{% endif %}
       {% if c.concerns %}<br><span class="muted">− {{ c.concerns|join(" · ") }}</span>{% endif %}
@@ -211,14 +212,19 @@
       {% endif %}
       <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" data-key="o">Open on {{ c.source }}</a>
     </div>
-    {% if c.status == "INTERESTED" %}
-    <form method="post" action="/radar/{{ c.id }}/outcome" class="outcome">
-      <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
-      <label>Bought for $<input name="bought_for" inputmode="decimal" size="7" value="{{ c.bought_for or '' }}" placeholder="landed"></label>
-      <label>Sold for $<input name="sold_for" inputmode="decimal" size="7" value="{{ c.sold_for or '' }}" placeholder="gross"></label>
-      <button class="secondary" type="submit">Save</button>
-    </form>
-    {% endif %}
+    <details class="adjust">
+      <summary class="muted small">{{ "Your resale set" if c.owner_resale else "Set your resale" }}{% if c.status == "INTERESTED" %} · bought / sold{% endif %}</summary>
+      <form method="post" action="/radar/{{ c.id }}/outcome" class="outcome">
+        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+        <label>Resale $<input name="resale_low" inputmode="numeric" size="5" value="{{ c.owner_resale[0] if c.owner_resale else '' }}" placeholder="low"></label>
+        <label>–$<input name="resale_high" inputmode="numeric" size="5" value="{{ c.owner_resale[1] if c.owner_resale else '' }}" placeholder="high"></label>
+        {% if c.status == "INTERESTED" %}
+        <label>Bought $<input name="bought_for" inputmode="decimal" size="7" value="{{ c.bought_for or '' }}" placeholder="landed"></label>
+        <label>Sold $<input name="sold_for" inputmode="decimal" size="7" value="{{ c.sold_for or '' }}" placeholder="gross"></label>
+        {% endif %}
+        <button class="secondary" type="submit">Save</button>
+      </form>
+    </details>
   </article>
 {% endfor %}
 </div>
@@ -232,6 +238,7 @@
 <style>
   .listing-card:focus-within, .listing-card.active { outline: 2px solid var(--teal); outline-offset: 2px; }
   .links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; align-items: baseline; }
+  details.adjust summary { cursor: pointer; margin-top: 6px; }
   .outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 8px; }
   .outcome input { width: 6em; padding: 4px 6px; background: #0b141b; color: inherit; border: 1px solid #2a3942; border-radius: 4px; }
   .walk dd strong { color: var(--teal); }

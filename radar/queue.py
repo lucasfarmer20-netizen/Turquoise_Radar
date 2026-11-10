@@ -53,9 +53,12 @@ def in_queue(item, triage, now, cfg):
     """True when an item belongs in the owner's queue."""
     if item.inbox_status != "NEW" or triage is None or triage.status != "OK":
         return False
-    if not triage.relevant or (triage.score or 0) < cfg["min_score"]:
+    from radar.triage import live_verdict
+
+    live = live_verdict(triage.data, item.normalized or {})
+    if not triage.relevant or (live.get("score") or 0) < cfg["min_score"]:
         return False
-    if triage.data.get("value_read") != "UNDERPRICED":
+    if live.get("value_read") != "UNDERPRICED":
         return False
     end = _end(item.normalized or {})
     return not (end and end < now)
@@ -70,7 +73,9 @@ def archive_reason(item, triage, now, cfg):
     if triage is not None and triage.status == "OK":
         if triage.relevant is False:
             return "irrelevant"
-        if triage.data.get("value_read") == "OVERPRICED":
+        from radar.triage import live_verdict
+
+        if live_verdict(triage.data, n).get("value_read") == "OVERPRICED":
             return "overpriced"
     is_auction = "AUCTION" in (n.get("buying_options") or [])
     first = _aware(item.first_seen)

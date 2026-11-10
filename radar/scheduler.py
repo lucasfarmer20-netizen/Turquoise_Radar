@@ -305,8 +305,13 @@ async def cycle(sessions, connection, mode, daily_limit):
         from radar.watch import refresh as refresh_watched
 
         await refresh_watched(sessions)
+        from radar.triage import reconcile
+
+        changed, total = reconcile(sessions)
+        if changed:
+            log.info("reconciled %d of %d verdicts against current prices", changed, total)
     except Exception:
-        log.exception("auction watch failed")
+        log.exception("auction watch / reconcile failed")
     try:
         from radar.notify import notify_pending
 

@@ -20,7 +20,7 @@ from radar.economics import walk_away
 from radar.queue import in_queue
 from radar.queue import settings as queue_settings
 from radar.scheduler import read_state, request_scan, trigger_path
-from radar.triage import thumb_url
+from radar.triage import live_verdict, thumb_url
 
 ALASKA = ZoneInfo("America/Anchorage")
 DECISIONS = {"interested": "INTERESTED", "pass": "IRRELEVANT", "reset": "NEW"}
@@ -97,7 +97,7 @@ def comp_links(query):
 
 def card(row, now, triage=None):
     n = row.normalized or {}
-    td = (triage.data if triage and triage.status == "OK" else None) or {}
+    td = live_verdict(triage.data, n) if triage and triage.status == "OK" else {}
     price = _dec(n.get("item_price"))
     ship = _dec(n.get("shipping_cost"))
     ends = _parse_time(n.get("item_end_time"))
@@ -143,7 +143,7 @@ def card(row, now, triage=None):
         mode=n.get("discovery_mode"),
         triaged=triage is not None and triage.status == "OK",
         relevant=triage.relevant if triage and triage.status == "OK" else None,
-        score=triage.score if triage and triage.status == "OK" else None,
+        score=td.get("score") if triage and triage.status == "OK" else None,
         category=(td.get("category") or "").replace("_", " ").title() or None,
         piece_type=td.get("piece_type"),
         signals=td.get("quality_signals") or [],
@@ -153,10 +153,11 @@ def card(row, now, triage=None):
         archive_reason=n.get("archive_reason"),
         pass_reason=PASS_REASONS.get(n.get("pass_reason") or "", n.get("pass_reason")),
         walk=walk_away(
-            (td.get("resale_estimate_usd") or [None])[0],
+            ((n.get("owner_resale_usd") or td.get("resale_estimate_usd") or [None])[0]),
             ship,
             (n.get("buyer_premium_rate") or 0),
         ),
+        owner_resale=n.get("owner_resale_usd"),
         comp_query=td.get("comp_query") or (n.get("raw_title") or "")[:80],
         comps=comp_links(td.get("comp_query") or (n.get("raw_title") or "")[:80]),
         hallmark_read=td.get("hallmark_read"),
@@ -167,7 +168,8 @@ def card(row, now, triage=None):
         if images
         else None,
         watched_at=n.get("watched_at"),
-        resale=td.get("resale_estimate_usd"),
+        resale=n.get("owner_resale_usd") or td.get("resale_estimate_usd"),
+        resale_source=td.get("resale_source", "model"),
     )
 
 
@@ -364,6 +366,8 @@ def radar_routes(app, render):
         item_id: int,
         bought_for: str = Form(""),
         sold_for: str = Form(""),
+        resale_low: str = Form(""),
+        resale_high: str = Form(""),
         back: str = Form("/radar"),
     ):
         with app.state.sessions.begin() as s:
@@ -371,6 +375,17 @@ def radar_routes(app, render):
             if row is None:
                 raise HTTPException(404, "Item not found")
             n = dict(row.normalized or {})
+            lo, hi = (
+                _dec(x.strip().lstrip("$").replace(",", "") or None)
+                for x in (resale_low, resale_high)
+            )
+            if lo is not None or hi is not None:
+                if lo is None or hi is None or lo <= 0 or hi < lo:
+                    raise HTTPException(400, "Resale needs a low and a high, low <= high")
+                n["owner_resale_usd"] = [int(lo), int(hi)]
+                n["owner_resale_at"] = datetime.now(UTC).isoformat()
+            elif resale_low == "clear":
+                n.pop("owner_resale_usd", None)
             for key, raw in (("bought_for", bought_for), ("sold_for", sold_for)):
                 raw = raw.strip().lstrip("$").replace(",", "")
                 if raw == "":

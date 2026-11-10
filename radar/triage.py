@@ -90,9 +90,14 @@ whenever you can; null only when the photo shows too little. Be honest about the
 buyer's downside is the low end. VALUE_READ is your one-word judgment of asking price vs that
 range; the system re-derives it from your numbers, so the range matters more than the word.
 
-Describe only what is visible. Do not assert tribe, maker, mine or age as fact; use "style"
-language. Transcribe a hallmark only if clearly legible. Keep the reason to one sentence a buyer
-can scan, and name the price-vs-value judgment in it."""
+A maker's name in the title, tag or hallmark matters: signed work by a known Native, Southwest
+or Mexican silversmith sells for a premium over unsigned work of the same quality, and
+established names (Zuni needlepoint and inlay families, well-known Navajo and Hopi
+silversmiths, Taxco masters) sell for multiples. Use what you know of that maker's market in
+the resale range and say so in the reason. Describe only what is visible. Do not assert tribe,
+maker, mine or age as fact beyond what the title or marks state; use "style" language.
+Transcribe a hallmark only if clearly legible. Keep the reason to one sentence a buyer can
+scan, and name the price-vs-value judgment in it."""
 
 
 class Verdict(BaseModel):
@@ -216,12 +221,22 @@ def landed_cost(n):
     return total
 
 
+def live_verdict(data, n):
+    """The verdict as it stands against the item's CURRENT price (not persisted). Starts from
+    the model's own read/score so a previous reconcile is not compounded."""
+    base = dict(data)
+    base["value_read"] = base.get("model_value_read", base.get("value_read"))
+    base["score"] = base.get("model_score", base.get("score"))
+    return reconcile_verdict(base, n)
+
+
 def reconcile_verdict(data, n):
     """Derive value_read and cap score from the model's own resale range and the landed
     cost, so the one-word judgment can never contradict the numbers. Returns the adjusted
     verdict dict; the model's original read and score are kept under 'model_'."""
     out = dict(data)
-    resale = out.get("resale_estimate_usd")
+    resale = n.get("owner_resale_usd") or out.get("resale_estimate_usd")
+    out["resale_source"] = "owner" if n.get("owner_resale_usd") else "model"
     landed = landed_cost(n)
     if not resale or len(resale) != 2 or landed is None or landed <= 0:
         return out
