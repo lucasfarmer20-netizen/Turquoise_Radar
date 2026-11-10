@@ -5,8 +5,10 @@ view-only child process. Owner decisions (Interested / Pass) are stored on the r
 inbox_status so they survive re-observation by later cycles.
 """
 
+import collections
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 from fastapi import Form, HTTPException, Request
@@ -14,6 +16,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 
 from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
+from radar.economics import walk_away
 from radar.queue import in_queue
 from radar.queue import settings as queue_settings
 from radar.scheduler import read_state, request_scan, trigger_path
@@ -21,6 +24,13 @@ from radar.triage import thumb_url
 
 ALASKA = ZoneInfo("America/Anchorage")
 DECISIONS = {"interested": "INTERESTED", "pass": "IRRELEVANT", "reset": "NEW"}
+PASS_REASONS = {
+    "style": "Not my style",
+    "price": "Overpriced",
+    "authenticity": "Doubt it's real",
+    "category": "Not Native / Southwest",
+    "other": "Other",
+}
 STATUS_FILTERS = {
     "new": ["NEW"],
     "interested": ["INTERESTED"],
@@ -125,6 +135,19 @@ def card(row, now, triage=None):
         reason=td.get("reason"),
         value_read=(td.get("value_read") or "").title() or None,
         archive_reason=n.get("archive_reason"),
+        pass_reason=PASS_REASONS.get(n.get("pass_reason") or "", n.get("pass_reason")),
+        walk=walk_away(
+            (td.get("resale_estimate_usd") or [None])[0],
+            ship,
+            (n.get("buyer_premium_rate") or 0),
+        ),
+        comps_url="https://www.ebay.com/sch/i.html?_nkw="
+        + quote_plus((n.get("raw_title") or "")[:80])
+        + "&LH_Sold=1&LH_Complete=1",
+        lens_url=("https://lens.google.com/uploadbyurl?url=" + quote_plus(thumb_url(images[0])))
+        if images
+        else None,
+        watched_at=n.get("watched_at"),
         resale=td.get("resale_estimate_usd"),
     )
 
@@ -208,6 +231,8 @@ def radar_routes(app, render):
                 cards.sort(key=lambda c: c["first_seen"] or now, reverse=True)
             total_matching = len(cards)
             cards = cards[(page - 1) * per_page : page * per_page]
+            for idx, c in enumerate(cards):
+                c["next_id"] = cards[idx + 1]["id"] if idx + 1 < len(cards) else 0
 
             sources = sorted(set(s.scalars(select(DiscoveredItem.source).distinct())) - {None})
             phrases = sorted(
@@ -251,6 +276,15 @@ def radar_routes(app, render):
                 s.scalar(select(func.count(TriageResult.id)).where(TriageResult.relevant.is_(True)))
                 or 0
             )
+            week = (now - timedelta(days=7)).replace(tzinfo=None)
+            passes = collections.Counter()
+            for it in s.scalars(
+                select(DiscoveredItem).where(DiscoveredItem.inbox_status == "IRRELEVANT")
+            ):
+                pr = (it.normalized or {}).get("pass_reason")
+                pa = _parse_time((it.normalized or {}).get("passed_at"))
+                if pr and pa and pa.replace(tzinfo=None) >= week:
+                    passes[PASS_REASONS.get(pr, pr)] += 1
             ledger = s.get(Setting, 91)
             calls_today = (
                 ledger.data.get("calls", 0)
@@ -285,6 +319,8 @@ def radar_routes(app, render):
             triaged_total=triaged_total,
             queue_total=queue_total,
             queue_min_score=qcfg["min_score"],
+            pass_reasons=PASS_REASONS,
+            pass_stats=passes.most_common(),
             relevant_total=relevant_total,
             phrases=phrases,
             counts=counts,
@@ -306,7 +342,12 @@ def radar_routes(app, render):
 
     @app.post("/radar/{item_id}/decision")
     def radar_decision(
-        request: Request, item_id: int, decision: str = Form(...), back: str = Form("/radar")
+        request: Request,
+        item_id: int,
+        decision: str = Form(...),
+        back: str = Form("/radar"),
+        reason: str = Form(""),
+        next_id: int = Form(0),
     ):
         if decision not in DECISIONS:
             raise HTTPException(400, "Unknown decision")
@@ -315,6 +356,18 @@ def radar_routes(app, render):
             if row is None:
                 raise HTTPException(404, "Item not found")
             row.inbox_status = DECISIONS[decision]
+            n = dict(row.normalized or {})
+            if decision == "pass":
+                n["pass_reason"] = reason if reason in PASS_REASONS else "other"
+                n["passed_at"] = datetime.now(UTC).isoformat()
+            elif decision == "reset":
+                n.pop("pass_reason", None)
+                n.pop("archive_reason", None)
+            elif decision == "interested":
+                n["interested_at"] = datetime.now(UTC).isoformat()
+            row.normalized = n
         if not back.startswith("/radar"):
             back = "/radar"
+        if next_id and "#" not in back:
+            back = f"{back}#item-{next_id}"
         return RedirectResponse(back, status_code=303)

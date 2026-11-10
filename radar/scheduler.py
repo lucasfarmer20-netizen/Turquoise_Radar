@@ -288,6 +288,12 @@ async def cycle(sessions, connection, mode, daily_limit):
     except Exception:
         log.exception("archive sweep failed")
     try:
+        from radar.watch import refresh as refresh_watched
+
+        await refresh_watched(sessions)
+    except Exception:
+        log.exception("auction watch failed")
+    try:
         from radar.notify import notify_pending
 
         await notify_pending(sessions)

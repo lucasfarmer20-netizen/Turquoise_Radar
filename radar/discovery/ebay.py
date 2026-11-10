@@ -293,6 +293,20 @@ class EbayAdapter(SourceAdapter):
             result.errors.append(f"{e.code}: {e}")
         return result
 
+    async def get_item(self, item_id):
+        """Browse getItem for one listing (current bid, bid count, end date, ship-to)."""
+        token = await self.access_token()
+        data = await self._request(
+            "GET",
+            f"/buy/browse/v1/item/{item_id}",
+            headers={
+                "Authorization": "Bearer " + token,
+                "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+                "X-EBAY-C-ENDUSERCTX": "contextualLocation=country%3DUS%2Czip%3D99669",
+            },
+        )
+        return self.public_data(data)
+
     async def retrieve(self, exact_query):
         result = await self.search(exact_query, SearchOptions(), limit=12)
         return [

@@ -289,3 +289,40 @@ def test_purge_deletes_ended_and_old_archived_but_keeps_interested(client):
         assert s.query(TriageResult).count() == 0  # verdict for item 1 went with it
     # disabled when purge_days is 0
     assert purge(client.app.state.sessions, {"purge_days": 0}, now=now) == {}
+
+
+def test_pass_records_reason_and_redirects_to_next(client):
+    from radar.db import DiscoveredItem
+
+    _add(client, 71)
+    _add(client, 72)
+    r = client.post(
+        "/radar/1/decision",
+        data={"decision": "pass", "reason": "price", "back": "/radar?show=all", "next_id": 2},
+        follow_redirects=False,
+    )
+    assert r.headers["location"] == "/radar?show=all#item-2"
+    with client.app.state.sessions() as s:
+        n = s.get(DiscoveredItem, 1).normalized
+        assert n["pass_reason"] == "price" and n["passed_at"]
+    html = client.get("/radar?show=all&status=passed").text
+    assert "passed: Overpriced" in html
+    # unknown reason -> other; reset clears it
+    client.post("/radar/2/decision", data={"decision": "pass", "reason": "zzz"})
+    client.post("/radar/2/decision", data={"decision": "reset"})
+    with client.app.state.sessions() as s:
+        assert "pass_reason" not in s.get(DiscoveredItem, 2).normalized
+
+
+def test_card_shows_walk_away_and_links(client):
+    _add(client, 81, buying_options=["FIXED_PRICE"], item_price="120", shipping_cost="8")
+    _triage(client, 1, True, 85)
+    from radar.db import TriageResult
+
+    with client.app.state.sessions.begin() as s:
+        t = s.get(TriageResult, 1)
+        t.data = {**t.data, "value_read": "UNDERPRICED", "resale_estimate_usd": [250, 400]}
+    html = client.get("/radar").text
+    assert "Walk away above" in html and "$156.77" in html  # 250 -> 35% tier, minus $8 ship
+    assert "LH_Sold=1" in html and "lens.google.com/uploadbyurl" in html
+    assert 'data-key="i"' in html and "Pass…" in html
