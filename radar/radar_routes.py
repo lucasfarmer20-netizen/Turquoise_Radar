@@ -14,6 +14,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 
 from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
+from radar.queue import in_queue
+from radar.queue import settings as queue_settings
 from radar.scheduler import read_state, request_scan, trigger_path
 from radar.triage import thumb_url
 
@@ -23,6 +25,7 @@ STATUS_FILTERS = {
     "new": ["NEW"],
     "interested": ["INTERESTED"],
     "passed": ["IRRELEVANT"],
+    "archived": ["ARCHIVED"],
     "all": None,
 }
 
@@ -121,6 +124,7 @@ def card(row, now, triage=None):
         concerns=td.get("concerns") or [],
         reason=td.get("reason"),
         value_read=(td.get("value_read") or "").title() or None,
+        archive_reason=n.get("archive_reason"),
         resale=td.get("resale_estimate_usd"),
     )
 
@@ -135,14 +139,15 @@ def radar_routes(app, render):
         phrase: str = "",
         hours: int = 0,
         page: int = 1,
-        show: str = "relevant",
+        show: str = "queue",
         min_score: int = 0,
         source: str = "",
     ):
         status = status if status in STATUS_FILTERS else "new"
         kind = kind if kind in ("all", "auction", "bin") else "all"
         sort = sort if sort in ("score", "newest", "ending", "price", "price_desc") else "score"
-        show = show if show in ("relevant", "all", "irrelevant", "untriaged") else "relevant"
+        show = show if show in ("queue", "relevant", "all", "irrelevant", "untriaged") else "queue"
+        qcfg = queue_settings()
         page = max(1, page)
         per_page = 48
         now = datetime.now(UTC)
@@ -161,6 +166,8 @@ def radar_routes(app, render):
                     select(TriageResult).where(TriageResult.item_id.in_([r.id for r in rows]))
                 )
             }
+            if show == "queue":
+                rows = [r for r in rows if in_queue(r, triage.get(r.id), now, qcfg)]
             cards = [card(r, now, triage.get(r.id)) for r in rows]
             if show == "relevant":
                 cards = [c for c in cards if c["relevant"] is True or not c["triaged"]]
@@ -179,8 +186,12 @@ def radar_routes(app, render):
             if source:
                 cards = [c for c in cards if c["source"] == source]
             if sort == "score":
+                soon = now + timedelta(hours=6)
                 cards.sort(
                     key=lambda c: (
+                        1
+                        if (c["is_auction"] and c["ends"] and not c["ended"] and c["ends"] <= soon)
+                        else 0,
                         c["score"] if c["score"] is not None else -1,
                         c["first_seen"] or now,
                     ),
@@ -223,6 +234,15 @@ def radar_routes(app, render):
                 or 0
             )
             last_run = s.scalar(select(DiscoveryRun).order_by(DiscoveryRun.id.desc()))
+            queue_total = sum(
+                1
+                for it, tr in s.execute(
+                    select(DiscoveredItem, TriageResult)
+                    .join(TriageResult, TriageResult.item_id == DiscoveredItem.id)
+                    .where(DiscoveredItem.inbox_status == "NEW")
+                ).all()
+                if in_queue(it, tr, now, qcfg)
+            )
             triaged_total = (
                 s.scalar(select(func.count(TriageResult.id)).where(TriageResult.status == "OK"))
                 or 0
@@ -263,6 +283,8 @@ def radar_routes(app, render):
             source=source,
             sources=sources,
             triaged_total=triaged_total,
+            queue_total=queue_total,
+            queue_min_score=qcfg["min_score"],
             relevant_total=relevant_total,
             phrases=phrases,
             counts=counts,

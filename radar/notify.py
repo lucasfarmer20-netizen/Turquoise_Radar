@@ -35,7 +35,10 @@ def settings():
         slack=os.environ.get("RADAR_SLACK_WEBHOOK", "").strip(),
         ntfy_topic=os.environ.get("RADAR_NTFY_TOPIC", "").strip(),
         ntfy_server=os.environ.get("RADAR_NTFY_SERVER", "https://ntfy.sh").rstrip("/"),
-        min_score=int(os.environ.get("RADAR_NOTIFY_MIN_SCORE", "75")),
+        min_score=int(
+            os.environ.get("RADAR_NOTIFY_MIN_SCORE", os.environ.get("RADAR_QUEUE_MIN_SCORE", "80"))
+        ),
+        max_items=int(os.environ.get("RADAR_NOTIFY_MAX_ITEMS", "10")),
         ending_hours=float(os.environ.get("RADAR_NOTIFY_ENDING_HOURS", "2")),
         base_url=os.environ.get("RADAR_PUBLIC_URL", "http://radar:8000").rstrip("/"),
     )
@@ -62,13 +65,14 @@ def pending_finds(session, cfg):
         .where(TriageResult.status == "OK")
         .where(TriageResult.relevant.is_(True))
         .where(TriageResult.score >= cfg["min_score"])
-        .where(DiscoveredItem.inbox_status != "IRRELEVANT")
+        .where(DiscoveredItem.inbox_status == "NEW")
     ).all()
-    return [
+    out = [
         (t, i)
         for t, i in rows
         if t.data.get("value_read") == "UNDERPRICED" and not t.data.get("notified_at")
     ]
+    return sorted(out, key=lambda ti: -(ti[0].score or 0))
 
 
 def pending_ending(session, cfg, now):
@@ -145,9 +149,10 @@ def build_message(finds, ending, now, cfg, slack):
         ge = "\u2265" if slack else ">="
         head = f"{n} new find{plural} (score {ge} {cfg['min_score']}, underpriced)"
         parts.append(f"*{head}*" if slack else head)
-        parts += [_find_line(t, i, cfg, slack) for t, i in finds[:12]]
-        if len(finds) > 12:
-            parts.append(f"…and {len(finds) - 12} more on /radar")
+        cap = cfg.get("max_items", 10)
+        parts += [_find_line(t, i, cfg, slack) for t, i in finds[:cap]]
+        if len(finds) > cap:
+            parts.append(f"…and {len(finds) - cap} more in the queue at {cfg['base_url']}/radar")
     if ending:
         parts.append(
             "*Interested auctions ending soon*" if slack else "Interested auctions ending soon"

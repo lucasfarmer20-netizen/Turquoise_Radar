@@ -281,6 +281,12 @@ async def cycle(sessions, connection, mode, daily_limit):
         except Exception:
             log.exception("triage failed; discovery results are kept")
     try:
+        from radar.queue import sweep
+
+        sweep(sessions)
+    except Exception:
+        log.exception("archive sweep failed")
+    try:
         from radar.notify import notify_pending
 
         await notify_pending(sessions)

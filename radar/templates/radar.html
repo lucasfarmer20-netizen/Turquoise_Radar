@@ -5,12 +5,12 @@
   <div>
     <div class="eyebrow">SCHEDULED DISCOVERY</div>
     <h1>Radar finds</h1>
-    <p class="muted">Everything the scheduler has pulled in, screened by vision and sorted by score. Mark Interested or Pass; decisions stick across later cycles.</p>
+    <p class="muted">Your queue: underpriced finds scoring {{ queue_min_score }}+, auctions ending within 6h pinned first. Mark Interested or Pass; everything else is auto-archived and one filter away.</p>
   </div>
 </div>
 
 <div class="stats">
-  <div><span>NEW (UNREVIEWED)</span><strong>{{ counts.get("NEW", 0) }}</strong><small class="muted">{{ new_24h }} found in last 24h</small></div>
+  <div><span>QUEUE</span><strong>{{ queue_total }}</strong><small class="muted">underpriced, score {{ queue_min_score }}+ · {{ counts.get("NEW", 0) }} new total · {{ new_24h }} found in 24h</small></div>
   <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
   <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant</small></div>
   <div><span>LAST CYCLE</span>
@@ -42,7 +42,7 @@
 <form class="filters" method="get" action="/radar">
   <label>Screening
     <select name="show">
-      {% for v, l in [("relevant","Relevant + unscreened"),("all","Everything"),("irrelevant","Screened out"),("untriaged","Unscreened only")] %}
+      {% for v, l in [("queue","Queue (underpriced, " ~ queue_min_score ~ "+)"),("relevant","Relevant + unscreened"),("all","Everything"),("irrelevant","Screened out"),("untriaged","Unscreened only")] %}
       <option value="{{ v }}" {% if show == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select></label>
   <label>Min score
@@ -52,7 +52,7 @@
     </select></label>
   <label>Status
     <select name="status">
-      {% for v, l in [("new","New"),("interested","Interested"),("passed","Passed"),("all","All")] %}
+      {% for v, l in [("new","New"),("interested","Interested"),("passed","Passed"),("archived","Archived"),("all","All")] %}
       <option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select></label>
   <label>Type
@@ -89,7 +89,7 @@
 </div>
 
 {% if not cards %}
-<div class="panel empty muted">Nothing here yet. {% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
+<div class="panel empty muted">{% if show == "queue" and total > 0 %}Queue is clear. Lower the min score in .env (RADAR_QUEUE_MIN_SCORE) if it stays empty for a day.{% else %}Nothing here yet. {% endif %}{% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
 {% endif %}
 
 <div class="listing-grid">
@@ -101,6 +101,7 @@
         {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
         {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
         {% if c.status == "IRRELEVANT" %}<span class="badge">PASSED</span>{% endif %}
+        {% if c.status == "ARCHIVED" %}<span class="badge">ARCHIVED · {{ (c.archive_reason or "")|upper }}</span>{% endif %}
         {% if c.is_auction and c.ends_relative and not c.ended %}<span class="badge review">ENDS {{ c.ends_relative|upper }}</span>{% endif %}
         {% if c.ended %}<span class="badge">RECORDED END PASSED</span>{% endif %}
       </div>
@@ -137,7 +138,7 @@
       <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}#item-{{ c.id }}">
       {% if c.status != "INTERESTED" %}<button name="decision" value="interested">Interested</button>{% endif %}
       {% if c.status != "IRRELEVANT" %}<button class="secondary" name="decision" value="pass">Pass</button>{% endif %}
-      {% if c.status != "NEW" %}<button class="secondary" name="decision" value="reset">Undo</button>{% endif %}
+      {% if c.status != "NEW" %}<button class="secondary" name="decision" value="reset">{{ "Restore" if c.status == "ARCHIVED" else "Undo" }}</button>{% endif %}
       <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer">Open on {{ c.source }}</a>
     </form>
   </article>
