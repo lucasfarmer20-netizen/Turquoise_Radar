@@ -38,6 +38,16 @@ SOURCES = {
         "Notification format/capabilities unverified",
     ),
     "ctbids": ("CTBids", ["ctbids.com"], "Notification format/capabilities unverified"),
+    "auctionzip": (
+        "AuctionZip",
+        ["auctionzip.com"],
+        "Saved-search alerts: format unverified until first messages are observed",
+    ),
+    "proxibid": (
+        "Proxibid",
+        ["proxibid.com"],
+        "Saved-search alerts: format unverified until first messages are observed",
+    ),
     "poshmark": (
         "Poshmark",
         ["poshmark.com"],

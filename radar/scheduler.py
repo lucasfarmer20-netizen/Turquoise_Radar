@@ -243,7 +243,15 @@ async def cycle(sessions, connection, mode, daily_limit):
     if run.errors:
         for err in run.errors[:5]:
             log.warning("  %s", err)
-    if run.new_count:
+    mail_new = 0
+    try:
+        from radar.mailbox import poll as poll_mailbox
+
+        mail_stats = poll_mailbox(sessions)
+        mail_new = (mail_stats or {}).get("candidates", 0)
+    except Exception:
+        log.exception("mailbox poll failed; will retry next cycle")
+    if run.new_count or mail_new:
         from radar.triage import run_triage
         from radar.triage import settings as triage_settings
 
