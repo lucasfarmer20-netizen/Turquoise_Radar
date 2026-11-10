@@ -67,12 +67,14 @@ def pending_finds(session, cfg):
         .where(TriageResult.score >= cfg["min_score"])
         .where(DiscoveredItem.inbox_status == "NEW")
     ).all()
-    out = [
-        (t, i)
-        for t, i in rows
-        if t.data.get("value_read") == "UNDERPRICED" and not t.data.get("notified_at")
-    ]
-    return sorted(out, key=lambda ti: -(ti[0].score or 0))
+    from radar.triage import live_verdict
+
+    out = []
+    for t, i in rows:
+        live = live_verdict(t.data, i.normalized or {})
+        if live.get("value_read") == "UNDERPRICED" and not t.data.get("notified_at"):
+            out.append((t, i))
+    return sorted(out, key=lambda ti: (-int(_buy_now(ti[1])), -(ti[0].score or 0)))
 
 
 def pending_ending(session, cfg, now):
@@ -92,6 +94,12 @@ def pending_ending(session, cfg, now):
 
 
 # ---------------------------------------------------------------- formatting
+
+
+def _buy_now(i):
+    n = i.normalized or {}
+    opts = n.get("buying_options") or []
+    return bool(n.get("buy_it_now_price")) or ("FIXED_PRICE" in opts and "AUCTION" not in opts)
 
 
 def _usd(v):
@@ -116,11 +124,12 @@ def _find_line(t, i, cfg, slack):
     resale_s = f"resale ~${resale[0]}–{resale[1]}" if resale else "resale ?"
     card = f"{cfg['base_url']}/radar?show=all&status=all#item-{i.id}"
     ebay = n.get("listing_url") or ""
+    tag = "BUY NOW · " if _buy_now(i) else ""
     if slack:
-        head = f"*{t.score}* · <{ebay}|{title}>"
+        head = f"*{t.score}* · {tag}<{ebay}|{title}>"
         tail = f"<{card}|card>"
     else:
-        head = f"[{t.score}] {title}"
+        head = f"[{t.score}] {tag}{title}"
         tail = ebay
     return (
         f"{head}\n"

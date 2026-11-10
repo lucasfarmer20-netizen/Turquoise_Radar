@@ -79,6 +79,22 @@ def _relative(when, now):
     return f"{text} ago" if past else f"in {text}"
 
 
+def _buyable_now(n, td, price, bin_price, ship):
+    """True when a fixed price exists and landing it stays under the walk-away landed cost."""
+    fixed = (
+        bin_price
+        if bin_price is not None
+        else (price if "AUCTION" not in (n.get("buying_options") or []) else None)
+    )
+    wa = td.get("walk_away_landed_usd")
+    if fixed is None or wa is None:
+        return False
+    try:
+        return fixed + (ship or Decimal(0)) <= Decimal(wa)
+    except (InvalidOperation, TypeError):
+        return False
+
+
 def comp_links(query):
     q = quote_plus(query)
     return [
@@ -158,6 +174,7 @@ def card(row, now, triage=None):
             (n.get("buyer_premium_rate") or 0),
         ),
         owner_resale=n.get("owner_resale_usd"),
+        buyable_now=_buyable_now(n, td, price, bin_price, ship),
         comp_query=td.get("comp_query") or (n.get("raw_title") or "")[:80],
         comps=comp_links(td.get("comp_query") or (n.get("raw_title") or "")[:80]),
         hallmark_read=td.get("hallmark_read"),
@@ -233,6 +250,7 @@ def radar_routes(app, render):
                 soon = now + timedelta(hours=6)
                 cards.sort(
                     key=lambda c: (
+                        1 if c["buyable_now"] and not c["ended"] else 0,
                         1
                         if (c["is_auction"] and c["ends"] and not c["ended"] and c["ends"] <= soon)
                         else 0,

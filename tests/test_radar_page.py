@@ -387,3 +387,24 @@ def test_live_verdict_follows_current_price_and_owner_resale_overrides(client):
     html = client.get("/radar").text
     assert "navaho cuff 95" in html and "(yours)" in html and "resale ~$900–1500" in html
     assert client.post("/radar/1/outcome", data={"resale_low": "900"}).status_code == 400
+
+
+def test_buy_now_badge_and_ordering(client):
+    from radar.db import TriageResult
+
+    _add(
+        client, 101, buying_options=["FIXED_PRICE"], item_price="60", shipping_cost="5"
+    )  # 1 BIN under walk-away
+    _add(client, 102, item_price="60", shipping_cost="5")  # 2 auction, same numbers, higher score
+    _triage(client, 1, True, 82)
+    _triage(client, 2, True, 95)
+    with client.app.state.sessions.begin() as s:
+        for tid in (1, 2):
+            t = s.get(TriageResult, tid)
+            t.data = {**t.data, "value_read": "UNDERPRICED", "resale_estimate_usd": [200, 300]}
+    html = client.get("/radar").text
+    assert "BUY NOW" in html
+    assert html.index("navaho cuff 101") < html.index(
+        "navaho cuff 102"
+    )  # BIN first despite lower score
+    assert html.count("BUY NOW") == 1

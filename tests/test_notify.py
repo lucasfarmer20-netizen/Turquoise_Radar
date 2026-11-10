@@ -50,7 +50,8 @@ def _db(tmp_path):
                     data={
                         "value_read": read,
                         "score": score,
-                        "resale_estimate_usd": [90, 150],
+                        # item 2 is "fair": $45 landed against a $40-60 range has no headroom
+                        "resale_estimate_usd": [40, 60] if i == 2 else [90, 150],
                         "reason": f"r{i}",
                         "landed_usd": "45",
                     },
