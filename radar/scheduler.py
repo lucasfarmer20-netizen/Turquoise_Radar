@@ -258,6 +258,13 @@ async def cycle(sessions, connection, mode, daily_limit):
             log.warning("  %s", err)
     market_new = 0
     try:
+        from radar.category_sweep import run as run_sweep
+
+        sweep_stats = await run_sweep(sessions)
+        market_new += (sweep_stats or {}).get("new", 0)
+    except Exception:
+        log.exception("category sweep failed; will retry next cycle")
+    try:
         from radar.marketplaces import run_marketplaces
 
         report = await run_marketplaces(sessions)
