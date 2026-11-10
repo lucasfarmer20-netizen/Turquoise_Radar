@@ -256,3 +256,36 @@ def test_sweep_archives_with_reasons(client):
         assert s.get(DiscoveredItem, 3).inbox_status == "NEW"
     # idempotent
     assert sweep(client.app.state.sessions, now=now) == {"ended": 1}
+
+
+def test_purge_deletes_ended_and_old_archived_but_keeps_interested(client):
+    from datetime import UTC, datetime, timedelta
+
+    from radar.db import DiscoveredItem, TriageResult
+    from radar.queue import purge
+
+    now = datetime.now(UTC)
+    old_end = (now - timedelta(days=20)).isoformat()
+    _add(client, 61, item_end_time=old_end)  # 1 ended long ago -> purged
+    _add(client, 62, item_end_time=old_end)  # 2 ended but INTERESTED -> kept
+    _add(
+        client, 63, buying_options=["FIXED_PRICE"], item_end_time=None
+    )  # 3 archived long ago -> purged
+    _add(
+        client, 64, buying_options=["FIXED_PRICE"], item_end_time=None
+    )  # 4 archived yesterday -> kept
+    _add(client, 65, item_end_time=(now + timedelta(days=1)).isoformat())  # 5 live -> kept
+    _triage(client, 1, True, 50)
+    with client.app.state.sessions.begin() as s:
+        s.get(DiscoveredItem, 2).inbox_status = "INTERESTED"
+        for iid, when in ((3, now - timedelta(days=30)), (4, now - timedelta(days=1))):
+            it = s.get(DiscoveredItem, iid)
+            it.inbox_status = "ARCHIVED"
+            it.normalized = {**it.normalized, "archived_at": when.isoformat()}
+    counts = purge(client.app.state.sessions, now=now)
+    assert counts == {"ended": 1, "archived": 1}
+    with client.app.state.sessions() as s:
+        assert {i.id for i in s.query(DiscoveredItem)} == {2, 4, 5}
+        assert s.query(TriageResult).count() == 0  # verdict for item 1 went with it
+    # disabled when purge_days is 0
+    assert purge(client.app.state.sessions, {"purge_days": 0}, now=now) == {}

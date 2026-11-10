@@ -281,9 +281,10 @@ async def cycle(sessions, connection, mode, daily_limit):
         except Exception:
             log.exception("triage failed; discovery results are kept")
     try:
-        from radar.queue import sweep
+        from radar.queue import purge, sweep
 
         sweep(sessions)
+        purge(sessions)
     except Exception:
         log.exception("archive sweep failed")
     try:

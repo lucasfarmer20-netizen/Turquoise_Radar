@@ -13,7 +13,13 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from radar.db import DiscoveredItem, TriageResult
+from radar.db import (
+    AlertObservation,
+    DiscoveredItem,
+    DiscoveryObservation,
+    TriageResult,
+    VisionCase,
+)
 
 log = logging.getLogger("radar.queue")
 ARCHIVED = "ARCHIVED"
@@ -24,6 +30,7 @@ def settings():
         min_score=int(os.environ.get("RADAR_QUEUE_MIN_SCORE", "80")),
         stale_days=int(os.environ.get("RADAR_STALE_DAYS", "7")),
         ended_grace_minutes=int(os.environ.get("RADAR_ENDED_GRACE_MINUTES", "30")),
+        purge_days=int(os.environ.get("RADAR_PURGE_DAYS", "14")),
     )
 
 
@@ -96,3 +103,91 @@ def sweep(sessions, cfg=None, now=None):
     if counts:
         log.info("archived %s", counts)
     return counts
+
+
+def purge(sessions, cfg=None, now=None):
+    """Delete listings that are over. Never touches INTERESTED items or anything with a
+    vision case. Removes: items whose listing ended more than purge_days ago (any status),
+    and ARCHIVED/IRRELEVANT items archived or last seen more than purge_days ago.
+    Returns {reason: count}. Set RADAR_PURGE_DAYS=0 to disable."""
+    cfg = cfg or settings()
+    if cfg["purge_days"] <= 0:
+        return {}
+    now = now or datetime.now(UTC)
+    cutoff = now - timedelta(days=cfg["purge_days"])
+    counts = {}
+    with sessions.begin() as s:
+        keep = {cid for cid in s.scalars(select(VisionCase.candidate_id)) if cid is not None}
+        victims = []
+        for item in s.scalars(
+            select(DiscoveredItem).where(DiscoveredItem.inbox_status != "INTERESTED")
+        ):
+            if item.id in keep:
+                continue
+            n = item.normalized or {}
+            end = _end(n)
+            reason = None
+            if end and end < cutoff:
+                reason = "ended"
+            elif item.inbox_status in (ARCHIVED, "IRRELEVANT"):
+                archived_at = _end({"item_end_time": n.get("archived_at")})
+                stamp = archived_at or _aware(item.last_seen) or _aware(item.first_seen)
+                if stamp and stamp < cutoff:
+                    reason = "archived"
+            if reason:
+                victims.append((item, reason))
+        for item, reason in victims:
+            for model in (TriageResult, DiscoveryObservation, AlertObservation):
+                for row in s.scalars(select(model).where(model.item_id == item.id)):
+                    s.delete(row)
+            s.delete(item)
+            counts[reason] = counts.get(reason, 0) + 1
+    if counts:
+        log.info("purged %s", counts)
+    return counts
+
+
+def main(argv=None):
+    import argparse
+    import logging as _logging
+
+    from radar.db import database
+    from radar.scheduler import load_env
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=["sweep", "purge", "status"])
+    parser.add_argument("--days", type=int, help="override RADAR_PURGE_DAYS for this run")
+    parser.add_argument("--env")
+    args = parser.parse_args(argv)
+    _logging.basicConfig(
+        level=_logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s", datefmt="%H:%M:%S"
+    )
+    load_env(args.env)
+    cfg = settings()
+    if args.days is not None:
+        cfg["purge_days"] = args.days
+    engine, sessions = database()
+    try:
+        if args.command == "sweep":
+            print(sweep(sessions, cfg) or "nothing to archive")
+        elif args.command == "purge":
+            print(purge(sessions, cfg) or "nothing to purge")
+        else:
+            with sessions() as s:
+                from sqlalchemy import func
+
+                rows = s.execute(
+                    select(DiscoveredItem.inbox_status, func.count()).group_by(
+                        DiscoveredItem.inbox_status
+                    )
+                ).all()
+                print(dict(rows), f"purge after {cfg['purge_days']} days")
+    finally:
+        engine.dispose()
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(main())
