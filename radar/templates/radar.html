@@ -65,6 +65,11 @@
       {% for v, l in [("score","Score"),("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low")] %}
       <option value="{{ v }}" {% if sort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select></label>
+  <label>Source
+    <select name="source">
+      <option value="">All sources</option>
+      {% for sname in sources %}<option value="{{ sname }}" {% if source == sname %}selected{% endif %}>{{ sname }}</option>{% endfor %}
+    </select></label>
   <label>Search term
     <select name="phrase">
       <option value="">All terms</option>
@@ -91,7 +96,7 @@
 {% for c in cards %}
   <article class="listing-card" id="item-{{ c.id }}">
     <div class="card-top">
-      <span class="source">{{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
+      <span class="source">{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
         {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
         {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
@@ -133,7 +138,7 @@
       {% if c.status != "INTERESTED" %}<button name="decision" value="interested">Interested</button>{% endif %}
       {% if c.status != "IRRELEVANT" %}<button class="secondary" name="decision" value="pass">Pass</button>{% endif %}
       {% if c.status != "NEW" %}<button class="secondary" name="decision" value="reset">Undo</button>{% endif %}
-      <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer">Open on eBay</a>
+      <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer">Open on {{ c.source }}</a>
     </form>
   </article>
 {% endfor %}
@@ -141,8 +146,8 @@
 
 {% if pages > 1 %}
 <div class="feed-pagination">
-  {% if page > 1 %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&page={{ page - 1 }}">← Newer</a>{% endif %}
-  {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&page={{ page + 1 }}">Older →</a>{% endif %}
+  {% if page > 1 %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&source={{ source }}&page={{ page - 1 }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&source={{ source }}&page={{ page + 1 }}">Older →</a>{% endif %}
 </div>
 {% endif %}
 {% endblock %}

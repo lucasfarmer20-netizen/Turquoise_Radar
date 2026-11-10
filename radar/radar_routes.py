@@ -79,6 +79,7 @@ def card(row, now, triage=None):
     images = n.get("image_urls") or []
     return dict(
         id=row.id,
+        source=row.source,
         status=row.inbox_status,
         title=n.get("raw_title") or "(untitled)",
         url=n.get("listing_url"),
@@ -136,6 +137,7 @@ def radar_routes(app, render):
         page: int = 1,
         show: str = "relevant",
         min_score: int = 0,
+        source: str = "",
     ):
         status = status if status in STATUS_FILTERS else "new"
         kind = kind if kind in ("all", "auction", "bin") else "all"
@@ -174,6 +176,8 @@ def radar_routes(app, render):
                 cards = [c for c in cards if not c["is_auction"]]
             if phrase:
                 cards = [c for c in cards if c["phrase"] == phrase]
+            if source:
+                cards = [c for c in cards if c["source"] == source]
             if sort == "score":
                 cards.sort(
                     key=lambda c: (
@@ -194,6 +198,7 @@ def radar_routes(app, render):
             total_matching = len(cards)
             cards = cards[(page - 1) * per_page : page * per_page]
 
+            sources = sorted(set(s.scalars(select(DiscoveredItem.source).distinct())) - {None})
             phrases = sorted(
                 {
                     (r.normalized or {}).get("raw_search_phrase")
@@ -255,6 +260,8 @@ def radar_routes(app, render):
             hours=hours,
             show=show,
             min_score=min_score,
+            source=source,
+            sources=sources,
             triaged_total=triaged_total,
             relevant_total=relevant_total,
             phrases=phrases,

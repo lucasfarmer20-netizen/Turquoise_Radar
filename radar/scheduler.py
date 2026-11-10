@@ -243,6 +243,14 @@ async def cycle(sessions, connection, mode, daily_limit):
     if run.errors:
         for err in run.errors[:5]:
             log.warning("  %s", err)
+    market_new = 0
+    try:
+        from radar.marketplaces import run_marketplaces
+
+        report = await run_marketplaces(sessions)
+        market_new = sum(v.get("new", 0) for v in report.values())
+    except Exception:
+        log.exception("marketplace adapters failed; will retry next cycle")
     mail_new = 0
     try:
         from radar.mailbox import poll as poll_mailbox
@@ -251,7 +259,7 @@ async def cycle(sessions, connection, mode, daily_limit):
         mail_new = (mail_stats or {}).get("candidates", 0)
     except Exception:
         log.exception("mailbox poll failed; will retry next cycle")
-    if run.new_count or mail_new:
+    if run.new_count or mail_new or market_new:
         from radar.triage import run_triage
         from radar.triage import settings as triage_settings
 
