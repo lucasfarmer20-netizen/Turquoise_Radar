@@ -146,3 +146,57 @@ def test_errored_items_are_retried(tmp_path, monkeypatch):
     with sessions() as s:
         assert {r.status for r in s.query(TriageResult)} == {"OK"}
     engine.dispose()
+
+
+def test_reconcile_verdict_derives_read_from_numbers():
+    n = {"item_price": "1995.00", "shipping_cost": "24.80"}
+    d = {"value_read": "UNDERPRICED", "score": 86, "resale_estimate_usd": [1200, 2200]}
+    out = triage.reconcile_verdict(d, n)
+    assert out["value_read"] == "OVERPRICED" and out["score"] == 45
+    assert out["model_value_read"] == "UNDERPRICED" and out["model_score"] == 86
+    assert out["landed_usd"] == "2019.80"
+    # cheap ring with real headroom stays underpriced
+    out = triage.reconcile_verdict(
+        {"value_read": "FAIR", "score": 60, "resale_estimate_usd": [60, 120]},
+        {"item_price": "20", "shipping_cost": "5.62"},
+    )
+    assert out["value_read"] == "UNDERPRICED" and out["score"] == 60
+    # BIN price is the landed basis when present
+    out = triage.reconcile_verdict(
+        {"value_read": "UNDERPRICED", "score": 90, "resale_estimate_usd": [100, 150]},
+        {"item_price": "39", "buy_it_now_price": "89", "shipping_cost": "0"},
+    )
+    assert out["value_read"] == "FAIR" and out["score"] == 70
+    # no range -> untouched
+    assert triage.reconcile_verdict({"value_read": "FAIR", "score": 50}, n)["score"] == 50
+
+
+def test_reconcile_command_updates_stored_rows(tmp_path):
+    engine, sessions = _db(tmp_path)
+    with sessions.begin() as s:
+        item = s.query(DiscoveredItem).first()
+        item.normalized = {**item.normalized, "item_price": "1995", "shipping_cost": "25"}
+        s.add(
+            TriageResult(
+                item_id=item.id,
+                model="m",
+                status="OK",
+                relevant=True,
+                score=86,
+                category="X",
+                data={
+                    "value_read": "UNDERPRICED",
+                    "score": 86,
+                    "resale_estimate_usd": [1200, 2200],
+                },
+                cost_usd="0",
+            )
+        )
+    changed, total = triage.reconcile(sessions)
+    assert (changed, total) == (1, 1)
+    with sessions() as s:
+        t = s.query(TriageResult).first()
+        assert t.score == 45 and t.data["value_read"] == "OVERPRICED"
+    # idempotent
+    assert triage.reconcile(sessions) == (0, 1)
+    engine.dispose()

@@ -21,7 +21,7 @@ import os
 import re
 import sys
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -84,9 +84,11 @@ A listing whose photo shows more than the title claims ("silver tone" that looks
 sterling, "costume lot" with a visible Southwest cuff) scores HIGHER, not lower. A beautiful piece
 priced at full retail is FAIR, not UNDERPRICED, and should not score above 70.
 
-VALUE_READ is your one-word judgment of asking price vs visible value. RESALE_ESTIMATE_USD is a
-rough low-high range of what a piece like this typically sells for to collectors; give it when
-you can, null when you cannot. These are rough screening aids, not appraisals.
+RESALE_ESTIMATE_USD is a rough low-high range of what a piece like this typically sells for on
+the secondary market (eBay sold listings, live auction shows), not gallery retail. Give it
+whenever you can; null only when the photo shows too little. Be honest about the low end: a
+buyer's downside is the low end. VALUE_READ is your one-word judgment of asking price vs that
+range; the system re-derives it from your numbers, so the range matters more than the word.
 
 Describe only what is visible. Do not assert tribe, maker, mine or age as fact; use "style"
 language. Transcribe a hallmark only if clearly legible. Keep the reason to one sentence a buyer
@@ -173,6 +175,59 @@ def listing_context(n):
     }
 
 
+# Value-read thresholds, derived from the owner's economics: resale 25-50% over landed,
+# platform fees ~11.5% below $1,500. UNDERPRICED needs headroom even at the low end of
+# the model's resale range; FAIR needs it at the midpoint; otherwise OVERPRICED.
+UNDERPRICED_RATIO = Decimal(
+    os.environ.get("RADAR_UNDERPRICED_RATIO", "1.35")
+)  # resale_low / landed
+FAIR_RATIO = Decimal(os.environ.get("RADAR_FAIR_RATIO", "1.15"))  # resale_mid / landed
+SCORE_CAPS = {"OVERPRICED": 45, "FAIR": 70}
+
+
+def landed_cost(n):
+    """Price the buyer would actually pay now: BIN if offered, else bid/asking, plus shipping."""
+    price = n.get("buy_it_now_price") or n.get("item_price")
+    try:
+        total = Decimal(str(price))
+    except (InvalidOperation, TypeError):
+        return None
+    ship = n.get("shipping_cost")
+    if ship not in (None, ""):
+        try:
+            total += Decimal(str(ship))
+        except InvalidOperation:
+            pass
+    return total
+
+
+def reconcile_verdict(data, n):
+    """Derive value_read and cap score from the model's own resale range and the landed
+    cost, so the one-word judgment can never contradict the numbers. Returns the adjusted
+    verdict dict; the model's original read and score are kept under 'model_'."""
+    out = dict(data)
+    resale = out.get("resale_estimate_usd")
+    landed = landed_cost(n)
+    if not resale or len(resale) != 2 or landed is None or landed <= 0:
+        return out
+    low, high = (Decimal(str(resale[0])), Decimal(str(resale[1])))
+    mid = (low + high) / 2
+    if low / landed >= UNDERPRICED_RATIO:
+        read = "UNDERPRICED"
+    elif mid / landed >= FAIR_RATIO:
+        read = "FAIR"
+    else:
+        read = "OVERPRICED"
+    out.setdefault("model_value_read", out.get("value_read"))
+    out.setdefault("model_score", out.get("score"))
+    out["value_read"] = read
+    out["landed_usd"] = str(landed)
+    cap = SCORE_CAPS.get(read)
+    if cap is not None and (out.get("score") or 0) > cap:
+        out["score"] = cap
+    return out
+
+
 async def screen_one(anthropic, http, model, item):
     n = item.normalized or {}
     images = n.get("image_urls") or []
@@ -223,7 +278,8 @@ async def screen_one(anthropic, http, model, item):
         len(v.resale_estimate_usd) != 2 or v.resale_estimate_usd[0] > v.resale_estimate_usd[1]
     ):
         v.resale_estimate_usd = None
-    return dict(status="OK", data=v.model_dump(), usage=response.usage.model_dump())
+    data = reconcile_verdict(v.model_dump(), n)
+    return dict(status="OK", data=data, usage=response.usage.model_dump())
 
 
 async def run_triage(sessions, cfg, limit=None, rescreen=False):
@@ -323,6 +379,29 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
     return processed
 
 
+def reconcile(sessions):
+    """Re-derive value_read/score for every stored OK verdict from its resale range and the
+    item's current landed cost. No model calls."""
+    changed = 0
+    with sessions.begin() as s:
+        rows = s.execute(
+            select(TriageResult, DiscoveredItem)
+            .join(DiscoveredItem, DiscoveredItem.id == TriageResult.item_id)
+            .where(TriageResult.status == "OK")
+        ).all()
+        for t, item in rows:
+            base = dict(t.data)
+            # start from the model's original read/score if a previous reconcile ran
+            base["value_read"] = base.get("model_value_read", base.get("value_read"))
+            base["score"] = base.get("model_score", base.get("score"))
+            new = reconcile_verdict(base, item.normalized or {})
+            if new.get("value_read") != t.data.get("value_read") or new.get("score") != t.score:
+                changed += 1
+            t.data = new
+            t.score = new.get("score")
+    return changed, len(rows)
+
+
 def status(sessions):
     with sessions() as s:
         total = s.scalar(select(func.count(TriageResult.id))) or 0
@@ -375,7 +454,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["run", "status"])
+    parser.add_argument("command", choices=["run", "status", "reconcile"])
     parser.add_argument("--limit", type=int)
     parser.add_argument(
         "--rescreen",
@@ -395,6 +474,9 @@ def main(argv=None):
     try:
         if args.command == "status":
             status(sessions)
+        elif args.command == "reconcile":
+            changed, total = reconcile(sessions)
+            print(f"reconciled {total} verdicts; {changed} changed")
         else:
             asyncio.run(run_triage(sessions, settings(), limit=args.limit, rescreen=args.rescreen))
     finally:
