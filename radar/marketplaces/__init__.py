@@ -51,6 +51,18 @@ def seed_queries():
     return out
 
 
+def queries_for(mod, queries):
+    """Search terms for one marketplace: <SOURCE>_QUERIES from .env (comma-separated), else the
+    adapter's own DEFAULT_QUERIES, else every seed term. Retail-heavy sites get a short list so
+    screening money isn't spent on thousands of full-price listings."""
+    override = os.environ.get(f"{mod.SOURCE.upper()}_QUERIES", "").strip()
+    if override.casefold() == "all":
+        return queries
+    if override:
+        return [q.strip() for q in override.split(",") if q.strip()]
+    return list(getattr(mod, "DEFAULT_QUERIES", None) or queries)
+
+
 def store(sessions, items):
     """Upsert ListingInput rows into discovered_items. Returns (new, refreshed)."""
     new = refreshed = 0
@@ -101,7 +113,7 @@ async def run_marketplaces(sessions, queries=None):
     for mod in active:
         name = mod.SOURCE
         stats = dict(queries=0, listings=0, new=0, refreshed=0, errors=0, calls=0)
-        for q in queries:
+        for q in queries_for(mod, queries):
             try:
                 items, calls = await mod.search(q)
                 stats["calls"] += calls

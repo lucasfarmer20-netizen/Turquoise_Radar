@@ -104,6 +104,7 @@ def test_not_ready_stops_that_adapter_only(tmp_path, monkeypatch):
         monkeypatch.setattr(mod, "configured", lambda: True)
         monkeypatch.setattr(mod, "search", fn)
         monkeypatch.setattr(mod, "PAUSE_SECONDS", 0)
+    monkeypatch.setenv("BONANZA_QUERIES", "all")
     report = asyncio.run(marketplaces.run_marketplaces(sessions, queries=["a", "b"]))
     assert report["Etsy"]["errors"] == 1 and report["Etsy"]["queries"] == 0
     assert report["Bonanza"]["new"] == 1 and report["Bonanza"]["queries"] == 2
@@ -123,3 +124,17 @@ def test_etsy_key_header_pairs_keystring_with_shared_secret(monkeypatch):
     assert etsy.api_key_header() == "abc:xyz"
     monkeypatch.setenv("ETSY_API_KEY", "abc:already")
     assert etsy.api_key_header() == "abc:already"
+
+
+def test_queries_for_uses_override_then_adapter_default(monkeypatch):
+    from radar import marketplaces
+
+    seeds = ["a", "b", "c"]
+    monkeypatch.delenv("BONANZA_QUERIES", raising=False)
+    monkeypatch.delenv("ETSY_QUERIES", raising=False)
+    assert marketplaces.queries_for(bonanza, seeds) == bonanza.DEFAULT_QUERIES
+    assert marketplaces.queries_for(etsy, seeds) == seeds
+    monkeypatch.setenv("BONANZA_QUERIES", "old pawn, zuni inlay ,")
+    assert marketplaces.queries_for(bonanza, seeds) == ["old pawn", "zuni inlay"]
+    monkeypatch.setenv("BONANZA_QUERIES", "all")
+    assert marketplaces.queries_for(bonanza, seeds) == seeds

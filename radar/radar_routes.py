@@ -19,7 +19,7 @@ from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
 from radar.economics import walk_away
 from radar.queue import in_queue
 from radar.queue import settings as queue_settings
-from radar.scheduler import read_state, request_scan, trigger_path
+from radar.scheduler import cycle_running, read_state, request_scan, trigger_path
 from radar.triage import condition_flags, live_verdict, thumb_url
 
 ALASKA = ZoneInfo("America/Anchorage")
@@ -341,7 +341,7 @@ def radar_routes(app, render):
             request,
             "radar.html",
             sched=sched,
-            sched_running=bool(sched.get("running")),
+            sched_running=cycle_running(sched, now),
             sched_requested=trigger_path().exists(),
             sched_next_relative=_relative(sched_next, now) if sched_next else None,
             sched_alive=bool(sched)

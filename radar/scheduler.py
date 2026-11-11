@@ -336,6 +336,37 @@ def _latest_run(sessions, after=0):
 # ---------------------------------------------------------------- loop
 
 
+HEARTBEAT_SECONDS = 60
+STALE_AFTER_SECONDS = 300
+
+
+async def with_heartbeat(coro, every=HEARTBEAT_SECONDS):
+    """Run a cycle while touching the state file, so the page can tell a live cycle from a
+    'running' flag left behind by a restart or a hang."""
+
+    async def beat():
+        while True:
+            await asyncio.sleep(every)
+            write_state(running=True)
+
+    task = asyncio.create_task(beat())
+    try:
+        return await coro
+    finally:
+        task.cancel()
+
+
+def cycle_running(state, now=None):
+    """True only while a cycle is live: flagged running and heard from recently."""
+    if not state.get("running"):
+        return False
+    try:
+        seen = datetime.fromisoformat(state.get("updated_at"))
+    except (TypeError, ValueError):
+        return False
+    return ((now or datetime.now(UTC)) - seen).total_seconds() <= STALE_AFTER_SECONDS
+
+
 def run_forever(sessions, connection, cfg, once=False):
     stop = {"flag": False}
 
@@ -350,7 +381,9 @@ def run_forever(sessions, connection, cfg, once=False):
     while True:
         write_state(running=True, reason=reason, started_at=datetime.now(UTC).isoformat())
         try:
-            run = asyncio.run(cycle(sessions, connection, cfg["mode"], cfg["daily_limit"]))
+            run = asyncio.run(
+                with_heartbeat(cycle(sessions, connection, cfg["mode"], cfg["daily_limit"]))
+            )
             summary = (
                 dict(run_id=run.id, status=run.status, new=run.new_count, dup=run.duplicate_count)
                 if run

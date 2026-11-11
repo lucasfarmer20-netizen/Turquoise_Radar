@@ -13,6 +13,17 @@ from radar.schemas import ListingInput, Shipping
 
 SOURCE = "Bonanza"
 URL = "https://api.bonanza.com/api_requests/standard_request"
+# Bonanza is fixed-price and mostly retail: the full 31-term list screened ~1,700 listings for
+# no finds. These are the terms where an under-priced piece is plausible. BONANZA_QUERIES in
+# .env replaces the list ("all" restores every seed term).
+DEFAULT_QUERIES = [
+    "old pawn",
+    "navajo cuff",
+    "zuni inlay",
+    "squash blossom necklace",
+    "southwestern sterling lot",
+    "estate sterling jewelry lot",
+]
 PAUSE_SECONDS = 0.5
 
 

@@ -440,3 +440,17 @@ def test_unpriced_auction_lot_reaches_queue_on_score(client):
     _triage(client, 1, True, 88)
     html = client.get("/radar").text
     assert 'id="item-1"' in html
+
+
+def test_stale_running_flag_is_not_shown_as_in_progress():
+    from datetime import UTC, datetime, timedelta
+
+    from radar.scheduler import cycle_running
+
+    now = datetime.now(UTC)
+    fresh = {"running": True, "updated_at": (now - timedelta(seconds=40)).isoformat()}
+    stale = {"running": True, "updated_at": (now - timedelta(minutes=20)).isoformat()}
+    assert cycle_running(fresh, now) is True
+    assert cycle_running(stale, now) is False
+    assert cycle_running({"running": False, "updated_at": now.isoformat()}, now) is False
+    assert cycle_running({"running": True}, now) is False

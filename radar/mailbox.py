@@ -112,7 +112,8 @@ def save_state(session, **fields):
 
 
 def connect(cfg):
-    conn = imaplib.IMAP4_SSL(cfg["host"])
+    # Without a timeout a stalled Gmail connection would hang the whole cycle.
+    conn = imaplib.IMAP4_SSL(cfg["host"], timeout=float(os.environ.get("RADAR_IMAP_TIMEOUT", "60")))
     conn.login(cfg["user"], cfg["password"])
     status, data = conn.select(cfg["folder"], readonly=True)
     if status != "OK":
