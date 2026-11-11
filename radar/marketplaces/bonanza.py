@@ -57,7 +57,14 @@ def _first(x):
 def to_listing(raw, query):
     selling = raw.get("sellingStatus") or {}
     shipping = raw.get("shippingInfo") or {}
-    price = _dec(selling.get("convertedCurrentPrice") or selling.get("currentPrice"))
+    info = raw.get("listingInfo") or {}
+    price = _dec(
+        selling.get("convertedCurrentPrice")
+        or selling.get("currentPrice")
+        or info.get("convertedBuyItNowPrice")
+        or info.get("buyItNowPrice")
+        or info.get("price")
+    )
     ship_cost = _dec(shipping.get("shippingServiceCost"))
     if ship_cost is None and (shipping.get("shippingType") or "").lower() == "free":
         ship_cost = Decimal(0)
@@ -85,6 +92,18 @@ def to_listing(raw, query):
     )
 
 
+def items_of(data):
+    """The item list from a findItemsByKeywords response. Bonanza's reference documents
+    searchResult.item; some responses carry item directly under the response."""
+    response = data.get("findItemsByKeywordsResponse") or {}
+    if not isinstance(response, dict):
+        return []
+    items = (response.get("searchResult") or {}).get("item") or response.get("item") or []
+    if isinstance(items, dict):
+        items = [items]
+    return [i for i in items if isinstance(i, dict)]
+
+
 async def search(query):
     body = {
         "findItemsByKeywordsRequest": {
@@ -102,16 +121,14 @@ async def search(query):
         raise NotReady(f"HTTP {r.status_code}: {r.text[:200]}")
     r.raise_for_status()
     data = r.json()
-    if data.get("ack") != "Success":
+    response = data.get("findItemsByKeywordsResponse") or {}
+    ack = data.get("ack") or (response.get("ack") if isinstance(response, dict) else None)
+    if ack != "Success":
         msg = str(data.get("errorMessage") or data)[:200]
         if "dev" in msg.lower() or "cert" in msg.lower() or "auth" in msg.lower():
             raise NotReady(msg)
         raise RuntimeError(msg)
-    items = (
-        ((data.get("findItemsByKeywordsResponse") or {}).get("searchResult") or {}).get("item")
-    ) or []
-    if isinstance(items, dict):
-        items = [items]
+    items = items_of(data)
     out = []
     for raw in items:
         try:
