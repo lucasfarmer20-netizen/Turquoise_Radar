@@ -242,6 +242,36 @@ def _chunks(raws):
         yield chunk
 
 
+def reparse(sessions, source_id):
+    """Re-run the parser over stored messages of one source that produced no items (for use
+    after a parser is added). Messages that already have items are left alone."""
+    import base64
+
+    from radar.db import AlertMessage, AlertObservation
+
+    with sessions.begin() as s:
+        used = set(s.scalars(select(AlertObservation.message_id)))
+        rows = [
+            m
+            for m in s.scalars(select(AlertMessage).where(AlertMessage.source_id == source_id))
+            if m.id not in used
+        ]
+        raws = [base64.b64decode(m.raw_b64) for m in rows]
+        for m in rows:
+            s.delete(m)
+    stats = dict(messages=len(raws), candidates=0, failed=0)
+    for chunk in _chunks(raws):
+        try:
+            with sessions.begin() as s:
+                result = import_alerts(s, source_id, chunk)
+            stats["candidates"] += result.stats.get("new_candidates", 0)
+        except Exception:  # noqa: BLE001
+            stats["failed"] += len(chunk)
+            log.exception("reparse failed for %d %s message(s)", len(chunk), source_id)
+    log.info("reparse %s: %s", source_id, stats)
+    return stats
+
+
 def _plain(stats):
     return {k: (dict(v) if isinstance(v, Counter) else v) for k, v in stats.items()}
 
@@ -255,7 +285,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["test", "poll", "status"])
+    parser.add_argument("command", choices=["test", "poll", "status", "reparse"])
+    parser.add_argument("source", nargs="?", help="source id for reparse, e.g. proxibid")
     parser.add_argument("--env")
     args = parser.parse_args(argv)
     logging.basicConfig(
@@ -278,7 +309,12 @@ def main(argv=None):
         return 0
     engine, sessions = database()
     try:
-        if args.command == "poll":
+        if args.command == "reparse":
+            if not args.source:
+                print("usage: python -m radar.mailbox reparse SOURCE_ID")
+                return 2
+            print(reparse(sessions, args.source))
+        elif args.command == "poll":
             stats = poll(sessions, cfg)
             if stats is not None:
                 print(_plain(stats))

@@ -249,7 +249,10 @@ def listing_context(n):
     return {
         "title": n.get("raw_title"),
         "price": n.get("item_price"),
-        "price_is": "current or starting bid"
+        "price_is": "NOT SHOWN: auction lot with no price yet. Score the piece itself (quality, "
+        "desirability, resale strength) and give the resale range; the owner bids from it"
+        if n.get("item_price") in (None, "") and not n.get("buy_it_now_price")
+        else "current or starting bid"
         if "AUCTION" in (n.get("buying_options") or [])
         else "asking price",
         "buy_it_now_price": n.get("buy_it_now_price"),

@@ -58,7 +58,12 @@ def in_queue(item, triage, now, cfg):
     live = live_verdict(triage.data, item.normalized or {})
     if not triage.relevant or (live.get("score") or 0) < cfg["min_score"]:
         return False
-    if live.get("value_read") != "UNDERPRICED":
+    from radar.triage import landed_cost
+
+    # Auction-house alerts often carry no price at all. Those lots are judged on the piece
+    # alone; the walk-away on the card is the owner's max bid.
+    priced = landed_cost(item.normalized or {}) is not None
+    if priced and live.get("value_read") != "UNDERPRICED":
         return False
     end = _end(item.normalized or {})
     return not (end and end < now)

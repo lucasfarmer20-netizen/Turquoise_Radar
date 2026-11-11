@@ -112,3 +112,67 @@ def test_one_bad_message_does_not_block_the_rest(tmp_path, monkeypatch):
     with sessions() as s:
         assert mailbox.last_uid(s) == 2
     engine.dispose()
+
+
+def _proxibid_html(n_photos=2):
+    card = (
+        '<tr><td><img src="https://images.proxibid.com/AuctionImages/5666/303466/FullDetail/'
+        '{lot}_1.jpg?replaceWithEmailPaddle"></td><td>'
+        '<a href="http://email.proxibid.com/c/eJxAAA{lot}">{title}</a><br>'
+        '<a href="http://email.proxibid.com/c/eJxAAA{lot}">VIEW ITEM</a></td></tr>'
+    )
+    rows = [
+        card.format(lot=64, title="SYNTHETIC 150 GRAM STERLING CONCHO BELT"),
+        card.format(lot=500, title="SYNTHETIC TURQUOISE CLUSTER BUCKLE"),
+    ]
+    if n_photos < 2:
+        rows[1] = rows[1].replace("<img", "<span")
+    return (
+        '<html><body><a href="http://email.proxibid.com/c/logo">'
+        '<img src="https://www.proxibid.com//images/proxibid-logo-new.png"></a>'
+        "<p>There are new items related to your saved searches.</p><h3>Native American Jewelry</h3>"
+        "<table>" + "".join(rows) + "</table>"
+        '<a href="http://email.proxibid.com/c/unsub">Unsubscribe</a></body></html>'
+    )
+
+
+def _html_msg(uid, html):
+    raw = (
+        "From: Proxibid <proxibid@proxibid.com>\r\nTo: turquoise.radar8@gmail.com\r\n"
+        "Subject: New Items In Your Saved Search\r\nDate: Tue, 10 Nov 2026 12:00:00 -0900\r\n"
+        f"Message-ID: <p{uid}@test>\r\nX-Turquoise-Synthetic: true\r\n"
+        f"MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n{html}\r\n"
+    ).encode()
+    return uid, raw
+
+
+def test_proxibid_saved_search_cards_become_items(tmp_path, monkeypatch):
+    from radar.db import DiscoveredItem
+
+    engine, sessions = database(f"sqlite:///{tmp_path / 'm.db'}")
+    _patch_imap(monkeypatch, [_html_msg(1, _proxibid_html())])
+    stats = mailbox.poll(sessions, CFG)
+    assert stats["imported"] == 1 and stats["candidates"] == 2
+    with sessions() as s:
+        items = {i.normalized["source_listing_id"]: i.normalized for i in s.query(DiscoveredItem)}
+    belt = items["303466-64"]
+    assert belt["raw_title"] == "SYNTHETIC 150 GRAM STERLING CONCHO BELT"
+    assert belt["image_urls"] == [
+        "https://images.proxibid.com/AuctionImages/5666/303466/FullDetail/64_1.jpg"
+    ]
+    assert belt["listing_url"] == "https://www.proxibid.com/asp/Catalog.asp?aid=303466"
+    assert "email.proxibid.com" not in str(items)  # tracking links are never kept
+    assert "303466-500" in items
+    engine.dispose()
+
+
+def test_proxibid_mismatched_photos_import_nothing_then_reparse(tmp_path, monkeypatch):
+    engine, sessions = database(f"sqlite:///{tmp_path / 'm.db'}")
+    _patch_imap(monkeypatch, [_html_msg(1, _proxibid_html(n_photos=1))])
+    stats = mailbox.poll(sessions, CFG)
+    assert stats["imported"] == 1 and stats["candidates"] == 0
+    # reparse replays stored messages that produced no items
+    assert mailbox.reparse(sessions, "proxibid") == dict(messages=1, candidates=0, failed=0)
+    with sessions() as s:
+        assert s.query(AlertMessage).count() == 1
+    engine.dispose()

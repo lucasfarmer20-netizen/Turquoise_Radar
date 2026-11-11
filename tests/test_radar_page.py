@@ -433,3 +433,10 @@ def test_interested_list_is_not_hidden_by_queue_default(client):
     r = client.get("/radar?status=interested")
     assert 'id="item-1"' in r.text
     assert "<title>Radar finds</title>" in r.text
+
+
+def test_unpriced_auction_lot_reaches_queue_on_score(client):
+    _add(client, 96, item_price=None, shipping_cost=None, item_end_time=None)
+    _triage(client, 1, True, 88)
+    html = client.get("/radar").text
+    assert 'id="item-1"' in html
