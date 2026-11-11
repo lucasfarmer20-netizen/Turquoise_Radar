@@ -48,6 +48,7 @@ def test_route_matches_parent_domains(tmp_path):
     assert mailbox.route("shopgoodwill.com", domains) == "shopgoodwill"
     assert mailbox.route("mail.auctionzip.com", domains) == "auctionzip"
     assert mailbox.route("proxibid.com", domains) == "proxibid"
+    assert mailbox.route("mail.gem.app", domains) == "gem"
     assert mailbox.route("newsletter.example.com", domains) is None
     assert mailbox.route(None, domains) is None
     engine.dispose()

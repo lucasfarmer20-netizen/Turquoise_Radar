@@ -58,6 +58,12 @@ SOURCES = {
         ["mercari.com"],
         "Owner text/CSV/JSON supported; notification format unverified",
     ),
+    "gem": (
+        "Gem",
+        ["gem.app"],
+        "Saved-search alerts aggregating other marketplaces: format unverified until first "
+        "messages are observed",
+    ),
     "other": (
         "Other authorized estate",
         ["example.invalid"],
