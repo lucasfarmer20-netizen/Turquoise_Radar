@@ -12,7 +12,7 @@
 <div class="stats">
   <div><span>QUEUE</span><strong>{{ queue_total }}</strong><small class="muted">underpriced, score {{ queue_min_score }}+ · {{ counts.get("NEW", 0) }} new total · {{ new_24h }} found in 24h</small></div>
   <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
-  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant</small></div>
+  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant{% if screen_waiting %} · {{ screen_waiting }} waiting{% endif %}</small>{% if screen_paused %}<small style="color:var(--gold)">Screening paused: today's ${{ screen_budget }} budget is spent (${{ screen_spent }}). Resumes at midnight UTC (3 pm Alaska in winter), or raise VISION_DAILY_BUDGET_USD in .env.</small>{% endif %}</div>
   <div><span>LAST CYCLE</span>
     {% if last_run %}
       <strong style="font-size:20px">{{ last_run_relative }}</strong>

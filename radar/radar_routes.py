@@ -20,7 +20,8 @@ from radar.economics import walk_away
 from radar.queue import in_queue
 from radar.queue import settings as queue_settings
 from radar.scheduler import cycle_running, read_state, request_scan, trigger_path
-from radar.triage import condition_flags, live_verdict, thumb_url
+from radar.triage import condition_flags, live_verdict, spent_today, thumb_url
+from radar.triage import settings as triage_settings
 
 ALASKA = ZoneInfo("America/Anchorage")
 DECISIONS = {"interested": "INTERESTED", "pass": "IRRELEVANT", "reset": "NEW"}
@@ -316,6 +317,16 @@ def radar_routes(app, render):
                 s.scalar(select(func.count(TriageResult.id)).where(TriageResult.status == "OK"))
                 or 0
             )
+            waiting = (
+                s.scalar(
+                    select(func.count(DiscoveredItem.id))
+                    .where(DiscoveredItem.id.not_in(select(TriageResult.item_id)))
+                    .where(DiscoveredItem.inbox_status != "IRRELEVANT")
+                )
+                or 0
+            )
+            budget = triage_settings()["daily_budget"]
+            spent = spent_today(s)
             relevant_total = (
                 s.scalar(select(func.count(TriageResult.id)).where(TriageResult.relevant.is_(True)))
                 or 0
@@ -361,6 +372,10 @@ def radar_routes(app, render):
             source=source,
             sources=sources,
             triaged_total=triaged_total,
+            screen_waiting=waiting,
+            screen_paused=waiting > 0 and spent >= budget,
+            screen_budget=f"{budget:.2f}",
+            screen_spent=f"{spent:.2f}",
             queue_total=queue_total,
             queue_min_score=qcfg["min_score"],
             pass_reasons=PASS_REASONS,

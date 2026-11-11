@@ -466,3 +466,34 @@ def test_next_cycle_is_aligned_to_the_hour():
     assert next_boundary(at(9, 5), 3600) == at(10, 0)
     assert next_boundary(at(9, 55), 3600) == at(11, 0)  # under 10 min rest -> skip one
     assert next_boundary(at(9, 10), 1800) == at(9, 30)  # half-hourly aligns to :00/:30
+
+
+def test_screening_paused_notice_when_budget_spent(client, monkeypatch):
+    _add(client, 97)
+    _add(client, 98)
+    _triage(client, 1, True, 88)
+    with client.app.state.sessions.begin() as s:
+        from radar.db import TriageResult
+
+        t = s.query(TriageResult).first()
+        t.cost_usd = "5.00"
+    monkeypatch.setenv("VISION_DAILY_BUDGET_USD", "1.00")
+    html = client.get("/radar").text
+    assert "1 waiting" in html and "Screening paused" in html
+    monkeypatch.setenv("VISION_DAILY_BUDGET_USD", "9.00")
+    assert "Screening paused" not in client.get("/radar").text
+
+
+def test_screen_priority_puts_auctions_before_fixed_price_marketplaces():
+    from types import SimpleNamespace as NS
+
+    from radar.triage import screen_priority
+
+    items = [
+        NS(id=1, source="Bonanza", normalized={"buying_options": ["FIXED_PRICE"]}),
+        NS(id=2, source="eBay", normalized={"buying_options": ["FIXED_PRICE"]}),
+        NS(id=3, source="eBay", normalized={"buying_options": ["AUCTION"]}),
+        NS(id=4, source="Etsy", normalized={}),
+        NS(id=5, source="Proxibid", normalized={"buying_options": ["AUCTION"]}),
+    ]
+    assert [i.id for i in sorted(items, key=screen_priority)] == [5, 3, 2, 4, 1]

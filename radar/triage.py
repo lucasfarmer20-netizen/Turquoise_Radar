@@ -164,6 +164,19 @@ def cost_usd(model, usage):
     ) / Decimal(1_000_000)
 
 
+def screen_priority(item):
+    """Order for spending the daily screening budget: auctions first (they end), then other
+    eBay and alert-email lots, then fixed-price marketplaces; newest first within each."""
+    n = item.normalized or {}
+    if "AUCTION" in (n.get("buying_options") or []):
+        tier = 0
+    elif item.source in ("Etsy", "Bonanza"):
+        tier = 2
+    else:
+        tier = 1
+    return (tier, -item.id)
+
+
 def spent_today(session):
     start = (
         datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=None)
@@ -442,7 +455,7 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
         )
         if limit:
             query = query.limit(limit)
-        items = list(s.scalars(query))
+        items = sorted(s.scalars(query), key=screen_priority)
         spent = spent_today(s)
     if not items:
         log.info("triage: nothing new")
