@@ -21,7 +21,7 @@ import os
 import signal
 import sys
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -336,6 +336,21 @@ def _latest_run(sessions, after=0):
 # ---------------------------------------------------------------- loop
 
 
+MIN_REST_SECONDS = 600
+
+
+def next_boundary(now, interval, min_rest=MIN_REST_SECONDS):
+    """The next clock-aligned start (hourly -> top of the hour), so cycles keep a fixed cadence
+    instead of drifting by however long each one ran. A boundary closer than min_rest is
+    skipped so a long cycle is not followed immediately by another."""
+    interval = max(60, int(interval))
+    epoch = now.timestamp()
+    nxt = (int(epoch) // interval + 1) * interval
+    if nxt - epoch < min(min_rest, interval / 2):
+        nxt += interval
+    return datetime.fromtimestamp(nxt, UTC)
+
+
 HEARTBEAT_SECONDS = 60
 STALE_AFTER_SECONDS = 300
 
@@ -398,7 +413,8 @@ def run_forever(sessions, connection, cfg, once=False):
         if once or stop["flag"]:
             write_state(running=False, last=summary, next_at=None)
             return
-        next_at = datetime.now(UTC) + timedelta(seconds=interval)
+        next_at = next_boundary(datetime.now(UTC), interval)
+        wait = (next_at - datetime.now(UTC)).total_seconds()
         write_state(
             running=False,
             last=summary,
@@ -407,15 +423,13 @@ def run_forever(sessions, connection, cfg, once=False):
             interval_hours=cfg["hours"],
         )
         log.info(
-            "sleeping %.1fh; next cycle at %s",
-            cfg["hours"],
+            "sleeping %.0f min; next cycle at %s",
+            wait / 60,
             next_at.astimezone().strftime("%H:%M %Z"),
         )
         reason = "scheduled"
-        slept = 0
-        while slept < interval and not stop["flag"]:
-            time.sleep(min(5, interval - slept))
-            slept += 5
+        while datetime.now(UTC) < next_at and not stop["flag"]:
+            time.sleep(max(0.0, min(5, (next_at - datetime.now(UTC)).total_seconds())))
             if trigger_path().exists():
                 log.info("scan requested from the web app; running now")
                 reason = "requested"

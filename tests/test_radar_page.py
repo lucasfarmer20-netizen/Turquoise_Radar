@@ -454,3 +454,15 @@ def test_stale_running_flag_is_not_shown_as_in_progress():
     assert cycle_running(stale, now) is False
     assert cycle_running({"running": False, "updated_at": now.isoformat()}, now) is False
     assert cycle_running({"running": True}, now) is False
+
+
+def test_next_cycle_is_aligned_to_the_hour():
+    from datetime import UTC, datetime
+
+    from radar.scheduler import next_boundary
+
+    at = lambda h, m: datetime(2026, 11, 11, h, m, tzinfo=UTC)  # noqa: E731
+    assert next_boundary(at(9, 49), 3600) == at(10, 0)  # finished :49 -> top of the hour
+    assert next_boundary(at(9, 5), 3600) == at(10, 0)
+    assert next_boundary(at(9, 55), 3600) == at(11, 0)  # under 10 min rest -> skip one
+    assert next_boundary(at(9, 10), 1800) == at(9, 30)  # half-hourly aligns to :00/:30
