@@ -96,7 +96,9 @@ async def search(query):
         "sort_order": "desc",
         "limit": int(os.environ.get("ETSY_PAGE_SIZE", "50")),
     }
-    loc = os.environ.get("ETSY_SHOP_LOCATION", "US").strip()
+    # Etsy matches this as a place name: "US" finds nothing, "United States" works.
+    loc = os.environ.get("ETSY_SHOP_LOCATION", "United States").strip()
+    loc = {"US": "United States", "USA": "United States"}.get(loc.upper(), loc)
     if loc:
         params["shop_location"] = loc
     if os.environ.get("ETSY_MIN_PRICE"):
