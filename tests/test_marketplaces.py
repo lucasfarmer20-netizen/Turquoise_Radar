@@ -113,3 +113,13 @@ def test_not_ready_stops_that_adapter_only(tmp_path, monkeypatch):
 def test_seed_queries_are_deduped():
     qs = marketplaces.seed_queries()
     assert len(qs) == len({q.casefold() for q in qs}) and "Old Pawn" in qs
+
+
+def test_etsy_key_header_pairs_keystring_with_shared_secret(monkeypatch):
+    monkeypatch.setenv("ETSY_API_KEY", "abc")
+    monkeypatch.delenv("ETSY_SHARED_SECRET", raising=False)
+    assert etsy.api_key_header() == "abc"
+    monkeypatch.setenv("ETSY_SHARED_SECRET", "xyz")
+    assert etsy.api_key_header() == "abc:xyz"
+    monkeypatch.setenv("ETSY_API_KEY", "abc:already")
+    assert etsy.api_key_header() == "abc:already"

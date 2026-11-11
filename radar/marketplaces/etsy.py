@@ -32,8 +32,16 @@ def configured():
     return bool(os.environ.get("ETSY_API_KEY", "").strip())
 
 
+def api_key_header():
+    """Etsy v3 wants "keystring:shared_secret" in x-api-key. ETSY_API_KEY may already hold the
+    pair; otherwise ETSY_SHARED_SECRET is appended. A bare keystring is sent as-is (and refused)."""
+    key = os.environ["ETSY_API_KEY"].strip()
+    secret = os.environ.get("ETSY_SHARED_SECRET", "").strip()
+    return f"{key}:{secret}" if secret and ":" not in key else key
+
+
 def _headers():
-    return {"x-api-key": os.environ["ETSY_API_KEY"].strip(), "Accept": "application/json"}
+    return {"x-api-key": api_key_header(), "Accept": "application/json"}
 
 
 def _money(m):
