@@ -704,27 +704,47 @@ async def run_deep(sessions, cfg, limit=None):
     return done
 
 
+RECONCILE_BATCH = 500
+
+
 def reconcile(sessions):
     """Re-derive value_read/score for every stored OK verdict from its resale range and the
     item's current landed cost. No model calls."""
-    changed = 0
-    with sessions.begin() as s:
-        rows = s.execute(
-            select(TriageResult, DiscoveredItem)
-            .join(DiscoveredItem, DiscoveredItem.id == TriageResult.item_id)
-            .where(TriageResult.status == "OK")
-        ).all()
-        for t, item in rows:
-            base = dict(t.data)
-            # start from the model's original read/score if a previous reconcile ran
-            base["value_read"] = base.get("model_value_read", base.get("value_read"))
-            base["score"] = base.get("model_score", base.get("score"))
-            new = reconcile_verdict(base, item.normalized or {})
-            if new.get("value_read") != t.data.get("value_read") or new.get("score") != t.score:
-                changed += 1
-            t.data = new
-            t.score = new.get("score")
-    return changed, len(rows)
+    changed = total = 0
+    last = 0
+    while True:
+        # Only listings still in play (archived and passed ones cannot change the queue), in
+        # batches, and only rows whose verdict actually moved are written back.
+        with sessions.begin() as s:
+            rows = s.execute(
+                select(TriageResult, DiscoveredItem)
+                .join(DiscoveredItem, DiscoveredItem.id == TriageResult.item_id)
+                .where(TriageResult.status == "OK")
+                .where(DiscoveredItem.inbox_status.in_(("NEW", "INTERESTED")))
+                .where(TriageResult.id > last)
+                .order_by(TriageResult.id)
+                .limit(RECONCILE_BATCH)
+            ).all()
+            for t, item in rows:
+                base = dict(t.data)
+                # start from the model's original read/score if a previous reconcile ran
+                base["value_read"] = base.get("model_value_read", base.get("value_read"))
+                base["score"] = base.get("model_score", base.get("score"))
+                new = reconcile_verdict(base, item.normalized or {})
+                if new != t.data or new.get("score") != t.score:
+                    if (
+                        new.get("value_read") != t.data.get("value_read")
+                        or new.get("score") != t.score
+                    ):
+                        changed += 1
+                    t.data = new
+                    t.score = new.get("score")
+            total += len(rows)
+            if rows:
+                last = rows[-1][0].id
+        if len(rows) < RECONCILE_BATCH:
+            break
+    return changed, total
 
 
 def status(sessions):

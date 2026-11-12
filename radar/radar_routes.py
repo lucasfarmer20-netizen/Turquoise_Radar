@@ -226,6 +226,16 @@ def radar_routes(app, render):
             if hours > 0:
                 since = (now - timedelta(hours=hours)).replace(tzinfo=None)
                 query = query.where(DiscoveredItem.first_seen >= since)
+            if show == "queue":
+                # The default view: let SQL drop everything that cannot be in the queue so a
+                # page view loads dozens of rows, not every NEW listing.
+                query = query.where(
+                    DiscoveredItem.id.in_(
+                        select(TriageResult.item_id)
+                        .where(TriageResult.relevant.is_(True))
+                        .where(TriageResult.score >= qcfg["min_score"])
+                    )
+                )
             rows = list(s.scalars(query))
             triage = {
                 tr.item_id: tr
@@ -280,12 +290,18 @@ def radar_routes(app, render):
                 c["next_id"] = cards[idx + 1]["id"] if idx + 1 < len(cards) else 0
 
             sources = sorted(set(s.scalars(select(DiscoveredItem.source).distinct())) - {None})
+            # Distinct values straight from SQL; loading every row just to list them is what
+            # made each page view cost as much memory as the whole table.
             phrases = sorted(
                 {
-                    (r.normalized or {}).get("raw_search_phrase")
-                    for r in s.scalars(select(DiscoveredItem))
+                    p
+                    for p in s.scalars(
+                        select(
+                            func.json_extract(DiscoveredItem.normalized, "$.raw_search_phrase")
+                        ).distinct()
+                    )
+                    if isinstance(p, str) and p
                 }
-                - {None}
             )
             counts = dict(
                 s.execute(
@@ -310,7 +326,9 @@ def radar_routes(app, render):
                     select(DiscoveredItem, TriageResult)
                     .join(TriageResult, TriageResult.item_id == DiscoveredItem.id)
                     .where(DiscoveredItem.inbox_status == "NEW")
-                ).all()
+                    .where(TriageResult.relevant.is_(True))
+                    .where(TriageResult.score >= qcfg["min_score"])
+                )
                 if in_queue(it, tr, now, qcfg)
             )
             triaged_total = (
@@ -333,11 +351,13 @@ def radar_routes(app, render):
             )
             week = (now - timedelta(days=7)).replace(tzinfo=None)
             passes = collections.Counter()
-            for it in s.scalars(
-                select(DiscoveredItem).where(DiscoveredItem.inbox_status == "IRRELEVANT")
+            for pr, passed_at in s.execute(
+                select(
+                    func.json_extract(DiscoveredItem.normalized, "$.pass_reason"),
+                    func.json_extract(DiscoveredItem.normalized, "$.passed_at"),
+                ).where(DiscoveredItem.inbox_status == "IRRELEVANT")
             ):
-                pr = (it.normalized or {}).get("pass_reason")
-                pa = _parse_time((it.normalized or {}).get("passed_at"))
+                pa = _parse_time(passed_at)
                 if pr and pa and pa.replace(tzinfo=None) >= week:
                     passes[PASS_REASONS.get(pr, pr)] += 1
             ledger = s.get(Setting, 91)

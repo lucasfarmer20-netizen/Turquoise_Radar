@@ -177,7 +177,7 @@ class DiscoveredItem(Base):
     ebay_item_id: Mapped[str] = mapped_column(String)
     inbox_status: Mapped[str] = mapped_column(String, default="NEW")
     normalized: Mapped[dict] = mapped_column(JSON)
-    original_data: Mapped[dict] = mapped_column(JSON)
+    original_data: Mapped[dict] = mapped_column(JSON, deferred=True)
     listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
     first_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
