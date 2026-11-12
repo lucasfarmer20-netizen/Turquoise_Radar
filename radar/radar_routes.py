@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 
 from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
 from radar.economics import walk_away
-from radar.queue import in_queue
+from radar.queue import in_queue, offer_target, score_floor
 from radar.queue import settings as queue_settings
 from radar.scheduler import cycle_running, read_state, request_scan, trigger_path
 from radar.triage import condition_flags, live_verdict, spent_today, thumb_url
@@ -179,6 +179,8 @@ def card(row, now, triage=None):
         ),
         owner_resale=n.get("owner_resale_usd"),
         buyable_now=_buyable_now(n, td, price, bin_price, ship),
+        offer=offer_target(n, td),
+        takes_offers="BEST_OFFER" in (n.get("buying_options") or []),
         comp_query=td.get("comp_query") or (n.get("raw_title") or "")[:80],
         comps=comp_links(td.get("comp_query") or (n.get("raw_title") or "")[:80]),
         hallmark_read=td.get("hallmark_read"),
@@ -233,7 +235,7 @@ def radar_routes(app, render):
                     DiscoveredItem.id.in_(
                         select(TriageResult.item_id)
                         .where(TriageResult.relevant.is_(True))
-                        .where(TriageResult.score >= qcfg["min_score"])
+                        .where(score_floor(qcfg["min_score"]))
                     )
                 )
             rows = list(s.scalars(query))
@@ -266,7 +268,9 @@ def radar_routes(app, render):
                 soon = now + timedelta(hours=6)
                 cards.sort(
                     key=lambda c: (
-                        1 if c["buyable_now"] and not c["ended"] else 0,
+                        2
+                        if c["buyable_now"] and not c["ended"]
+                        else (1 if c["offer"] and not c["ended"] else 0),
                         1
                         if (c["is_auction"] and c["ends"] and not c["ended"] and c["ends"] <= soon)
                         else 0,
@@ -327,7 +331,7 @@ def radar_routes(app, render):
                     .join(TriageResult, TriageResult.item_id == DiscoveredItem.id)
                     .where(DiscoveredItem.inbox_status == "NEW")
                     .where(TriageResult.relevant.is_(True))
-                    .where(TriageResult.score >= qcfg["min_score"])
+                    .where(score_floor(qcfg["min_score"]))
                 )
                 if in_queue(it, tr, now, qcfg)
             )

@@ -31,6 +31,44 @@ def settings():
         stale_days=int(os.environ.get("RADAR_STALE_DAYS", "7")),
         ended_grace_minutes=int(os.environ.get("RADAR_ENDED_GRACE_MINUTES", "30")),
         purge_days=int(os.environ.get("RADAR_PURGE_DAYS", "14")),
+        offer_max_discount=float(os.environ.get("RADAR_OFFER_MAX_DISCOUNT", "0.30")),
+    )
+
+
+def offer_target(n, live, cfg=None):
+    """The offer to make on a fixed-price listing that accepts Best Offer and is priced above
+    the walk-away: the walk-away price (before shipping), in whole dollars, when that is no
+    more than offer_max_discount below asking. None when no offer applies. Whether a seller
+    accepts is unknown; this only says what the piece is worth to the owner."""
+    from decimal import ROUND_DOWN, Decimal, InvalidOperation
+
+    opts = n.get("buying_options") or []
+    if "BEST_OFFER" not in opts:
+        return None
+    asking = n.get("buy_it_now_price") or (n.get("item_price") if "AUCTION" not in opts else None)
+    wa = (live or {}).get("walk_away_landed_usd")
+    if asking in (None, "") or wa in (None, ""):
+        return None
+    try:
+        asking = Decimal(str(asking))
+        offer = Decimal(str(wa)) - Decimal(str(n.get("shipping_cost") or 0))
+    except (InvalidOperation, TypeError):
+        return None
+    offer = offer.quantize(Decimal(1), rounding=ROUND_DOWN)
+    discount = (cfg or settings())["offer_max_discount"]
+    if offer <= 0 or offer >= asking or offer < asking * (1 - Decimal(str(discount))):
+        return None
+    return offer
+
+
+def score_floor(min_score):
+    """SQL condition: the model's own score (before a price-based cap) clears the bar. Rows
+    that could be queued, either outright or as an offer candidate."""
+    from sqlalchemy import func
+
+    return (
+        func.coalesce(func.json_extract(TriageResult.data, "$.model_score"), TriageResult.score)
+        >= min_score
     )
 
 
@@ -55,15 +93,23 @@ def in_queue(item, triage, now, cfg):
         return False
     from radar.triage import live_verdict
 
-    live = live_verdict(triage.data, item.normalized or {})
-    if not triage.relevant or (live.get("score") or 0) < cfg["min_score"]:
+    n = item.normalized or {}
+    live = live_verdict(triage.data, n)
+    if not triage.relevant:
         return False
     from radar.triage import landed_cost
 
     # Auction-house alerts often carry no price at all. Those lots are judged on the piece
     # alone; the walk-away on the card is the owner's max bid.
-    priced = landed_cost(item.normalized or {}) is not None
+    priced = landed_cost(n) is not None
     if priced and live.get("value_read") != "UNDERPRICED":
+        # Priced above the walk-away, but the seller takes offers and the walk-away is a
+        # realistic one: judge the piece on the model's score before the price cap.
+        if offer_target(n, live, cfg) is None:
+            return False
+        if (live.get("model_score") or live.get("score") or 0) < cfg["min_score"]:
+            return False
+    elif (live.get("score") or 0) < cfg["min_score"]:
         return False
     end = _end(item.normalized or {})
     return not (end and end < now)
@@ -80,7 +126,8 @@ def archive_reason(item, triage, now, cfg):
             return "irrelevant"
         from radar.triage import live_verdict
 
-        if live_verdict(triage.data, n).get("value_read") == "OVERPRICED":
+        live = live_verdict(triage.data, n)
+        if live.get("value_read") == "OVERPRICED" and offer_target(n, live, cfg) is None:
             return "overpriced"
     is_auction = "AUCTION" in (n.get("buying_options") or [])
     first = _aware(item.first_seen)

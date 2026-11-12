@@ -497,3 +497,36 @@ def test_screen_priority_puts_auctions_before_fixed_price_marketplaces():
         NS(id=5, source="Proxibid", normalized={"buying_options": ["AUCTION"]}),
     ]
     assert [i.id for i in sorted(items, key=screen_priority)] == [5, 3, 2, 4, 1]
+
+
+def test_best_offer_listing_above_walk_away_is_queued_with_offer_target():
+    from datetime import UTC, datetime
+    from decimal import Decimal
+    from types import SimpleNamespace as NS
+
+    from radar import queue
+    from radar.triage import live_verdict
+
+    cfg = {**queue.settings(), "min_score": 80}
+    now = datetime.now(UTC)
+    data = {"value_read": "UNDERPRICED", "score": 85, "resale_estimate_usd": [52, 80]}
+
+    def item(options, price="40"):
+        n = {"item_price": price, "shipping_cost": "0", "buying_options": options}
+        return NS(inbox_status="NEW", normalized=n, first_seen=now)
+
+    tr = NS(status="OK", relevant=True, data=data, score=45)
+    offer = item(["FIXED_PRICE", "BEST_OFFER"])
+    live = live_verdict(data, offer.normalized)
+    assert live["value_read"] == "OVERPRICED" and live["model_score"] == 85
+    assert queue.offer_target(offer.normalized, live, cfg) == Decimal(30)  # $40 ask, $30 walk-away
+    assert queue.in_queue(offer, tr, now, cfg) is True
+    assert queue.archive_reason(offer, tr, now, cfg) is None
+    # same listing without Best Offer is simply overpriced
+    plain = item(["FIXED_PRICE"])
+    assert queue.in_queue(plain, tr, now, cfg) is False
+    assert queue.archive_reason(plain, tr, now, cfg) == "overpriced"
+    # an offer more than 30% under asking is not realistic: no target
+    far = item(["FIXED_PRICE", "BEST_OFFER"], price="60")
+    assert queue.offer_target(far.normalized, live_verdict(data, far.normalized), cfg) is None
+    assert queue.in_queue(far, tr, now, cfg) is False

@@ -26,6 +26,8 @@ import httpx
 from sqlalchemy import select
 
 from radar.db import DiscoveredItem, TriageResult, database
+from radar.queue import in_queue, offer_target, score_floor
+from radar.queue import settings as queue_settings
 
 log = logging.getLogger("radar.notify")
 
@@ -64,15 +66,14 @@ def pending_finds(session, cfg):
         .join(DiscoveredItem, DiscoveredItem.id == TriageResult.item_id)
         .where(TriageResult.status == "OK")
         .where(TriageResult.relevant.is_(True))
-        .where(TriageResult.score >= cfg["min_score"])
+        .where(score_floor(cfg["min_score"]))
         .where(DiscoveredItem.inbox_status == "NEW")
     ).all()
-    from radar.triage import live_verdict
-
+    qcfg = {**queue_settings(), "min_score": cfg["min_score"]}
+    now = datetime.now(UTC)
     out = []
     for t, i in rows:
-        live = live_verdict(t.data, i.normalized or {})
-        if live.get("value_read") == "UNDERPRICED" and not t.data.get("notified_at"):
+        if not t.data.get("notified_at") and in_queue(i, t, now, qcfg):
             out.append((t, i))
     return sorted(out, key=lambda ti: (-int(_buy_now(ti[1])), -(ti[0].score or 0)))
 
@@ -124,9 +125,10 @@ def _find_line(t, i, cfg, slack):
     resale_s = f"resale ~${resale[0]}–{resale[1]}" if resale else "resale ?"
     card = f"{cfg['base_url']}/radar?show=all&status=all#item-{i.id}"
     ebay = n.get("listing_url") or ""
-    from radar.triage import condition_flags
+    from radar.triage import condition_flags, live_verdict
 
-    tag = "BUY NOW · " if _buy_now(i) else ""
+    offer = offer_target(n, live_verdict(d, n))
+    tag = f"OFFER ≤ ${offer} · " if offer else ("BUY NOW · " if _buy_now(i) else "")
     flags = condition_flags(n) or d.get("condition_flags") or []
     if flags:
         tag += f"CONDITION ({flags[0]}) · "

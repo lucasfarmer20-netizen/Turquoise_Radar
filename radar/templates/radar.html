@@ -5,7 +5,7 @@
   <div>
     <div class="eyebrow">SCHEDULED DISCOVERY</div>
     <h1>Radar finds</h1>
-    <p class="muted">Your queue: underpriced finds scoring {{ queue_min_score }}+. Buy-It-Now under your walk-away first, then auctions ending within 6h, then by score. Mark Interested or Pass; everything else is auto-archived and one filter away.</p>
+    <p class="muted">Your queue: underpriced finds scoring {{ queue_min_score }}+. Buy-It-Now under your walk-away first, then listings worth an offer, then auctions ending within 6h, then by score. Mark Interested or Pass; everything else is auto-archived and one filter away.</p>
   </div>
 </div>
 
@@ -100,6 +100,7 @@
       <span class="source">{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
         {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}
+        {% if c.offer %}<span class="badge buy" title="Seller accepts offers. This is your walk-away price; open low and stop here.">OFFER ≤ ${{ c.offer }}</span>{% elif c.takes_offers %}<span class="badge" title="Seller accepts offers">OFFERS</span>{% endif %}
         {% if c.condition_flags %}<span class="badge warn" title="seller's listing mentions: {{ c.condition_flags|join(', ') }}">CONDITION · {{ c.condition_flags[0]|upper }}</span>{% endif %}
         {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
         {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
