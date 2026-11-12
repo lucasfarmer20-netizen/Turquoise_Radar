@@ -150,6 +150,7 @@ def settings():
         daily_budget=Decimal(os.environ.get("VISION_DAILY_BUDGET_USD", "1.00")),
         enabled=os.environ.get("VISION_TRIAGE_ENABLED", "true").lower() in ("1", "true", "yes"),
         concurrency=int(os.environ.get("VISION_CONCURRENCY", "4")),
+        max_per_cycle=int(os.environ.get("VISION_MAX_PER_CYCLE", "600")),
         deep_model=os.environ.get("VISION_DEEP_MODEL", "claude-sonnet-5-5"),
         deep_budget=Decimal(os.environ.get("VISION_DEEP_DAILY_BUDGET_USD", "1.50")),
         deep_enabled=os.environ.get("VISION_DEEP_ENABLED", "true").lower() in ("1", "true", "yes"),
@@ -468,6 +469,12 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
             len(items),
         )
         return 0
+    cap = cfg.get("max_per_cycle") or 0
+    if cap and not limit and len(items) > cap:
+        # A backlog is worked off a slice per cycle (highest priority first) so one pass
+        # cannot tie up a small VM for the whole hour.
+        log.info("triage: %d waiting; screening %d this cycle", len(items), cap)
+        items = items[:cap]
     log.info(
         "triage: %d items to screen with %s (spent today $%.3f)", len(items), cfg["model"], spent
     )

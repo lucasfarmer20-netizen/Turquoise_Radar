@@ -14,6 +14,19 @@ import httpx
 from radar.schemas import ListingInput, Shipping
 
 SOURCE = "Etsy"
+# Etsy is retail-priced and huge: all 31 seed terms brought ~230 new listings an hour (about
+# $2 a day to screen) for few finds. ETSY_QUERIES in .env replaces this list; "all" restores
+# every seed term.
+DEFAULT_QUERIES = [
+    "old pawn",
+    "navajo cuff",
+    "zuni inlay",
+    "squash blossom necklace",
+    "concho belt",
+    "fred harvey era",
+    "southwestern sterling lot",
+    "estate sterling jewelry lot",
+]
 BASE = "https://openapi.etsy.com/v3/application"
 PAUSE_SECONDS = 0.3
 WEIGHT_TO_G = {

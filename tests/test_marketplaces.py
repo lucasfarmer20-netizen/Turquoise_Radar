@@ -83,6 +83,7 @@ def test_run_marketplaces_uses_configured_adapters_and_records_state(tmp_path, m
     monkeypatch.setattr(etsy, "search", fake_etsy)
     monkeypatch.setattr(etsy, "PAUSE_SECONDS", 0)
     monkeypatch.setattr(bonanza, "configured", lambda: False)
+    monkeypatch.setenv("ETSY_QUERIES", "all")
     report = asyncio.run(marketplaces.run_marketplaces(sessions, queries=["a", "b", "c"]))
     assert list(report) == ["Etsy"]
     assert report["Etsy"]["new"] == 3 and report["Etsy"]["calls"] == 6 and calls == ["a", "b", "c"]
@@ -105,6 +106,7 @@ def test_not_ready_stops_that_adapter_only(tmp_path, monkeypatch):
         monkeypatch.setattr(mod, "search", fn)
         monkeypatch.setattr(mod, "PAUSE_SECONDS", 0)
     monkeypatch.setenv("BONANZA_QUERIES", "all")
+    monkeypatch.setenv("ETSY_QUERIES", "all")
     report = asyncio.run(marketplaces.run_marketplaces(sessions, queries=["a", "b"]))
     assert report["Etsy"]["errors"] == 1 and report["Etsy"]["queries"] == 0
     assert report["Bonanza"]["new"] == 1 and report["Bonanza"]["queries"] == 2
@@ -133,7 +135,7 @@ def test_queries_for_uses_override_then_adapter_default(monkeypatch):
     monkeypatch.delenv("BONANZA_QUERIES", raising=False)
     monkeypatch.delenv("ETSY_QUERIES", raising=False)
     assert marketplaces.queries_for(bonanza, seeds) == bonanza.DEFAULT_QUERIES
-    assert marketplaces.queries_for(etsy, seeds) == seeds
+    assert marketplaces.queries_for(etsy, seeds) == etsy.DEFAULT_QUERIES
     monkeypatch.setenv("BONANZA_QUERIES", "old pawn, zuni inlay ,")
     assert marketplaces.queries_for(bonanza, seeds) == ["old pawn", "zuni inlay"]
     monkeypatch.setenv("BONANZA_QUERIES", "all")

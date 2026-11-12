@@ -276,3 +276,28 @@ def test_hydrate_description_stores_full_text_once(tmp_path):
     assert FakeAdapter.calls == 1
     assert asyncio.run(triage.hydrate_description(sessions, 1, None)) is False
     engine.dispose()
+
+
+def test_backlog_is_screened_a_slice_per_cycle(tmp_path, monkeypatch):
+    engine, sessions = _db(tmp_path)
+
+    async def fake_screen(anthropic, http, model, item):
+        return dict(
+            status="OK",
+            data={"relevant": False, "score": 5, "category": "UNCLEAR"},
+            usage={"input_tokens": 1, "output_tokens": 1},
+        )
+
+    monkeypatch.setattr(triage, "screen_one", fake_screen)
+    monkeypatch.setattr("anthropic.AsyncAnthropic", lambda **kw: SimpleNamespace(), raising=False)
+    cfg = dict(
+        api_key="k",
+        model="claude-haiku-5-5",
+        daily_budget=Decimal("1"),
+        enabled=True,
+        concurrency=2,
+        max_per_cycle=2,
+    )
+    assert asyncio.run(triage.run_triage(sessions, cfg)) == 2
+    assert asyncio.run(triage.run_triage(sessions, cfg)) == 1
+    engine.dispose()
