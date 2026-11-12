@@ -530,3 +530,15 @@ def test_best_offer_listing_above_walk_away_is_queued_with_offer_target():
     far = item(["FIXED_PRICE", "BEST_OFFER"], price="60")
     assert queue.offer_target(far.normalized, live_verdict(data, far.normalized), cfg) is None
     assert queue.in_queue(far, tr, now, cfg) is False
+
+
+def test_listing_age_shown_and_sortable(client):
+    from datetime import UTC, datetime, timedelta
+
+    old = (datetime.now(UTC) - timedelta(days=47)).isoformat()
+    new = (datetime.now(UTC) - timedelta(days=2)).isoformat()
+    _add(client, 201, listing_time=new)
+    _add(client, 202, listing_time=old)
+    html = client.get("/radar?show=all&sort=listed").text
+    assert "47 days ago" in html and "2 days ago" in html
+    assert html.index('id="item-2"') < html.index('id="item-1"')

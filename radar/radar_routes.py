@@ -81,6 +81,16 @@ def _relative(when, now):
     return f"{text} ago" if past else f"in {text}"
 
 
+def _listed_days(n, now):
+    """Whole days since the marketplace says the listing was created, or None."""
+    listed = _parse_time(n.get("listing_time"))
+    if listed is None:
+        return None
+    if listed.tzinfo is None:
+        listed = listed.replace(tzinfo=UTC)
+    return max(0, (now - listed).days)
+
+
 def _buyable_now(n, td, price, bin_price, ship):
     """True when a fixed price exists and landing it stays under the walk-away landed cost."""
     fixed = (
@@ -155,6 +165,7 @@ def card(row, now, triage=None):
         seller=n.get("seller_id"),
         phrase=n.get("raw_search_phrase") or n.get("original_search_phrase"),
         first_seen=_aware(row.first_seen),
+        listed_days=_listed_days(n, now),
         first_seen_relative=_relative(row.first_seen, now) if row.first_seen else None,
         last_seen=_aware(row.last_seen),
         synthetic=bool(n.get("synthetic")),
@@ -212,7 +223,11 @@ def radar_routes(app, render):
     ):
         status = status if status in STATUS_FILTERS else "new"
         kind = kind if kind in ("all", "auction", "bin") else "all"
-        sort = sort if sort in ("score", "newest", "ending", "price", "price_desc") else "score"
+        sort = (
+            sort
+            if sort in ("score", "newest", "ending", "price", "price_desc", "listed")
+            else "score"
+        )
         show = show if show in ("queue", "relevant", "all", "irrelevant", "untriaged") else "queue"
         if show == "queue" and status != "new":
             show = "all"  # the queue only holds NEW items
@@ -271,6 +286,9 @@ def radar_routes(app, render):
                         2
                         if c["buyable_now"] and not c["ended"]
                         else (1 if c["offer"] and not c["ended"] else 0),
+                        # among offer candidates, the longest-listed come first: a seller
+                        # who has waited is likelier to take less
+                        (c["listed_days"] or 0) if c["offer"] and not c["buyable_now"] else 0,
                         1
                         if (c["is_auction"] and c["ends"] and not c["ended"] and c["ends"] <= soon)
                         else 0,
@@ -284,6 +302,8 @@ def radar_routes(app, render):
                 cards.sort(key=lambda c: (c["ended"], c["ends"] or far))
             elif sort == "price":
                 cards.sort(key=lambda c: (c["price"] is None, c["price"] or 0))
+            elif sort == "listed":
+                cards.sort(key=lambda c: (c["listed_days"] is None, -(c["listed_days"] or 0)))
             elif sort == "price_desc":
                 cards.sort(key=lambda c: (c["price"] is None, -(c["price"] or 0)))
             else:

@@ -62,7 +62,7 @@
     </select></label>
   <label>Sort
     <select name="sort">
-      {% for v, l in [("score","Score"),("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low")] %}
+      {% for v, l in [("score","Score"),("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low"),("listed","Longest listed")] %}
       <option value="{{ v }}" {% if sort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select></label>
   <label>Source
@@ -137,6 +137,7 @@
       <div><dt>Landed{% if c.bin_price %} at bid{% endif %} (before tax)</dt><dd>{{ c.landed|usd }}{% if c.bin_price %} <small class="muted">+{{ c.ship|usd }} ship</small>{% endif %}</dd></div>
       {% if c.walk %}<div class="walk {% if c.price is not none and c.price > c.walk.bid %}over{% endif %}"><dt>Walk away above</dt><dd><strong>{{ c.walk.bid|usd }}</strong> <small class="muted">{{ "bid" if c.is_auction else "price" }} · {{ (c.walk.margin * 100)|int }}% on ${{ c.walk.sale|int }}</small></dd></div>{% endif %}
       <div><dt>{{ "Ends" if c.is_auction else "Listed end" }}</dt><dd class="small">{{ c.ends_local or "unknown" }}</dd></div>
+      {% if c.listed_days is not none %}<div><dt>Listed</dt><dd class="small">{{ "today" if c.listed_days == 0 else c.listed_days ~ " days ago" }}</dd></div>{% endif %}
     </dl>
     <div class="query"><span>FOUND BY</span><code>{{ c.phrase }}</code><span>{{ c.first_seen_relative }}</span></div>
     <div class="links">
