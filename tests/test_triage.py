@@ -301,3 +301,27 @@ def test_backlog_is_screened_a_slice_per_cycle(tmp_path, monkeypatch):
     assert asyncio.run(triage.run_triage(sessions, cfg)) == 2
     assert asyncio.run(triage.run_triage(sessions, cfg)) == 1
     engine.dispose()
+
+
+def test_deep_pass_spend_does_not_count_against_quick_budget(tmp_path):
+    engine, sessions = _db(tmp_path)
+    with sessions.begin() as s:
+        for item_id, model, cost in (
+            (1, "claude-haiku-5-5", "0.10"),
+            (2, "claude-sonnet-5-5", "0.90"),
+        ):
+            s.add(
+                TriageResult(
+                    item_id=item_id,
+                    model=model,
+                    status="OK",
+                    relevant=True,
+                    score=80,
+                    category="X",
+                    data={},
+                    cost_usd=cost,
+                )
+            )
+    with sessions() as s:
+        assert triage.spent_today(s) == Decimal("0.10")
+    engine.dispose()

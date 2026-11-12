@@ -178,11 +178,18 @@ def screen_priority(item):
     return (tier, -item.id)
 
 
-def spent_today(session):
+def spent_today(session, deep_model=None):
+    """Today's quick-screen spend (UTC day). Rows upgraded by the deep pass carry the deep
+    model's name and a fresh timestamp; they are charged to the deep budget, not this one."""
     start = (
         datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=None)
     )
-    rows = session.scalars(select(TriageResult.cost_usd).where(TriageResult.created_at >= start))
+    deep_model = deep_model or os.environ.get("VISION_DEEP_MODEL", "claude-sonnet-5-5")
+    rows = session.scalars(
+        select(TriageResult.cost_usd)
+        .where(TriageResult.created_at >= start)
+        .where(TriageResult.model != deep_model)
+    )
     return sum((Decimal(r) for r in rows), Decimal(0))
 
 
