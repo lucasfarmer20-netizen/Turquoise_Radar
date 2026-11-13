@@ -482,6 +482,35 @@ def radar_routes(app, render):
             back = "/radar"
         return RedirectResponse(f"{back}#item-{item_id}", status_code=303)
 
+    @app.post("/radar/bulk-pass")
+    def radar_bulk_pass(
+        request: Request,
+        ids: list[int] = Form(default_factory=list),  # noqa: B008
+        back: str = Form("/radar"),
+        reason: str = Form("other"),
+        note: str = Form(""),
+    ):
+        """Pass on several listings at once with one reason and optional note."""
+        note = " ".join(note.split())[:300]
+        stamp = datetime.now(UTC).isoformat()
+        with app.state.sessions.begin() as s:
+            rows = s.scalars(select(DiscoveredItem).where(DiscoveredItem.id.in_(ids[:500])))
+            for row in rows:
+                if row.inbox_status == "INTERESTED":
+                    continue  # never bulk-pass something already marked Interested
+                row.inbox_status = DECISIONS["pass"]
+                n = dict(row.normalized or {})
+                n["pass_reason"] = reason if reason in PASS_REASONS else "other"
+                n["passed_at"] = stamp
+                if note:
+                    n["pass_note"] = note
+                else:
+                    n.pop("pass_note", None)
+                row.normalized = n
+        if not back.startswith("/radar"):
+            back = "/radar"
+        return RedirectResponse(back, status_code=303)
+
     @app.post("/radar/{item_id}/decision")
     def radar_decision(
         request: Request,

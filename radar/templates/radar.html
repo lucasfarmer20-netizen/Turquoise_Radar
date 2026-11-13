@@ -12,15 +12,15 @@
 <div class="stats">
   <div><span>QUEUE</span><strong>{{ queue_total }}</strong><small class="muted">underpriced, score {{ queue_min_score }}+ · {{ counts.get("NEW", 0) }} new total · {{ new_24h }} found in 24h</small></div>
   <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
-  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant{% if screen_waiting %} · {{ screen_waiting }} waiting{% endif %}</small>{% if screen_paused %}<small style="color:var(--gold)">Screening paused: today's ${{ screen_budget }} budget is spent (${{ screen_spent }}). Resumes at midnight UTC (3 pm Alaska in winter), or raise VISION_DAILY_BUDGET_USD in .env.</small>{% endif %}</div>
+  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant{% if screen_waiting %} · {{ screen_waiting }} waiting{% endif %}</small>{% if screen_paused %}<small class="rs0">Screening paused: today's ${{ screen_budget }} budget is spent (${{ screen_spent }}). Resumes at midnight UTC (3 pm Alaska in winter), or raise VISION_DAILY_BUDGET_USD in .env.</small>{% endif %}</div>
   <div><span>LAST CYCLE</span>
     {% if last_run %}
-      <strong style="font-size:20px">{{ last_run_relative }}</strong>
+      <strong class="rs3">{{ last_run_relative }}</strong>
       <small class="muted">{{ last_run.mode }} · {{ last_run.status }} · {{ last_run.new_count }} new · {{ calls_today }} API calls today</small>
     {% else %}
-      <strong style="font-size:20px">never</strong><small class="muted">run <code>python -m radar.scheduler run --once</code></small>
+      <strong class="rs3">never</strong><small class="muted">run <code>python -m radar.scheduler run --once</code></small>
     {% endif %}
-    <form method="post" action="/radar/scan" style="margin-top:8px">
+    <form method="post" action="/radar/scan" class="rs5">
       <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
       {% if sched_running %}
         <button type="submit" disabled>Scanning…</button>
@@ -85,7 +85,7 @@
 
 <div class="section-heading">
   <h2>{{ total_matching }} item{{ "" if total_matching == 1 else "s" }}</h2>
-  <span class="muted small">keys: <kbd>J</kbd>/<kbd>K</kbd> next/prev · <kbd>I</kbd> interested · <kbd>P</kbd> pass then <kbd>1</kbd>–<kbd>6</kbd> · <kbd>O</kbd> open{% if pass_stats %} · passes this week: {% for r, n in pass_stats %}{{ r }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</span>
+  <span class="muted small">keys: <kbd>J</kbd>/<kbd>K</kbd> next/prev · <kbd>I</kbd> interested · <kbd>P</kbd> pass then <kbd>1</kbd>–<kbd>6</kbd> · <kbd>O</kbd> open · <kbd>X</kbd> select{% if pass_stats %} · passes this week: {% for r, n in pass_stats %}{{ r }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</span>
   {% if pages > 1 %}<span class="muted">page {{ page }} of {{ pages }}</span>{% endif %}
 </div>
 
@@ -93,11 +93,24 @@
 <div class="panel empty muted">{% if show == "queue" and total > 0 %}Queue is clear. Lower the min score in .env (RADAR_QUEUE_MIN_SCORE) if it stays empty for a day. {% else %}Nothing here yet. {% endif %}{% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
 {% endif %}
 
+{% if cards %}
+<form id="bulk" method="post" action="/radar/bulk-pass" class="bulkbar" hidden>
+  <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+  <strong><span id="bulk-count">0</span> selected</strong>
+  <select name="reason" aria-label="pass reason">
+    {% for key, label in pass_reasons.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+  </select>
+  <input type="text" name="note" maxlength="300" placeholder="note (optional)" aria-label="pass note">
+  <button type="submit">Pass selected</button>
+  <button type="button" class="secondary" id="bulk-all">Select all on page</button>
+  <button type="button" class="secondary" id="bulk-clear">Clear</button>
+</form>
+{% endif %}
 <div class="listing-grid">
 {% for c in cards %}
   <article class="listing-card" id="item-{{ c.id }}">
     <div class="card-top">
-      <span class="source">{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
+      <span class="source">{% if c.status != "INTERESTED" %}<label class="pick" title="Select to pass several at once"><input type="checkbox" name="ids" value="{{ c.id }}" form="bulk" aria-label="select this listing"></label>{% endif %}{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
         {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}
         {% if c.offer %}<span class="badge buy" title="Seller accepts offers. This is your walk-away price; open low and stop here.">OFFER ≤ ${{ c.offer }}</span>{% elif c.takes_offers %}<span class="badge" title="Seller accepts offers">OFFERS</span>{% endif %}
@@ -112,7 +125,7 @@
     </div>
     {% if c.image %}
     <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">
-      <img src="{{ c.image }}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#0b141b">
+      <img src="{{ c.image }}" alt="" loading="lazy" class="rs6">
     </a>
     {% endif %}
     <h3><a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a></h3>
@@ -122,12 +135,12 @@
       {% if c.seller %} · {{ c.seller }}{% endif %}
     </p>
     {% if c.triaged %}
-    <p class="shipping" style="margin-top:6px">
+    <p class="shipping rs4">
       <strong>{{ c.category }}</strong>{% if c.piece_type %} · {{ c.piece_type }}{% endif %}
       {% if c.value_read %} · <span class="{% if c.value_read == 'Underpriced' %}accent{% else %}muted{% endif %}">{{ c.value_read }}</span>{% endif %}
       {% if c.resale %} · resale ~${{ c.resale[0] }}–{{ c.resale[1] }}{% if c.resale_source == "owner" %} <span class="accent">(yours)</span>{% endif %}{% endif %}<br>
       {{ c.reason }}
-      {% if c.signals %}<br><span style="color:var(--teal)">+ {{ c.signals|join(" · ") }}</span>{% endif %}
+      {% if c.signals %}<br><span class="rs1">+ {{ c.signals|join(" · ") }}</span>{% endif %}
       {% if c.concerns %}<br><span class="muted">− {{ c.concerns|join(" · ") }}</span>{% endif %}
     </p>
     {% endif %}
@@ -167,7 +180,7 @@
           {% for key, label in pass_reasons.items() %}
           <button name="reason" value="{{ key }}" class="secondary" data-key="{{ loop.index }}">{{ loop.index }} · {{ label }}</button>
           {% endfor %}
-          <input type="text" name="note" maxlength="300" placeholder="note (optional) — e.g. stone cracked in half" aria-label="pass note" style="flex:1 1 100%;min-width:0">
+          <input type="text" name="note" maxlength="300" placeholder="note (optional) — e.g. stone cracked in half" aria-label="pass note" class="rs2">
         </form>
       </details>
       {% endif %}
@@ -202,42 +215,5 @@
   {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&source={{ source }}&page={{ page + 1 }}">Older →</a>{% endif %}
 </div>
 {% endif %}
-<style>
-  .listing-card:focus-within, .listing-card.active { outline: 2px solid var(--teal); outline-offset: 2px; }
-  .links { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; margin: 6px 0 2px; align-items: baseline; }
-  details.adjust summary { cursor: pointer; margin-top: 6px; }
-  .outcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; margin-top: 8px; }
-  .outcome input { width: 6em; padding: 4px 6px; background: #0b141b; color: inherit; border: 1px solid #2a3942; border-radius: 4px; }
-  .walk dd strong { color: var(--teal); }
-  .walk.over dd strong { color: #e0a24a; }
-  details.pass summary { list-style: none; cursor: pointer; display: inline-block; }
-  details.pass summary::-webkit-details-marker { display: none; }
-  details.pass .reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-  details.pass .reasons button { font-size: 0.8rem; padding: 4px 8px; }
-  kbd { font: inherit; font-size: 0.8em; padding: 0 4px; border: 1px solid #44525c; border-radius: 3px; }
-  @media (max-width: 700px) {
-    .actions { position: sticky; bottom: 0; background: var(--card, #0f1a22); padding: 8px 0 4px; border-top: 1px solid #1f2b34; z-index: 2; }
-    .actions button, .actions summary, .actions .button { min-height: 44px; }
-  }
-</style>
-<script>
-(() => {
-  const cards = Array.from(document.querySelectorAll('.listing-card'));
-  if (!cards.length) return;
-  let idx = Math.max(0, cards.findIndex(c => c.id === location.hash.slice(1)));
-  const mark = () => { cards.forEach(c => c.classList.remove('active')); const c = cards[idx]; if (c) { c.classList.add('active'); c.scrollIntoView({ block: 'center', behavior: 'smooth' }); } };
-  const act = (key) => { const c = cards[idx]; if (!c) return; const el = c.querySelector(`[data-key="${key}"]`); if (!el) return; if (el.tagName === 'SUMMARY') { el.parentElement.open = true; el.parentElement.querySelector('button')?.focus(); } else if (el.tagName === 'A') { window.open(el.href, '_blank'); } else { el.click(); } };
-  document.addEventListener('keydown', (e) => {
-    if (e.target.matches('input, select, textarea')) return;
-    const k = e.key.toLowerCase();
-    if (k === 'j') { idx = Math.min(cards.length - 1, idx + 1); mark(); }
-    else if (k === 'k') { idx = Math.max(0, idx - 1); mark(); }
-    else if (['i', 'p', 'u', 'o', '1', '2', '3', '4', '5', '6'].includes(k)) { e.preventDefault(); act(k); }
-    else if (k === 'escape') { cards[idx]?.querySelector('details.pass')?.removeAttribute('open'); }
-    else return;
-  });
-  cards.forEach((c, i) => c.addEventListener('click', () => { idx = i; cards.forEach(x => x.classList.remove('active')); c.classList.add('active'); }));
-  if (location.hash) mark();
-})();
-</script>
+<script src="/static/radar.js" defer></script>
 {% endblock %}

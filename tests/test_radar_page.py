@@ -542,3 +542,25 @@ def test_listing_age_shown_and_sortable(client):
     html = client.get("/radar?show=all&sort=listed").text
     assert "47 days ago" in html and "2 days ago" in html
     assert html.index('id="item-2"') < html.index('id="item-1"')
+
+
+def test_bulk_pass_marks_selected_and_spares_interested(client):
+    for n in (301, 302, 303):
+        _add(client, n)
+    client.post("/radar/3/decision", data={"decision": "interested"})
+    html = client.get("/radar?show=all&status=all").text
+    assert html.count('name="ids"') == 2 and 'action="/radar/bulk-pass"' in html
+    r = client.post(
+        "/radar/bulk-pass",
+        data={"ids": ["1", "2", "3"], "reason": "condition", "note": "all cracked"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    with client.app.state.sessions() as s:
+        rows = {i.id: i for i in s.query(DiscoveredItem)}
+        assert rows[1].inbox_status == rows[2].inbox_status == "IRRELEVANT"
+        assert rows[1].normalized["pass_reason"] == "condition"
+        assert rows[2].normalized["pass_note"] == "all cracked"
+        assert rows[3].inbox_status == "INTERESTED"
+    # nothing selected is a harmless no-op
+    assert client.post("/radar/bulk-pass", data={}, follow_redirects=False).status_code == 303
