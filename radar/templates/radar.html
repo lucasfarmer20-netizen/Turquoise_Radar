@@ -89,7 +89,14 @@
 </form>
 
 <div class="section-heading">
-  <h2>{{ total_matching }} item{{ "" if total_matching == 1 else "s" }}</h2>
+  <h2>{{ total_matching }} {% if show in ("queue", "hero") and seen == "hide" %}new {% endif %}item{{ "" if total_matching == 1 else "s" }}</h2>
+  {% if show in ("queue", "hero") %}
+  <div class="seenbar">
+    {% if mark_ids %}<form method="post" action="/radar/mark-seen"><input type="hidden" name="ids" value="{{ mark_ids }}"><input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}"><button type="submit" class="secondary">Mark all as seen</button></form>{% endif %}
+    {% if seen == "hide" and seen_hidden %}<a href="/radar?show={{ show }}&seen=show">{{ seen_hidden }} seen hidden · show</a>
+    {% elif seen == "show" %}<a href="/radar?show={{ show }}">Hide seen</a>{% endif %}
+  </div>
+  {% endif %}
   <span class="muted small">keys: <kbd>J</kbd>/<kbd>K</kbd> next/prev · <kbd>I</kbd> interested · <kbd>P</kbd> pass then <kbd>1</kbd>–<kbd>6</kbd> · <kbd>O</kbd> open · <kbd>X</kbd> select{% if pass_stats %} · passes this week: {% for r, n in pass_stats %}{{ r }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</span>
   {% if pages > 1 %}<span class="muted">page {{ page }} of {{ pages }}</span>{% endif %}
 </div>
@@ -113,10 +120,11 @@
 {% endif %}
 <div class="listing-grid">
 {% for c in cards %}
-  <article class="listing-card" id="item-{{ c.id }}">
+  <article class="listing-card{{ ' is-seen' if c.seen else '' }}" id="item-{{ c.id }}">
     <div class="card-top">
       <span class="source">{% if c.status != "INTERESTED" %}<label class="pick" title="Select to pass several at once"><input type="checkbox" name="ids" value="{{ c.id }}" form="bulk" aria-label="select this listing"></label>{% endif %}{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
+        {% if c.seen %}<span class="badge">SEEN</span>{% endif %}
         {% if c.hero %}<span class="badge hero" title="{{ c.hero|join(', ') }}">HERO · {{ c.hero[0]|upper }}</span>{% endif %}
         {% if c.era %}<span class="badge">{{ c.era|upper }}</span>{% endif %}
         {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}

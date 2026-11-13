@@ -174,6 +174,7 @@ def card(row, now, triage=None):
         phrase=n.get("raw_search_phrase") or n.get("original_search_phrase"),
         first_seen=_aware(row.first_seen),
         listed_days=_listed_days(n, now),
+        seen=bool(n.get("seen_at")),
         hero=hero_notes(n, td) if td.get("relevant") else [],
         contemporary=is_contemporary(td),
         era=(td.get("era") or "").title() if td.get("era") not in (None, "UNKNOWN") else None,
@@ -231,7 +232,9 @@ def radar_routes(app, render):
         show: str = "queue",
         min_score: int = 0,
         source: str = "",
+        seen: str = "hide",
     ):
+        seen = "show" if seen == "show" else "hide"
         status = status if status in STATUS_FILTERS else "new"
         kind = kind if kind in ("all", "auction", "bin") else "all"
         sort = (
@@ -335,6 +338,14 @@ def radar_routes(app, render):
                 cards.sort(key=lambda c: (c["price"] is None, -(c["price"] or 0)))
             else:
                 cards.sort(key=lambda c: c["first_seen"] or now, reverse=True)
+            # In the two queues, listings already marked seen drop out of the way by default.
+            seen_hidden = 0
+            mark_ids = ""
+            if show in ("queue", "hero"):
+                seen_hidden = sum(1 for c in cards if c["seen"])
+                if seen == "hide":
+                    cards = [c for c in cards if not c["seen"]]
+                mark_ids = ",".join(str(c["id"]) for c in cards if not c["seen"])
             total_matching = len(cards)
             cards = cards[(page - 1) * per_page : page * per_page]
             for idx, c in enumerate(cards):
@@ -380,7 +391,7 @@ def radar_routes(app, render):
                     .where(TriageResult.relevant.is_(True))
                     .where(score_floor(qcfg["min_score"]))
                 )
-                if in_queue(it, tr, now, qcfg)
+                if in_queue(it, tr, now, qcfg) and not (it.normalized or {}).get("seen_at")
             )
             hero_total = sum(
                 1
@@ -392,7 +403,7 @@ def radar_routes(app, render):
                     .where(score_floor(qcfg["hero_min_score"]))
                     .where(hero_candidates())
                 )
-                if in_hero(it, tr, now, qcfg)
+                if in_hero(it, tr, now, qcfg) and not (it.normalized or {}).get("seen_at")
             )
             triaged_total = (
                 s.scalar(select(func.count(TriageResult.id)).where(TriageResult.status == "OK"))
@@ -443,6 +454,9 @@ def radar_routes(app, render):
             < timedelta(hours=max(2.0, 2 * float(sched.get("interval_hours") or 1))),
             cards=cards,
             total_matching=total_matching,
+            seen=seen,
+            seen_hidden=seen_hidden,
+            mark_ids=mark_ids,
             page=page,
             pages=max(1, -(-total_matching // per_page)),
             status=status,
@@ -522,6 +536,38 @@ def radar_routes(app, render):
         if not back.startswith("/radar"):
             back = "/radar"
         return RedirectResponse(f"{back}#item-{item_id}", status_code=303)
+
+    @app.post("/radar/mark-seen")
+    def radar_mark_seen(
+        request: Request,
+        ids: str = Form(""),
+        back: str = Form("/radar"),
+        undo: str = Form(""),
+    ):
+        """Mark listings as seen (or, with undo, unseen). Seen is not a decision: the listing
+        keeps its status, is still archived on the normal rules, and can still be acted on."""
+        wanted = [int(x) for x in ids.split(",") if x.strip().isdigit()][:2000]
+        stamp = datetime.now(UTC).isoformat()
+        with app.state.sessions.begin() as s:
+            query = select(DiscoveredItem)
+            if wanted:
+                query = query.where(DiscoveredItem.id.in_(wanted))
+            elif undo:
+                query = query.where(
+                    func.json_extract(DiscoveredItem.normalized, "$.seen_at").is_not(None)
+                )
+            else:
+                query = None
+            for row in s.scalars(query) if query is not None else ():
+                n = dict(row.normalized or {})
+                if undo:
+                    n.pop("seen_at", None)
+                else:
+                    n.setdefault("seen_at", stamp)
+                row.normalized = n
+        if not back.startswith("/radar"):
+            back = "/radar"
+        return RedirectResponse(back, status_code=303)
 
     @app.post("/radar/bulk-pass")
     def radar_bulk_pass(

@@ -590,3 +590,24 @@ def test_hero_tab_lists_statement_pieces_contemporary_first(client):
     # score 66 is below the core queue's bar, so neither is in the core queue
     core = client.get("/radar").text
     assert 'id="item-2"' not in core and 'id="item-3"' not in core
+
+
+def test_mark_all_as_seen_hides_them_until_asked(client):
+    for n in (501, 502):
+        _add(client, n, item_price=None, shipping_cost=None, item_end_time=None)
+        _triage(client, n - 500, True, 90)
+    html = client.get("/radar").text
+    assert "2 new items" in html and 'name="ids" value="2,1"' in html
+    client.post("/radar/mark-seen", data={"ids": "1,2"})
+    _add(client, 503, item_price=None, shipping_cost=None, item_end_time=None)
+    _triage(client, 3, True, 90)
+    html = client.get("/radar").text
+    assert "1 new item" in html and 'id="item-3"' in html and 'id="item-1"' not in html
+    assert "2 seen hidden" in html and "Core queue <b>1</b>" in html
+    html = client.get("/radar?seen=show").text
+    assert 'id="item-1"' in html and "SEEN" in html
+    # seen is not a decision: status is untouched, and it can be undone
+    with client.app.state.sessions() as s:
+        assert s.get(DiscoveredItem, 1).inbox_status == "NEW"
+    client.post("/radar/mark-seen", data={"undo": "1"})
+    assert "3 new items" in client.get("/radar").text
