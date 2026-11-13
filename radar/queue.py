@@ -32,6 +32,72 @@ def settings():
         ended_grace_minutes=int(os.environ.get("RADAR_ENDED_GRACE_MINUTES", "30")),
         purge_days=int(os.environ.get("RADAR_PURGE_DAYS", "14")),
         offer_max_discount=float(os.environ.get("RADAR_OFFER_MAX_DISCOUNT", "0.30")),
+        hero_min_score=int(os.environ.get("RADAR_HERO_MIN_SCORE", "60")),
+    )
+
+
+def hero_notes(n, data):
+    """Why a listing counts as a statement / hero piece: the model's notes when it flagged
+    one, plus hero materials the seller names. Empty list when it is not one."""
+    from radar.triage import hero_signals
+
+    notes = list((data or {}).get("statement_notes") or []) if (data or {}).get("statement") else []
+    for term in hero_signals(n):
+        if not any(term in note.casefold() for note in notes):
+            notes.append(term)
+    if (data or {}).get("statement") and not notes:
+        notes = ["statement piece"]
+    return notes
+
+
+def is_contemporary(data):
+    data = data or {}
+    return data.get("era") == "CONTEMPORARY" or str(data.get("category") or "").startswith(
+        "CONTEMPORARY"
+    )
+
+
+def in_hero(item, triage, now, cfg):
+    """True when an item belongs on the Statement / hero tab: a relevant statement piece that
+    is not priced past the walk-away (or takes offers that could get it there). The bar is the
+    piece, not the bargain, so FAIR-priced pieces are shown and the score floor is lower."""
+    if item.inbox_status != "NEW" or triage is None or triage.status != "OK":
+        return False
+    if not triage.relevant:
+        return False
+    n = item.normalized or {}
+    if not hero_notes(n, triage.data):
+        return False
+    from radar.triage import landed_cost, live_verdict
+
+    live = live_verdict(triage.data, n)
+    if (live.get("model_score") or live.get("score") or 0) < cfg["hero_min_score"]:
+        return False
+    if (
+        landed_cost(n) is not None
+        and live.get("value_read") == "OVERPRICED"
+        and offer_target(n, live, cfg) is None
+    ):
+        return False
+    end = _end(n)
+    return not (end and end < now)
+
+
+def hero_candidates():
+    """SQL condition narrowing to rows that could be hero pieces, so the tab does not load
+    every listing: flagged by the model, or naming a hero material."""
+    from sqlalchemy import String, cast, func, or_
+
+    from radar.triage import HERO_TERMS
+
+    text = func.lower(cast(DiscoveredItem.normalized, String))
+    return or_(
+        DiscoveredItem.id.in_(
+            select(TriageResult.item_id).where(
+                func.json_extract(TriageResult.data, "$.statement").in_((1, True))
+            )
+        ),
+        *[text.like(f"%{term}%") for term in HERO_TERMS],
     )
 
 

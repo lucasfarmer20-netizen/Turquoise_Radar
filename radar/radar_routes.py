@@ -17,7 +17,15 @@ from sqlalchemy import func, select
 
 from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
 from radar.economics import walk_away
-from radar.queue import in_queue, offer_target, score_floor
+from radar.queue import (
+    hero_candidates,
+    hero_notes,
+    in_hero,
+    in_queue,
+    is_contemporary,
+    offer_target,
+    score_floor,
+)
 from radar.queue import settings as queue_settings
 from radar.scheduler import cycle_running, read_state, request_scan, trigger_path
 from radar.triage import condition_flags, live_verdict, spent_today, thumb_url
@@ -166,6 +174,9 @@ def card(row, now, triage=None):
         phrase=n.get("raw_search_phrase") or n.get("original_search_phrase"),
         first_seen=_aware(row.first_seen),
         listed_days=_listed_days(n, now),
+        hero=hero_notes(n, td) if td.get("relevant") else [],
+        contemporary=is_contemporary(td),
+        era=(td.get("era") or "").title() if td.get("era") not in (None, "UNKNOWN") else None,
         first_seen_relative=_relative(row.first_seen, now) if row.first_seen else None,
         last_seen=_aware(row.last_seen),
         synthetic=bool(n.get("synthetic")),
@@ -228,8 +239,12 @@ def radar_routes(app, render):
             if sort in ("score", "newest", "ending", "price", "price_desc", "listed")
             else "score"
         )
-        show = show if show in ("queue", "relevant", "all", "irrelevant", "untriaged") else "queue"
-        if show == "queue" and status != "new":
+        show = (
+            show
+            if show in ("queue", "hero", "relevant", "all", "irrelevant", "untriaged")
+            else "queue"
+        )
+        if show in ("queue", "hero") and status != "new":
             show = "all"  # the queue only holds NEW items
         qcfg = queue_settings()
         page = max(1, page)
@@ -253,6 +268,14 @@ def radar_routes(app, render):
                         .where(score_floor(qcfg["min_score"]))
                     )
                 )
+            if show == "hero":
+                query = query.where(hero_candidates()).where(
+                    DiscoveredItem.id.in_(
+                        select(TriageResult.item_id)
+                        .where(TriageResult.relevant.is_(True))
+                        .where(score_floor(qcfg["hero_min_score"]))
+                    )
+                )
             rows = list(s.scalars(query))
             triage = {
                 tr.item_id: tr
@@ -262,6 +285,8 @@ def radar_routes(app, render):
             }
             if show == "queue":
                 rows = [r for r in rows if in_queue(r, triage.get(r.id), now, qcfg)]
+            elif show == "hero":
+                rows = [r for r in rows if in_hero(r, triage.get(r.id), now, qcfg)]
             cards = [card(r, now, triage.get(r.id)) for r in rows]
             if show == "relevant":
                 cards = [c for c in cards if c["relevant"] is True or not c["triaged"]]
@@ -283,6 +308,8 @@ def radar_routes(app, render):
                 soon = now + timedelta(hours=6)
                 cards.sort(
                     key=lambda c: (
+                        # the hero tab leads with contemporary work
+                        1 if show == "hero" and c["contemporary"] else 0,
                         2
                         if c["buyable_now"] and not c["ended"]
                         else (1 if c["offer"] and not c["ended"] else 0),
@@ -355,6 +382,18 @@ def radar_routes(app, render):
                 )
                 if in_queue(it, tr, now, qcfg)
             )
+            hero_total = sum(
+                1
+                for it, tr in s.execute(
+                    select(DiscoveredItem, TriageResult)
+                    .join(TriageResult, TriageResult.item_id == DiscoveredItem.id)
+                    .where(DiscoveredItem.inbox_status == "NEW")
+                    .where(TriageResult.relevant.is_(True))
+                    .where(score_floor(qcfg["hero_min_score"]))
+                    .where(hero_candidates())
+                )
+                if in_hero(it, tr, now, qcfg)
+            )
             triaged_total = (
                 s.scalar(select(func.count(TriageResult.id)).where(TriageResult.status == "OK"))
                 or 0
@@ -421,6 +460,8 @@ def radar_routes(app, render):
             screen_budget=f"{budget:.2f}",
             screen_spent=f"{spent:.2f}",
             queue_total=queue_total,
+            hero_total=hero_total,
+            hero_min_score=qcfg["hero_min_score"],
             queue_min_score=qcfg["min_score"],
             pass_reasons=PASS_REASONS,
             pass_stats=passes.most_common(),

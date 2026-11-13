@@ -51,6 +51,35 @@ CATEGORIES = [
     "UNCLEAR",
 ]
 VALUE_READS = ["UNDERPRICED", "FAIR", "OVERPRICED", "UNCLEAR"]
+ERAS = ["CONTEMPORARY", "VINTAGE", "UNKNOWN"]
+# Materials that mark a statement / hero piece by name. Also used to flag listings screened
+# before the model was asked about statement pieces, from the seller's own words.
+HERO_TERMS = (
+    "spiny oyster",
+    "pink conch",
+    "queen conch",
+    "dry creek",
+    "sonoran gold",
+    "sonoran mountain",
+    "white water",
+    "whitewater",
+    "morenci",
+    "royston",
+    "statement",
+)
+
+
+def hero_signals(n):
+    """Hero materials named in the seller's title or description, in order of appearance."""
+    text = f"{n.get('raw_title') or ''} {n.get('raw_description') or ''}".casefold()
+    found = []
+    for term in HERO_TERMS:
+        if term in text:
+            label = {"whitewater": "white water", "queen conch": "pink conch"}.get(term, term)
+            if label not in found:
+                found.append(label)
+    return found
+
 
 SYSTEM_PROMPT = """You screen online listings for a reseller who sells on live-auction shows.
 His specialty: vintage Native American / Southwestern sterling and turquoise jewelry, old pawn,
@@ -89,6 +118,17 @@ the secondary market (eBay sold listings, live auction shows), not gallery retai
 whenever you can; null only when the photo shows too little. Be honest about the low end: a
 buyer's downside is the low end. VALUE_READ is your one-word judgment of asking price vs that
 range; the system re-derives it from your numbers, so the range matters more than the word.
+
+STATEMENT pieces are a growing part of his shop, separate from the score. Set STATEMENT = true
+when the piece is large, bold or brightly coloured enough to be the hero of a show: oversized
+cuffs and cluster work, big squash blossoms and multi-strand necklaces, wide concho belts, large
+pendants and rings, and anything in vivid material such as spiny oyster (orange, red, purple),
+pink conch, or named high-grade turquoise (Dry Creek, Sonoran Gold, White Water, Morenci,
+Royston, and similar named mines). Judge size and colour from the photo, not the seller's
+adjectives. Dainty, small or plain silver pieces are not statement pieces however good the deal.
+STATEMENT_NOTES says why in a few words. ERA is CONTEMPORARY for recent or current work (clean
+modern finish, living artist, new-looking stones and findings), VINTAGE for older work with
+real age, UNKNOWN when the photo does not settle it.
 
 CONDITION decides whether a deal is a deal. Read the description and the photo for cracked,
 chipped, missing, loose or replaced stones, broken or repaired findings, solder repairs, dents,
@@ -140,6 +180,18 @@ class Verdict(BaseModel):
         max_length=60,
         description="Hallmark or signature exactly as legible in the photos, else null",
     )
+    statement: bool = Field(
+        default=False,
+        description="True for a statement / hero piece: large, bold or brightly coloured, the "
+        "piece that carries an outfit or a show table",
+    )
+    statement_notes: list[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Why it is a statement piece, 1-4 words each: 'spiny oyster', 'Royston "
+        "turquoise', 'oversized cluster', '3 inch wide cuff'. Empty when statement is false.",
+    )
+    era: str = Field(default="UNKNOWN", description="One of: " + ", ".join(ERAS))
     reason: str = Field(max_length=300, description="One sentence, under 30 words")
 
 

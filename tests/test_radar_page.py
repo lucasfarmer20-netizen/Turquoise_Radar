@@ -564,3 +564,29 @@ def test_bulk_pass_marks_selected_and_spares_interested(client):
         assert rows[3].inbox_status == "INTERESTED"
     # nothing selected is a harmless no-op
     assert client.post("/radar/bulk-pass", data={}, follow_redirects=False).status_code == 303
+
+
+def test_hero_tab_lists_statement_pieces_contemporary_first(client):
+    from radar.db import TriageResult
+
+    _add(client, 401)  # plain vintage ring: not a hero piece
+    _add(client, 402, raw_title="SYNTHETIC vintage spiny oyster cluster necklace")
+    _add(client, 403, raw_title="SYNTHETIC big cuff")
+    for item_id in (1, 2, 3):
+        _triage(client, item_id, True, 66)
+    with client.app.state.sessions.begin() as s:
+        t = s.query(TriageResult).filter_by(item_id=3).one()
+        t.data = {
+            **t.data,
+            "statement": True,
+            "statement_notes": ["oversized cuff"],
+            "era": "CONTEMPORARY",
+        }
+    html = client.get("/radar?show=hero").text
+    assert 'id="item-1"' not in html
+    assert "HERO · OVERSIZED CUFF" in html and "HERO · SPINY OYSTER" in html
+    assert html.index('id="item-3"') < html.index('id="item-2"')  # contemporary first
+    assert "Statement / hero <b>2</b>" in html
+    # score 66 is below the core queue's bar, so neither is in the core queue
+    core = client.get("/radar").text
+    assert 'id="item-2"' not in core and 'id="item-3"' not in core
