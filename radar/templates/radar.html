@@ -1,19 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Radar finds{% endblock %}
 {% block content %}
-<div class="page-heading">
-  <div>
-    <div class="eyebrow">SCHEDULED DISCOVERY</div>
-    <h1>Radar finds</h1>
-    {% if show != "hero" %}<p class="muted">Your queue: underpriced finds scoring {{ queue_min_score }}+. Buy-It-Now under your walk-away first, then listings worth an offer, then auctions ending within 6h, then by score. Mark Interested or Pass; everything else is auto-archived and one filter away.</p>{% endif %}
-  </div>
-</div>
-
+<h1 class="sr-title">Radar finds</h1>
 <nav class="viewtabs" aria-label="Queues">
-  <a href="/radar" class="{{ 'on' if show != 'hero' else '' }}">Core queue <b>{{ queue_total }}</b></a>
-  <a href="/radar?show=hero" class="{{ 'on' if show == 'hero' else '' }}">Statement / hero <b>{{ hero_total }}</b></a>
+  <a href="/radar" class="{{ 'on' if show != 'hero' and status == 'new' else '' }}">Core queue <b>{{ queue_total }}</b></a>
+  <a href="/radar?show=hero" class="{{ 'on' if show == 'hero' and status == 'new' else '' }}">Statement / hero <b>{{ hero_total }}</b></a>
+  <a href="/radar?status=interested" class="{{ 'on' if status == 'interested' else '' }}">Interested <b>{{ counts.get("INTERESTED", 0) }}</b></a>
 </nav>
 {% if show == "hero" %}<p class="muted small">Statement pieces: large, bold or bright work and named materials (spiny oyster, pink conch, Dry Creek, Sonoran Gold, White Water, Morenci, Royston). Contemporary first. Shown when the piece scores {{ hero_min_score }}+ and the price is at or under fair, or an offer could get it there.</p>{% endif %}
+<details class="fold"{% if show not in ("queue", "hero") or status != "new" %} open{% endif %}>
+  <summary>Scan, stats and filters{% if last_run %} · last cycle {{ last_run_relative }}{% endif %}{% if screen_paused %} · <span class="rs-warn">screening paused</span>{% endif %}{% if fast and (fast.stale or not fast.ok) %} · <span class="rs-warn">fast lane overdue</span>{% endif %}</summary>
+  {% if show != "hero" %}<p class="muted small">Your queue: underpriced finds scoring {{ queue_min_score }}+. Buy-It-Now under your walk-away first, then listings worth an offer, then auctions ending within 6h, then by score. Mark Interested or Pass; everything else is auto-archived and one filter away.</p>{% endif %}
 <div class="stats">
   <div><span>QUEUE</span><strong>{{ queue_total }}</strong><small class="muted">underpriced, score {{ queue_min_score }}+ · {{ counts.get("NEW", 0) }} new total · {{ new_24h }} found in 24h</small></div>
   <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a>{% if counts.get("ENDED") %} · <a href="/radar?status=ended">{{ counts.get("ENDED") }} ended</a>{% endif %}</small></div>
@@ -117,6 +114,7 @@
 <div class="panel empty muted">{% if show == "queue" and total > 0 %}Queue is clear. Lower the min score in .env (RADAR_QUEUE_MIN_SCORE) if it stays empty for a day. {% else %}Nothing here yet. {% endif %}{% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
 {% endif %}
 
+</details>
 {% if cards %}
 <form id="bulk" method="post" action="/radar/bulk-pass" class="bulkbar" hidden>
   <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
@@ -133,9 +131,20 @@
 <div class="listing-grid">
 {% for c in cards %}
   <article class="listing-card{{ ' is-seen' if c.seen else '' }}" id="item-{{ c.id }}">
-    <div class="card-top">
-      <span class="source">{% if c.status != "INTERESTED" %}<label class="pick" title="Select to pass several at once"><input type="checkbox" name="ids" value="{{ c.id }}" form="bulk" aria-label="select this listing"></label>{% endif %}{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
-      <div class="labels">
+    <div class="c-row">
+      {% if c.image %}<a class="c-thumb" href="{{ c.url }}" target="_blank" rel="noopener noreferrer"><img src="{{ c.image }}" alt="" loading="lazy"></a>{% endif %}
+      <div class="c-main">
+        <div class="c-meta">
+          <span class="source">{% if c.status != "INTERESTED" %}<label class="pick" title="Select to pass several at once"><input type="checkbox" name="ids" value="{{ c.id }}" form="bulk" aria-label="select this listing"></label>{% endif %}{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
+          {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
+        </div>
+        <h3><a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a></h3>
+        <p class="c-price">
+          <strong class="accent">{{ c.price|usd }}</strong>
+          <span class="muted">{% if c.is_auction %}{{ "bid" if c.bid_count else "start" }}{% if c.bid_count %} · {{ c.bid_count }}{% endif %}{% else %}price{% endif %}{% if c.bin_price %} · BIN {{ c.bin_price|usd }}{% endif %}{% if c.ship is not none %} · +{{ c.ship|usd }} ship{% endif %}</span>
+          {% if c.walk %}<span class="c-max{% if c.price is not none and c.price > c.walk.bid %} over{% endif %}">max <strong>{{ c.walk.bid|usd }}</strong></span>{% endif %}
+        </p>
+        <div class="labels">
         {% if c.seen %}<span class="badge">SEEN</span>{% endif %}
         {% if c.marketplace %}<span class="badge" title="Listed at {{ c.original_price }}; converted to USD. Check for coral or shell before importing.">{{ c.marketplace|upper }} · {{ c.original_price }}</span>{% endif %}
         {% if c.hero %}<span class="badge hero" title="{{ c.hero|join(', ') }}">HERO · {{ c.hero[0]|upper }}</span>{% endif %}
@@ -143,20 +152,47 @@
         {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}
         {% if c.offer %}<span class="badge buy" title="Seller accepts offers. This is your walk-away price; open low and stop here.">OFFER ≤ ${{ c.offer }}</span>{% elif c.takes_offers %}<span class="badge" title="Seller accepts offers">OFFERS</span>{% endif %}
         {% if c.condition_flags %}<span class="badge warn" title="seller's listing mentions: {{ c.condition_flags|join(', ') }}">CONDITION · {{ c.condition_flags[0]|upper }}</span>{% endif %}
-        {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
         {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
         {% if c.status == "IRRELEVANT" %}<span class="badge">PASSED</span>{% endif %}
         {% if c.status == "ARCHIVED" %}<span class="badge">ARCHIVED · {{ (c.archive_reason or "")|upper }}</span>{% endif %}
         {% if c.is_auction and c.ends_relative and not c.ended %}<span class="badge review">ENDS {{ c.ends_relative|upper }}</span>{% endif %}
         {% if c.ended %}<span class="badge">RECORDED END PASSED</span>{% endif %}
+        </div>
       </div>
     </div>
-    {% if c.image %}
-    <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">
-      <img src="{{ c.image }}" alt="" loading="lazy" class="rs6">
-    </a>
-    {% endif %}
-    <h3><a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a></h3>
+    {% if c.triaged and c.reason %}<p class="c-reason">{{ c.reason }}</p>{% endif %}
+    <div class="feed-actions actions" data-item="{{ c.id }}">
+      {% if c.status != "INTERESTED" %}
+      <form method="post" action="/radar/{{ c.id }}/decision">
+        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+        <input type="hidden" name="next_id" value="{{ c.next_id }}">
+        <button name="decision" value="interested" data-key="i">Interested</button>
+      </form>
+      {% endif %}
+      {% if c.status != "IRRELEVANT" %}
+      <details class="pass">
+        <summary class="button secondary" data-key="p">Pass…</summary>
+        <form method="post" action="/radar/{{ c.id }}/decision" class="reasons">
+          <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+          <input type="hidden" name="next_id" value="{{ c.next_id }}">
+          <input type="hidden" name="decision" value="pass">
+          {% for key, label in pass_reasons.items() %}
+          <button name="reason" value="{{ key }}" class="secondary" data-key="{{ loop.index }}">{{ loop.index }} · {{ label }}</button>
+          {% endfor %}
+          <input type="text" name="note" maxlength="300" placeholder="note (optional) — e.g. stone cracked in half" aria-label="pass note" class="rs2">
+        </form>
+      </details>
+      {% endif %}
+      {% if c.status != "NEW" %}
+      <form method="post" action="/radar/{{ c.id }}/decision">
+        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}#item-{{ c.id }}">
+        <button class="secondary" name="decision" value="reset" data-key="u">{{ "Restore" if c.status == "ARCHIVED" else "Undo" }}</button>
+      </form>
+      {% endif %}
+      <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" data-key="o">Open on {{ c.source }}</a>
+    </div>
+    <details class="c-more">
+      <summary class="muted small">Details · comps{% if c.hallmark_read %} · hallmark{% endif %} · resale</summary>
     <p class="shipping">
       {% if c.ship_status == "CONFIRMED_TO_ALASKA" %}Ships to 99669{% elif c.ship_status == "UNKNOWN" %}Alaska shipping unconfirmed{% else %}{{ c.ship_status|replace("_"," ")|lower }}{% endif %}
       {% if c.condition %} · {{ c.condition }}{% endif %}
@@ -190,36 +226,6 @@
       {% if c.watched_at %}<span class="muted" title="{{ c.watched_at }}">watching · bid refreshed hourly</span>{% endif %}
       {% if c.pass_reason %}<span class="muted">passed: {{ c.pass_reason }}{% if c.pass_note %} — “{{ c.pass_note }}”{% endif %}</span>{% endif %}
     </div>
-    <div class="feed-actions actions" data-item="{{ c.id }}">
-      {% if c.status != "INTERESTED" %}
-      <form method="post" action="/radar/{{ c.id }}/decision">
-        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
-        <input type="hidden" name="next_id" value="{{ c.next_id }}">
-        <button name="decision" value="interested" data-key="i">Interested</button>
-      </form>
-      {% endif %}
-      {% if c.status != "IRRELEVANT" %}
-      <details class="pass">
-        <summary class="button secondary" data-key="p">Pass…</summary>
-        <form method="post" action="/radar/{{ c.id }}/decision" class="reasons">
-          <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
-          <input type="hidden" name="next_id" value="{{ c.next_id }}">
-          <input type="hidden" name="decision" value="pass">
-          {% for key, label in pass_reasons.items() %}
-          <button name="reason" value="{{ key }}" class="secondary" data-key="{{ loop.index }}">{{ loop.index }} · {{ label }}</button>
-          {% endfor %}
-          <input type="text" name="note" maxlength="300" placeholder="note (optional) — e.g. stone cracked in half" aria-label="pass note" class="rs2">
-        </form>
-      </details>
-      {% endif %}
-      {% if c.status != "NEW" %}
-      <form method="post" action="/radar/{{ c.id }}/decision">
-        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}#item-{{ c.id }}">
-        <button class="secondary" name="decision" value="reset" data-key="u">{{ "Restore" if c.status == "ARCHIVED" else "Undo" }}</button>
-      </form>
-      {% endif %}
-      <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" data-key="o">Open on {{ c.source }}</a>
-    </div>
     <details class="adjust">
       <summary class="muted small">{{ "Your resale set" if c.owner_resale else "Set your resale" }}{% if c.status in ("INTERESTED", "ENDED") %} · bought / sold{% endif %}</summary>
       <form method="post" action="/radar/{{ c.id }}/outcome" class="outcome">
@@ -232,6 +238,7 @@
         {% endif %}
         <button class="secondary" type="submit">Save</button>
       </form>
+    </details>
     </details>
   </article>
 {% endfor %}
