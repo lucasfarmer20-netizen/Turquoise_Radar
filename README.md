@@ -540,3 +540,19 @@ JRI-020's [offline fresh-pilot qualification](docs/JRI-020.md) exercises a new
 isolated synthetic cohort, exact one-shot request limits and fresh deletion gates.
 It is not a live launcher: username-only seller identity remains quarantined, and
 real inventory/maintenance integration is still required before a sourcing beta.
+
+## Sources added from the November 2026 sourcing research
+
+- **Foreign eBay sites** (`radar/foreign.py`): eBay Germany and UK through the Browse API with
+  local-language phrases, limited to sellers who deliver to the US. Prices are stored in USD at
+  the ECB daily reference rate (or `RADAR_FX_EUR` / `RADAR_FX_GBP`), the seller's original
+  amount is kept, and `RADAR_IMPORT_RATE` (default 15%) is allowed for in the max price.
+  A currency with no rate is skipped. Not verified against live eBay at the time of writing.
+- **Shop feeds** (`radar/feeds.py`): the standard Shopify product Atom feed of the stores in
+  `RADAR_SHOP_FEEDS`. Seller tags (artist, tribal affiliation) are kept as evidence to verify.
+- **Sourcing calendar** (`fixtures/sourcing_calendar.json`): dated sales shown on the Radar
+  page, one Slack reminder each. Dates are from news reports; confirm on the auctioneer's site.
+- **Pickup lots**: a lot from a source that quotes no shipping is costed with
+  `RADAR_PICKUP_RATE` (5%) and `RADAR_FORWARD_POSTAGE` ($12).
+- **Not built**: GSA Auctions. Its response fields could not be confirmed, and nothing is
+  written against an unverified API.
