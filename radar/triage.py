@@ -645,7 +645,7 @@ async def run_deep(sessions, cfg, limit=None):
         return 0
     from anthropic import AsyncAnthropic
 
-    from radar.queue import in_queue
+    from radar.queue import in_queue, score_floor
     from radar.queue import settings as queue_settings
 
     now = datetime.now(UTC)
@@ -655,6 +655,8 @@ async def run_deep(sessions, cfg, limit=None):
             select(DiscoveredItem, TriageResult)
             .join(TriageResult, TriageResult.item_id == DiscoveredItem.id)
             .where(DiscoveredItem.inbox_status == "NEW")
+            .where(TriageResult.relevant.is_(True))
+            .where(score_floor(qcfg["min_score"]))
         ).all()
         todo = [
             (it.id, tr.id)

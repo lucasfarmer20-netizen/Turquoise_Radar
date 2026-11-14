@@ -256,37 +256,33 @@ async def cycle(sessions, connection, mode, daily_limit):
     if run.errors:
         for err in run.errors[:5]:
             log.warning("  %s", err)
-    market_new = 0
     try:
         from radar.category_sweep import run as run_sweep
 
-        sweep_stats = await run_sweep(sessions)
-        market_new += (sweep_stats or {}).get("new", 0)
+        await run_sweep(sessions)
     except Exception:
         log.exception("category sweep failed; will retry next cycle")
     try:
         from radar.marketplaces import run_marketplaces
 
-        report = await run_marketplaces(sessions)
-        market_new = sum(v.get("new", 0) for v in report.values())
+        await run_marketplaces(sessions)
     except Exception:
         log.exception("marketplace adapters failed; will retry next cycle")
-    mail_new = 0
     try:
         from radar.mailbox import poll as poll_mailbox
 
-        mail_stats = poll_mailbox(sessions)
-        mail_new = (mail_stats or {}).get("candidates", 0)
+        poll_mailbox(sessions)
     except Exception:
         log.exception("mailbox poll failed; will retry next cycle")
-    if run.new_count or mail_new or market_new:
+    # Always run: with a per-cycle cap, a backlog must keep draining even in an hour that
+    # found nothing new. run_triage returns at once when nothing is waiting.
+    try:
         from radar.triage import run_triage
         from radar.triage import settings as triage_settings
 
-        try:
-            await run_triage(sessions, triage_settings())
-        except Exception:
-            log.exception("triage failed; discovery results are kept")
+        await run_triage(sessions, triage_settings())
+    except Exception:
+        log.exception("triage failed; discovery results are kept")
     try:
         from radar.triage import run_deep
         from radar.triage import settings as triage_settings
