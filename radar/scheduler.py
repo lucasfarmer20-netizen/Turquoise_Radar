@@ -368,13 +368,13 @@ async def fast_cycle(sessions, daily_limit):
         log.exception("fast lane: marketplace check failed")
     with sessions() as s:
         ids = list(s.scalars(select(DiscoveredItem.id).where(DiscoveredItem.id > before)))
-    if not ids:
-        return 0
     from radar.notify import notify_pending
     from radar.triage import run_triage
     from radar.triage import settings as triage_settings
 
-    await run_triage(sessions, triage_settings(), item_ids=ids)
+    if ids:
+        await run_triage(sessions, triage_settings(), item_ids=ids)
+    # Always check: an auction already known may just have entered its last hour.
     await notify_pending(sessions)
     return len(ids)
 

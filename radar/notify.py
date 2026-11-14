@@ -42,6 +42,7 @@ def settings():
         ),
         max_items=int(os.environ.get("RADAR_NOTIFY_MAX_ITEMS", "10")),
         ending_hours=float(os.environ.get("RADAR_NOTIFY_ENDING_HOURS", "2")),
+        auction_hours=float(os.environ.get("RADAR_NOTIFY_AUCTION_HOURS", "1")),
         base_url=os.environ.get("RADAR_PUBLIC_URL", "http://radar:8000").rstrip("/"),
     )
 
@@ -73,8 +74,16 @@ def pending_finds(session, cfg):
     now = datetime.now(UTC)
     out = []
     for t, i in rows:
-        if not t.data.get("notified_at") and in_queue(i, t, now, qcfg):
-            out.append((t, i))
+        if t.data.get("notified_at") or not in_queue(i, t, now, qcfg):
+            continue
+        n = i.normalized or {}
+        if "AUCTION" in (n.get("buying_options") or []) and not n.get("buy_it_now_price"):
+            # A plain auction is only worth an alert in its last hour, at the bid it has
+            # then. Until that point it waits (un-notified) and is re-judged each check.
+            end = _parse(n.get("item_end_time"))
+            if end is None or end > now + timedelta(hours=cfg.get("auction_hours", 1)):
+                continue
+        out.append((t, i))
     return sorted(out, key=lambda ti: (-int(_buy_now(ti[1])), -(ti[0].score or 0)))
 
 

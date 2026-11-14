@@ -116,3 +116,33 @@ def test_unconfigured_is_noop(tmp_path):
     engine, sessions = _db(tmp_path)
     assert asyncio.run(notify.notify_pending(sessions, {**CFG, "slack": ""})) == 0
     engine.dispose()
+
+
+def test_plain_auction_alerts_only_in_its_last_hour(tmp_path):
+    from datetime import timedelta
+
+    engine, sessions = _db(tmp_path)
+    now = datetime.now(UTC)
+
+    def set_item_one(end, **extra):
+        with sessions.begin() as s:
+            item = s.get(DiscoveredItem, 1)
+            item.normalized = {
+                **item.normalized,
+                "buying_options": ["AUCTION"],
+                "item_end_time": end.isoformat(),
+                "buy_it_now_price": None,
+                **extra,
+            }
+
+    def pending_ids():
+        with sessions() as s:
+            return [t.item_id for t, _ in notify.pending_finds(s, {**CFG, "auction_hours": 1})]
+
+    set_item_one(now + timedelta(hours=20))
+    assert pending_ids() == []  # still underpriced, but hours from closing
+    set_item_one(now + timedelta(minutes=40))
+    assert pending_ids() == [1]  # last hour
+    set_item_one(now + timedelta(hours=20), buy_it_now_price="40")
+    assert pending_ids() == [1]  # a Buy It Now alerts whenever it appears
+    engine.dispose()

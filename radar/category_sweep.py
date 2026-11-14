@@ -100,9 +100,10 @@ def store(sessions, raws, mode, label):
     return new, refreshed, invalid
 
 
-# The fast lane: newest fixed-price listings in every style, plus newest auctions in the first
-# style (an auction's Buy It Now disappears at the first bid, so it has to be seen new).
-FAST_LANES = (("FIXED_PRICE", "newlyListed"), ("AUCTION", "newlyListed"))
+# The fast lane: newest fixed-price listings in every style, plus the auctions closing soonest
+# in the first style, so their current bids are fresh when the last-hour alert is decided.
+# Newly listed auctions are deliberately left out: an opening bid says nothing.
+FAST_LANES = (("FIXED_PRICE", "newlyListed"), ("AUCTION", "endingSoonest"))
 
 
 async def run(sessions, cfg=None, fast=False):
