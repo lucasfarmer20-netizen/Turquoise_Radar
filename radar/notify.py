@@ -123,7 +123,6 @@ def _find_line(t, i, cfg, slack):
     n = i.normalized or {}
     d = t.data
     title = (n.get("raw_title") or "(untitled)")[:80]
-    landed = d.get("landed_usd")
     price = n.get("buy_it_now_price") or n.get("item_price")
     kind = (
         "BIN"
@@ -141,6 +140,14 @@ def _find_line(t, i, cfg, slack):
     flags = condition_flags(n) or d.get("condition_flags") or []
     if flags:
         tag += f"CONDITION ({flags[0]}) · "
+    from radar.economics import acquisition_terms, walk_away
+
+    low = (n.get("owner_resale_usd") or resale or [None])[0]
+    walk = walk_away(low, *acquisition_terms(n))
+    limit = ""
+    if walk:
+        word = "max bid" if kind == "bid" else "max price"
+        limit = f"*{word} {_usd(walk['bid'])}* · " if slack else f"{word} {_usd(walk['bid'])} · "
     if slack:
         head = f"*{t.score}* · {tag}<{ebay}|{title}>"
         tail = f"<{card}|card>"
@@ -149,7 +156,7 @@ def _find_line(t, i, cfg, slack):
         tail = ebay
     return (
         f"{head}\n"
-        f"    {_usd(price)} {kind} → {_usd(landed)} landed · {resale_s} · "
+        f"    {_usd(price)} {kind} · {limit}{resale_s} · "
         f"{(d.get('category') or '').replace('_', ' ').title()}\n"
         f"    {d.get('reason', '')}\n"
         f"    {tail}"

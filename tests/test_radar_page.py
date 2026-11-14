@@ -340,7 +340,9 @@ def test_card_shows_walk_away_and_links(client):
         t = s.get(TriageResult, 1)
         t.data = {**t.data, "value_read": "UNDERPRICED", "resale_estimate_usd": [250, 400]}
     html = client.get("/radar").text
-    assert "Walk away above" in html and "$156.77" in html  # 250 -> 35% tier, minus $8 ship
+    assert (
+        "Max bid" in html or "Max price" in html
+    ) and "$156.77" in html  # 250 -> 35% tier, minus $8 ship
     assert "LH_Sold=1" in html and "lens.google.com/uploadbyurl" in html
     assert 'data-key="i"' in html and "Pass…" in html
 

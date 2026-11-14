@@ -146,3 +146,13 @@ def test_plain_auction_alerts_only_in_its_last_hour(tmp_path):
     set_item_one(now + timedelta(hours=20), buy_it_now_price="40")
     assert pending_ids() == [1]  # a Buy It Now alerts whenever it appears
     engine.dispose()
+
+
+def test_digest_states_the_max_price(tmp_path):
+    engine, sessions = _db(tmp_path)
+    with sessions() as s:
+        finds = notify.pending_finds(s, CFG)
+        text = notify.build_message(finds, [], datetime.now(UTC), CFG, slack=True)
+    # resale low $90 -> 50% tier -> landed $53.26, minus $5 shipping
+    assert "*max price $48.26*" in text and "landed" not in text
+    engine.dispose()
