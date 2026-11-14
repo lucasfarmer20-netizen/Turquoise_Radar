@@ -379,6 +379,36 @@ async def fast_cycle(sessions, daily_limit):
     return len(ids)
 
 
+def record_fast(found, ok, now=None):
+    """Keep a rolling hour of fast-lane checks in the state file, so the page can show that
+    the lane is alive even when it is finding nothing."""
+    now = now or datetime.now(UTC)
+    cutoff = (now.timestamp()) - 3600
+    recent = [r for r in (read_state().get("fast_recent") or []) if r[0] >= cutoff]
+    recent.append([now.timestamp(), int(found or 0), bool(ok)])
+    write_state(fast_recent=recent[-40:], fast_at=now.isoformat(), fast_ok=bool(ok))
+
+
+def fast_summary(state, now=None):
+    """dict(at, ok, checks, new) for the last hour, or None when the lane has never run."""
+    if not state.get("fast_at"):
+        return None
+    now = now or datetime.now(UTC)
+    cutoff = now.timestamp() - 3600
+    recent = [r for r in (state.get("fast_recent") or []) if r[0] >= cutoff]
+    try:
+        at = datetime.fromisoformat(state["fast_at"])
+    except (TypeError, ValueError):
+        return None
+    return dict(
+        at=at,
+        ok=bool(state.get("fast_ok", True)),
+        checks=len(recent),
+        new=sum(r[1] for r in recent),
+        stale=(now - at).total_seconds() > 1200,
+    )
+
+
 MIN_REST_SECONDS = 600
 
 
@@ -485,10 +515,13 @@ def run_forever(sessions, connection, cfg, once=False):
                 and time.monotonic() >= next_fast
                 and (next_at - datetime.now(UTC)).total_seconds() > 120
             ):
+                found, ok = 0, True
                 try:
-                    asyncio.run(fast_cycle(sessions, cfg["daily_limit"]))
+                    found = asyncio.run(fast_cycle(sessions, cfg["daily_limit"]))
                 except Exception:
+                    ok = False
                     log.exception("fast lane failed; will retry")
+                record_fast(found, ok)
                 next_fast = time.monotonic() + fast_every
         if stop["flag"]:
             write_state(running=False)

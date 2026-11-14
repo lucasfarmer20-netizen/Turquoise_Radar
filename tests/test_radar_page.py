@@ -658,3 +658,22 @@ def test_far_off_plain_auction_waits_but_bin_auction_shows():
     assert queue.in_queue(lot(6), tr, now, cfg) is False  # opening bid, 6 days out
     assert queue.in_queue(lot(1), tr, now, cfg) is True  # closes tomorrow
     assert queue.in_queue(lot(6, buy_it_now_price="60"), tr, now, cfg) is True  # BIN can vanish
+
+
+def test_fast_lane_status_summarises_the_last_hour():
+    from datetime import UTC, datetime, timedelta
+
+    from radar.scheduler import fast_summary
+
+    now = datetime.now(UTC)
+    ts = lambda m: (now - timedelta(minutes=m)).timestamp()  # noqa: E731
+    state = {
+        "fast_at": (now - timedelta(minutes=3)).isoformat(),
+        "fast_ok": True,
+        "fast_recent": [[ts(90), 5, True], [ts(40), 2, True], [ts(3), 0, True]],
+    }
+    f = fast_summary(state, now)
+    assert (f["checks"], f["new"], f["ok"], f["stale"]) == (2, 2, True, False)
+    state["fast_at"] = (now - timedelta(minutes=45)).isoformat()
+    assert fast_summary(state, now)["stale"] is True
+    assert fast_summary({}, now) is None

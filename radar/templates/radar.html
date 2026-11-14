@@ -41,6 +41,7 @@
         {% if sched_next_relative %}<small class="muted">next scheduled {{ sched_next_relative }}</small>{% endif %}
       {% endif %}
     </form>
+    {% if fast %}<small class="{{ 'rs-warn' if fast.stale or not fast.ok else 'muted' }}">Fast lane: checked {{ fast.ago }}{% if not fast.ok %} · last check failed{% elif fast.stale %} · overdue{% endif %} · {{ fast.checks }} check{{ "" if fast.checks == 1 else "s" }}, {{ fast.new }} new in the last hour</small>{% endif %}
   </div>
 </div>
 

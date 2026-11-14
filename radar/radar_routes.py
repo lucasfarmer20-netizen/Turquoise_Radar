@@ -90,6 +90,15 @@ def _relative(when, now):
     return f"{text} ago" if past else f"in {text}"
 
 
+def _fast_view(sched, now):
+    from radar.scheduler import fast_summary
+
+    f = fast_summary(sched, now)
+    if f:
+        f["ago"] = _relative(f["at"], now)
+    return f
+
+
 def _listed_days(n, now):
     """Whole days since the marketplace says the listing was created, or None."""
     listed = _parse_time(n.get("listing_time"))
@@ -448,6 +457,7 @@ def radar_routes(app, render):
             "radar.html",
             sched=sched,
             sched_running=cycle_running(sched, now),
+            fast=_fast_view(sched, now),
             sched_requested=trigger_path().exists(),
             sched_next_relative=_relative(sched_next, now) if sched_next else None,
             sched_alive=bool(sched)
