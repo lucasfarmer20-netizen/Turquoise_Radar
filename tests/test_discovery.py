@@ -386,6 +386,15 @@ def test_fixture_plan_run_dedup_history_and_review(client):
         assert len(listings) == 1 and listings[0].review_state == "RESEARCH"
         assert listings[0].data["resale_low"] is None
         assert listings[0].original_data["provider"] == "eBay Browse"
+    # owner / radar annotations added after discovery must survive the next scan
+    with client.app.state.sessions.begin() as s:
+        for row in s.scalars(select(DiscoveredItem)):
+            row.normalized = {
+                **row.normalized,
+                "seen_at": "2026-11-13T00:00:00+00:00",
+                "pass_note": "kept",
+                "owner_resale_usd": [100, 150],
+            }
     assert (
         client.post(
             "/discovery/run", data={"mode": "fixture", "auto_correct": "KEYWORD"}
@@ -393,6 +402,9 @@ def test_fixture_plan_run_dedup_history_and_review(client):
         == 200
     )
     with client.app.state.sessions() as s:
+        for row in s.scalars(select(DiscoveredItem)):
+            assert row.normalized["seen_at"] and row.normalized["pass_note"] == "kept"
+            assert row.normalized["owner_resale_usd"] == [100, 150]
         run = s.get(DiscoveryRun, 2)
         assert run.new_count == 0 and run.duplicate_count > 0
         nature = list(

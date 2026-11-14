@@ -280,6 +280,17 @@ async def run_discovery(
                                 "effective_query",
                             ):
                                 updated[key] = first.get(key)
+                            # Everything the radar or the owner added after discovery (seen,
+                            # pass reason and note, resale override, outcomes, notification
+                            # stamps, fetched description) is not part of a search result and
+                            # must survive a re-scan.
+                            for key, value in first.items():
+                                if key not in updated:
+                                    updated[key] = value
+                            if len(first.get("raw_description") or "") > len(
+                                updated.get("raw_description") or ""
+                            ):
+                                updated["raw_description"] = first["raw_description"]
                             found.normalized = updated
                             execution.duplicate_count += 1
                             run.duplicate_count += 1
