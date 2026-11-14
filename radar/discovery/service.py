@@ -19,7 +19,7 @@ from radar.db import (
 from radar.discovery.config import Budgets, Connection, DiscoveryError, GroupInput, SearchOptions
 from radar.discovery.ebay import SOURCE_NAMES, EbayAdapter, FixtureDiscoveryAdapter, normalize
 from radar.discovery.image_freshness import feed_only
-from radar.schemas import ListingInput, utcnow
+from radar.schemas import listing_from_record, utcnow
 from radar.sources import dedup_key
 from radar.workflow import attributed_patterns
 
@@ -363,7 +363,7 @@ def promote(session, item_id):
     found = session.get(DiscoveredItem, item_id)
     if not found:
         raise DiscoveryError("NOT_FOUND", "Discovered item not found")
-    item = ListingInput.model_validate(found.normalized)
+    item = listing_from_record(found.normalized)
     if found.listing_id:
         return session.get(Listing, found.listing_id)
     key = dedup_key(item)
@@ -416,7 +416,7 @@ def overview(session, prefs):
     for row in items:
         if feed_only(row.normalized):
             continue
-        item = ListingInput.model_validate(row.normalized)
+        item = listing_from_record(row.normalized)
         a = analyze(item, prefs)
         cards.append(
             dict(

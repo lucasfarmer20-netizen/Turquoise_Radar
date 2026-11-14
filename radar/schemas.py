@@ -434,3 +434,12 @@ class FeedbackInput(BaseModel):
 
 def utcnow():
     return datetime.now(UTC)
+
+
+def listing_from_record(data):
+    """A ListingInput from a stored listing record. Stored records also carry annotations the
+    radar and the owner add later (seen, pass note, resale override, notification stamps);
+    those are not listing fields and are left out here rather than rejected."""
+    return ListingInput.model_validate(
+        {k: v for k, v in (data or {}).items() if k in ListingInput.model_fields}
+    )
