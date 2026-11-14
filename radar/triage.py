@@ -483,7 +483,7 @@ async def screen_one(anthropic, http, model, item, max_images=1, deep=False):
     return dict(status="OK", data=data, usage=response.usage.model_dump())
 
 
-async def run_triage(sessions, cfg, limit=None, rescreen=False):
+async def run_triage(sessions, cfg, limit=None, rescreen=False, item_ids=None):
     """Screen un-triaged items until none remain, the limit is hit, or the daily budget is spent.
     With rescreen=True, existing verdicts for items not marked passed are discarded first."""
     if not cfg["enabled"]:
@@ -513,12 +513,16 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False):
             .where(DiscoveredItem.inbox_status != "IRRELEVANT")
             .order_by(DiscoveredItem.id.desc())
         )
+        if item_ids is not None:
+            # The fast lane screens just what it found, ahead of any backlog.
+            query = query.where(DiscoveredItem.id.in_(list(item_ids)))
         if limit:
             query = query.limit(limit)
         items = sorted(s.scalars(query), key=screen_priority)
         spent = spent_today(s)
     if not items:
-        log.info("triage: nothing new")
+        if item_ids is None:
+            log.info("triage: nothing new")
         return 0
     if spent >= cfg["daily_budget"]:
         log.warning(

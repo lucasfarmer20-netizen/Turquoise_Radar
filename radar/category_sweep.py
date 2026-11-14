@@ -100,8 +100,14 @@ def store(sessions, raws, mode, label):
     return new, refreshed, invalid
 
 
-async def run(sessions, cfg=None):
-    """Sweep every configured style. Returns stats dict or None when disabled."""
+# The fast lane: newest fixed-price listings in every style, plus newest auctions in the first
+# style (an auction's Buy It Now disappears at the first bid, so it has to be seen new).
+FAST_LANES = (("FIXED_PRICE", "newlyListed"), ("AUCTION", "newlyListed"))
+
+
+async def run(sessions, cfg=None, fast=False):
+    """Sweep every configured style. Returns stats dict or None when disabled. With fast=True
+    only the newest listings are fetched (see FAST_LANES) and routine logging is skipped."""
     cfg = cfg or settings()
     if not cfg["styles"]:
         return None
@@ -117,11 +123,20 @@ async def run(sessions, cfg=None):
         return None
     stats = dict(calls=0, listings=0, new=0, refreshed=0, invalid=0, errors=0, by_style={})
     try:
-        for style in cfg["styles"]:
+        for index, style in enumerate(cfg["styles"]):
             st = dict(listings=0, new=0)
-            for buying, sort in LANES:
+            lanes = LANES
+            if fast:
+                lanes = FAST_LANES if index == 0 else FAST_LANES[:1]
+            for buying, sort in lanes:
                 try:
-                    raws = await fetch(adapter, style, buying, sort, cfg["limit"])
+                    raws = await fetch(
+                        adapter,
+                        style,
+                        buying,
+                        sort,
+                        min(cfg["limit"], 50) if fast else cfg["limit"],
+                    )
                 except DiscoveryError as e:
                     stats["errors"] += 1
                     log.warning("sweep %s/%s: %s", style, buying, e)
@@ -137,6 +152,16 @@ async def run(sessions, cfg=None):
             stats["by_style"][style] = st
     finally:
         await adapter.close()
+    if fast:
+        if stats["new"] or stats["errors"]:
+            log.info(
+                "fast lane: %d calls, %d new, %d errors; %s",
+                stats["calls"],
+                stats["new"],
+                stats["errors"],
+                {k: v["new"] for k, v in stats["by_style"].items() if v["new"]},
+            )
+        return stats
     with sessions.begin() as s:
         row = s.get(Setting, STATE_SETTING_ID)
         data = {"last_run_at": datetime.now(UTC).isoformat(), "stats": stats}

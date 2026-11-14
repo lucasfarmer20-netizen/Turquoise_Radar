@@ -611,3 +611,23 @@ def test_mark_all_as_seen_hides_them_until_asked(client):
         assert s.get(DiscoveredItem, 1).inbox_status == "NEW"
     client.post("/radar/mark-seen", data={"undo": "1"})
     assert "3 new items" in client.get("/radar").text
+
+
+def test_interested_listing_that_ended_moves_to_ended(client):
+    from datetime import UTC, datetime, timedelta
+
+    from radar import queue
+
+    past = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+    _add(client, 601, item_end_time=past)
+    _add(client, 602)
+    for i in (1, 2):
+        client.post(f"/radar/{i}/decision", data={"decision": "interested"})
+    counts = queue.sweep(client.app.state.sessions)
+    assert counts.get("interested ended") == 1
+    with client.app.state.sessions() as s:
+        assert s.get(DiscoveredItem, 1).inbox_status == "ENDED"
+        assert s.get(DiscoveredItem, 2).inbox_status == "INTERESTED"
+    assert 'id="item-1"' not in client.get("/radar?status=interested").text
+    html = client.get("/radar?status=ended").text
+    assert 'id="item-1"' in html and "bought / sold" in html

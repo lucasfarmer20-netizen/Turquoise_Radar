@@ -16,7 +16,7 @@
 {% if show == "hero" %}<p class="muted small">Statement pieces: large, bold or bright work and named materials (spiny oyster, pink conch, Dry Creek, Sonoran Gold, White Water, Morenci, Royston). Contemporary first. Shown when the piece scores {{ hero_min_score }}+ and the price is at or under fair, or an offer could get it there.</p>{% endif %}
 <div class="stats">
   <div><span>QUEUE</span><strong>{{ queue_total }}</strong><small class="muted">underpriced, score {{ queue_min_score }}+ · {{ counts.get("NEW", 0) }} new total · {{ new_24h }} found in 24h</small></div>
-  <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
+  <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a>{% if counts.get("ENDED") %} · <a href="/radar?status=ended">{{ counts.get("ENDED") }} ended</a>{% endif %}</small></div>
   <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant{% if screen_waiting %} · {{ screen_waiting }} waiting{% endif %}</small>{% if screen_paused %}<small class="rs0">Screening paused: today's ${{ screen_budget }} budget is spent (${{ screen_spent }}). Resumes at midnight UTC (3 pm Alaska in winter), or raise VISION_DAILY_BUDGET_USD in .env.</small>{% endif %}</div>
   <div><span>LAST CYCLE</span>
     {% if last_run %}
@@ -57,7 +57,7 @@
     </select></label>
   <label>Status
     <select name="status">
-      {% for v, l in [("new","New"),("interested","Interested"),("passed","Passed"),("archived","Archived"),("all","All")] %}
+      {% for v, l in [("new","New"),("interested","Interested"),("ended","Interested · ended"),("passed","Passed"),("archived","Archived"),("all","All")] %}
       <option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
     </select></label>
   <label>Type
@@ -208,12 +208,12 @@
       <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" data-key="o">Open on {{ c.source }}</a>
     </div>
     <details class="adjust">
-      <summary class="muted small">{{ "Your resale set" if c.owner_resale else "Set your resale" }}{% if c.status == "INTERESTED" %} · bought / sold{% endif %}</summary>
+      <summary class="muted small">{{ "Your resale set" if c.owner_resale else "Set your resale" }}{% if c.status in ("INTERESTED", "ENDED") %} · bought / sold{% endif %}</summary>
       <form method="post" action="/radar/{{ c.id }}/outcome" class="outcome">
         <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
         <label>Resale $<input name="resale_low" inputmode="numeric" size="5" value="{{ c.owner_resale[0] if c.owner_resale else '' }}" placeholder="low"></label>
         <label>–$<input name="resale_high" inputmode="numeric" size="5" value="{{ c.owner_resale[1] if c.owner_resale else '' }}" placeholder="high"></label>
-        {% if c.status == "INTERESTED" %}
+        {% if c.status in ("INTERESTED", "ENDED") %}
         <label>Bought $<input name="bought_for" inputmode="decimal" size="7" value="{{ c.bought_for or '' }}" placeholder="landed"></label>
         <label>Sold $<input name="sold_for" inputmode="decimal" size="7" value="{{ c.sold_for or '' }}" placeholder="gross"></label>
         {% endif %}

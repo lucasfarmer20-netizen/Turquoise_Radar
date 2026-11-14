@@ -325,3 +325,64 @@ def test_deep_pass_spend_does_not_count_against_quick_budget(tmp_path):
     with sessions() as s:
         assert triage.spent_today(s) == Decimal("0.10")
     engine.dispose()
+
+
+def test_fast_cycle_screens_only_what_it_found_and_notifies(tmp_path, monkeypatch):
+    from radar import category_sweep, notify, scheduler
+
+    engine, sessions = _db(tmp_path)  # three older, unscreened listings = a backlog
+    screened, notified = [], []
+
+    async def fake_sweep(sessions_, cfg=None, fast=False):
+        assert fast is True
+        with sessions_.begin() as s:
+            s.add(
+                DiscoveredItem(
+                    identity="fresh",
+                    source="eBay",
+                    ebay_item_id="v1|99|0",
+                    normalized={"raw_title": "new cuff", "image_urls": ["https://x/a.jpg"]},
+                    original_data={},
+                )
+            )
+        return dict(calls=4, new=1, errors=0, by_style={})
+
+    async def fake_triage(sessions_, cfg, item_ids=None, **kw):
+        screened.extend(item_ids)
+        return len(item_ids)
+
+    async def fake_notify(sessions_, cfg=None):
+        notified.append(True)
+        return 0
+
+    monkeypatch.setattr(category_sweep, "run", fake_sweep)
+    monkeypatch.setattr(triage, "run_triage", fake_triage)
+    monkeypatch.setattr(notify, "notify_pending", fake_notify)
+    assert asyncio.run(scheduler.fast_cycle(sessions, daily_limit=4000)) == 1
+    assert screened == [4] and notified == [True]  # the backlog (ids 1-3) was not touched
+    assert scheduler.calls_today(sessions) == 4
+    # near the daily call limit the fast lane stands down
+    assert asyncio.run(scheduler.fast_cycle(sessions, daily_limit=300)) == 0
+    assert screened == [4]
+    engine.dispose()
+
+
+def test_run_triage_item_ids_limits_the_pass(tmp_path, monkeypatch):
+    engine, sessions = _db(tmp_path)
+    seen = []
+
+    async def fake_screen(anthropic, http, model, item):
+        seen.append(item.id)
+        return dict(status="OK", data={"relevant": False, "score": 1}, usage={})
+
+    monkeypatch.setattr(triage, "screen_one", fake_screen)
+    monkeypatch.setattr("anthropic.AsyncAnthropic", lambda **kw: SimpleNamespace(), raising=False)
+    cfg = dict(
+        api_key="k",
+        model="claude-haiku-5-5",
+        daily_budget=Decimal("1"),
+        enabled=True,
+        concurrency=1,
+    )
+    assert asyncio.run(triage.run_triage(sessions, cfg, item_ids=[2])) == 1 and seen == [2]
+    engine.dispose()

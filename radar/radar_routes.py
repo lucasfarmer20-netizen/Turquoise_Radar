@@ -44,6 +44,7 @@ PASS_REASONS = {
 STATUS_FILTERS = {
     "new": ["NEW"],
     "interested": ["INTERESTED"],
+    "ended": ["ENDED"],
     "passed": ["IRRELEVANT"],
     "archived": ["ARCHIVED"],
     "all": None,

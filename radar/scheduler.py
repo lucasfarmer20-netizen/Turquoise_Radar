@@ -114,6 +114,7 @@ def settings():
     return dict(
         mode=os.environ.get("EBAY_MODE", "fixture"),
         hours=float(os.environ.get("RADAR_SCHEDULE_HOURS", "1")),
+        fast_minutes=float(os.environ.get("RADAR_FAST_MINUTES", "5")),
         daily_limit=int(os.environ.get("RADAR_DAILY_CALL_LIMIT", "4000")),
         queries=Path(os.environ.get("RADAR_QUERIES", ROOT / "fixtures" / "seed_queries.json")),
         page_size=int(os.environ.get("RADAR_PAGE_SIZE", "50")),
@@ -206,6 +207,17 @@ def record_calls(sessions, calls):
         else:
             s.add(Setting(id=COUNTER_SETTING_ID, data=data))
         return data
+
+
+def add_calls(sessions, calls):
+    """Count API calls against today's ledger without counting a cycle."""
+    with sessions.begin() as s:
+        row, data = ledger(s)
+        data["calls"] += calls
+        if row:
+            row.data = data
+        else:
+            s.add(Setting(id=COUNTER_SETTING_ID, data=data))
 
 
 def calls_today(sessions):
@@ -332,6 +344,36 @@ def _latest_run(sessions, after=0):
 # ---------------------------------------------------------------- loop
 
 
+FAST_RESERVE_CALLS = 400
+
+
+async def fast_cycle(sessions, daily_limit):
+    """Between full cycles: fetch the newest listings in the jewelry category, screen only
+    those, and notify at once. A mispriced Buy It Now sells in minutes; the hourly cycle is
+    too slow for it. Returns the number of new listings found."""
+    from radar.category_sweep import run as run_sweep
+
+    if calls_today(sessions) >= daily_limit - FAST_RESERVE_CALLS:
+        return 0  # leave the rest of today's eBay calls to the full cycles
+    with sessions() as s:
+        before = s.scalar(select(func.max(DiscoveredItem.id))) or 0
+    stats = await run_sweep(sessions, fast=True)
+    if not stats:
+        return 0
+    add_calls(sessions, stats["calls"])
+    if not stats["new"]:
+        return 0
+    with sessions() as s:
+        ids = list(s.scalars(select(DiscoveredItem.id).where(DiscoveredItem.id > before)))
+    from radar.notify import notify_pending
+    from radar.triage import run_triage
+    from radar.triage import settings as triage_settings
+
+    await run_triage(sessions, triage_settings(), item_ids=ids)
+    await notify_pending(sessions)
+    return len(ids)
+
+
 MIN_REST_SECONDS = 600
 
 
@@ -424,12 +466,25 @@ def run_forever(sessions, connection, cfg, once=False):
             next_at.astimezone().strftime("%H:%M %Z"),
         )
         reason = "scheduled"
+        fast_every = cfg.get("fast_minutes", 0) * 60
+        next_fast = time.monotonic() + fast_every
         while datetime.now(UTC) < next_at and not stop["flag"]:
             time.sleep(max(0.0, min(5, (next_at - datetime.now(UTC)).total_seconds())))
             if trigger_path().exists():
                 log.info("scan requested from the web app; running now")
                 reason = "requested"
                 break
+            # Fast lane between full cycles, unless one is about to start anyway.
+            if (
+                fast_every
+                and time.monotonic() >= next_fast
+                and (next_at - datetime.now(UTC)).total_seconds() > 120
+            ):
+                try:
+                    asyncio.run(fast_cycle(sessions, cfg["daily_limit"]))
+                except Exception:
+                    log.exception("fast lane failed; will retry")
+                next_fast = time.monotonic() + fast_every
         if stop["flag"]:
             write_state(running=False)
             return

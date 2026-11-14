@@ -23,6 +23,7 @@ from radar.db import (
 
 log = logging.getLogger("radar.queue")
 ARCHIVED = "ARCHIVED"
+ENDED = "ENDED"  # was Interested when the listing ended
 
 
 def settings():
@@ -223,6 +224,17 @@ def sweep(sessions, cfg=None, now=None):
                     "archived_at": now.isoformat(),
                 }
                 counts[reason] = counts.get(reason, 0) + 1
+        # Interested listings that have ended leave the Interested list but are kept, under
+        # their own status, so a win can still be recorded against them.
+        grace = timedelta(minutes=cfg["ended_grace_minutes"])
+        for item in s.scalars(
+            select(DiscoveredItem).where(DiscoveredItem.inbox_status == "INTERESTED")
+        ):
+            end = _end(item.normalized or {})
+            if end and end < now - grace:
+                item.inbox_status = ENDED
+                item.normalized = {**(item.normalized or {}), "ended_at": now.isoformat()}
+                counts["interested ended"] = counts.get("interested ended", 0) + 1
     if counts:
         log.info("archived %s", counts)
     return counts
@@ -248,6 +260,8 @@ def purge(sessions, cfg=None, now=None):
             if item.id in keep:
                 continue
             n = item.normalized or {}
+            if n.get("bought_for") not in (None, ""):
+                continue  # purchase history is kept
             end = _end(n)
             reason = None
             if end and end < cutoff:
