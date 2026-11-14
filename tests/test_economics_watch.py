@@ -100,3 +100,23 @@ def test_refresh_only_touches_interested_live_ebay_auctions(tmp_path, monkeypatc
         assert s.get(DiscoveredItem, 1).normalized["item_price"] == "77.00"
         assert s.get(DiscoveredItem, 5).normalized["item_price"] == "10"
     engine.dispose()
+
+
+def test_pickup_lots_allow_for_fee_and_forwarding():
+    from decimal import Decimal
+
+    from radar.economics import acquisition_terms, pickup_assumed, walk_away
+    from radar.triage import landed_cost
+
+    lot = {"source": "HiBid", "item_price": "100", "buyer_premium_rate": "0.15"}
+    assert pickup_assumed(lot) is True
+    ship, premium = acquisition_terms(lot)
+    assert (ship, premium) == ("12", Decimal("0.20"))  # 15% premium + 5% pickup
+    assert landed_cost(lot) == Decimal("132.00")  # 100 * 1.20 + 12
+    # a marketplace that quotes shipping is untouched
+    ebay = {"source": "eBay", "item_price": "100", "shipping_cost": "8"}
+    assert pickup_assumed(ebay) is False and landed_cost(ebay) == Decimal("108.00")
+    assert pickup_assumed({"source": "eBay", "item_price": "100"}) is False
+    # the max bid drops accordingly
+    plain = walk_away(300, None, 0)["bid"]
+    assert walk_away(300, *acquisition_terms(lot))["bid"] < plain

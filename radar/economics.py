@@ -58,3 +58,27 @@ def walk_away(resale_low, shipping=None, premium_rate=None):
     return dict(
         sale=q(sale), margin=margin, net=q(net), landed=q(landed), bid=max(q(bid), Decimal(0))
     )
+
+
+SHIPS_ITSELF = {"ebay", "etsy", "bonanza"}
+
+
+def pickup_assumed(n):
+    """True when no shipping cost is known and the source is not a marketplace that always
+    quotes one: estate and auction lots that someone has to collect and send on."""
+    if n.get("shipping_cost") not in (None, ""):
+        return False
+    return str(n.get("source") or "").split(" ")[0].casefold() not in SHIPS_ITSELF
+
+
+def acquisition_terms(n):
+    """(shipping, premium_rate) for the walk-away. For a lot that will be collected by a
+    contact and forwarded, adds the owner's pickup fee (RADAR_PICKUP_RATE, a share of the
+    purchase price, default 5%) to any buyer's premium and uses RADAR_FORWARD_POSTAGE (default
+    $12, an estimate for a small insured parcel to Alaska) as the shipping."""
+    premium = Decimal(str(n.get("buyer_premium_rate") or 0))
+    ship = n.get("shipping_cost")
+    if pickup_assumed(n):
+        premium += Decimal(os.environ.get("RADAR_PICKUP_RATE", "0.05"))
+        ship = os.environ.get("RADAR_FORWARD_POSTAGE", "12")
+    return ship, premium

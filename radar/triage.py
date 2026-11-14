@@ -350,13 +350,16 @@ def landed_cost(n):
         total = Decimal(str(price))
     except (InvalidOperation, TypeError):
         return None
-    ship = n.get("shipping_cost")
+    from radar.economics import acquisition_terms
+
+    ship, premium = acquisition_terms(n)
+    total *= 1 + premium  # buyer's premium and any pickup fee
     if ship not in (None, ""):
         try:
             total += Decimal(str(ship))
         except InvalidOperation:
             pass
-    return total
+    return total.quantize(Decimal("0.01"))
 
 
 def live_verdict(data, n):
@@ -383,8 +386,9 @@ def reconcile_verdict(data, n):
         return out
     low, high = (Decimal(str(resale[0])), Decimal(str(resale[1])))
     mid = (low + high) / 2
-    ship = n.get("shipping_cost")
-    premium = n.get("buyer_premium_rate") or 0
+    from radar.economics import acquisition_terms
+
+    ship, premium = acquisition_terms(n)
     wa_low = walk_away(low, ship, premium)
     wa_mid = walk_away(mid, ship, premium)
     if wa_low is None or wa_mid is None:

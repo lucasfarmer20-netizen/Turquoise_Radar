@@ -163,7 +163,7 @@
       <div><dt>{% if c.is_auction %}{{ "Current bid" if c.bid_count else "Starting bid" }}{% if c.bid_count %} · {{ c.bid_count }} bid{{ "" if c.bid_count == 1 else "s" }}{% endif %}{% else %}Price{% endif %}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
       {% if c.bin_price %}<div><dt>Buy It Now</dt><dd>{{ c.bin_price|usd }}</dd></div>{% else %}<div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>{% endif %}
       <div><dt>Landed{% if c.bin_price %} at bid{% endif %} (before tax)</dt><dd>{{ c.landed|usd }}{% if c.bin_price %} <small class="muted">+{{ c.ship|usd }} ship</small>{% endif %}</dd></div>
-      {% if c.walk %}<div class="walk {% if c.price is not none and c.price > c.walk.bid %}over{% endif %}"><dt>Walk away above</dt><dd><strong>{{ c.walk.bid|usd }}</strong> <small class="muted">{{ "bid" if c.is_auction else "price" }} · {{ (c.walk.margin * 100)|int }}% on ${{ c.walk.sale|int }}</small></dd></div>{% endif %}
+      {% if c.walk %}<div class="walk {% if c.price is not none and c.price > c.walk.bid %}over{% endif %}"><dt>Walk away above</dt><dd><strong>{{ c.walk.bid|usd }}</strong> <small class="muted">{{ "bid" if c.is_auction else "price" }} · {{ (c.walk.margin * 100)|int }}% on ${{ c.walk.sale|int }}{% if c.pickup_assumed %} · allows for pickup fee and forwarding postage{% endif %}</small></dd></div>{% endif %}
       <div><dt>{{ "Ends" if c.is_auction else "Listed end" }}</dt><dd class="small">{{ c.ends_local or "unknown" }}</dd></div>
       {% if c.listed_days is not none %}<div><dt>Listed</dt><dd class="small">{{ "today" if c.listed_days == 0 else c.listed_days ~ " days ago" }}</dd></div>{% endif %}
     </dl>

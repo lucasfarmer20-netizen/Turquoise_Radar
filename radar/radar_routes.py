@@ -16,7 +16,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 
 from radar.db import DiscoveredItem, DiscoveryRun, Setting, TriageResult
-from radar.economics import walk_away
+from radar.economics import acquisition_terms, pickup_assumed, walk_away
 from radar.queue import (
     hero_candidates,
     hero_notes,
@@ -198,9 +198,9 @@ def card(row, now, triage=None):
         condition_flags=condition_flags(n) or td.get("condition_flags") or [],
         walk=walk_away(
             ((n.get("owner_resale_usd") or td.get("resale_estimate_usd") or [None])[0]),
-            ship,
-            (n.get("buyer_premium_rate") or 0),
+            *acquisition_terms(n),
         ),
+        pickup_assumed=pickup_assumed(n),
         owner_resale=n.get("owner_resale_usd"),
         buyable_now=_buyable_now(n, td, price, bin_price, ship),
         offer=offer_target(n, td),
