@@ -1,0 +1,75 @@
+{
+  "note": "Dates come from news reports and the auctioneers' past schedules; confirm on the linked site. remind_on is when the radar posts a Slack reminder.",
+  "events": [
+    {
+      "id": "nv-unclaimed-2026",
+      "name": "Nevada unclaimed-property auction (safe-deposit boxes)",
+      "where": "Online, JJ Kane",
+      "url": "https://www.jjkane.com",
+      "when": "Nov 10-16, 2026",
+      "ends": "2026-11-16",
+      "remind_on": "2026-11-14",
+      "note": "Jewelry, coins, watches. Check shipping or arrange pickup."
+    },
+    {
+      "id": "bradfords-2026-12",
+      "name": "Bradford's Wild West Trading Post auction",
+      "where": "Sun City, AZ (online bidding)",
+      "url": "https://www.bradfordsauction.com",
+      "when": "Dec 6, 2026",
+      "ends": "2026-12-06",
+      "remind_on": "2026-11-29",
+      "note": "25% premium reported. Jewelry-only invoices ship in-house; otherwise Westside Mail Center."
+    },
+    {
+      "id": "az-unclaimed-2027",
+      "name": "Arizona unclaimed-property auction",
+      "where": "Phoenix, Sierra Auction",
+      "url": "https://bid.sierraauction.com",
+      "when": "Usually February; 2027 date not announced",
+      "ends": "2027-03-01",
+      "remind_on": "2027-01-10",
+      "note": "About 600 lots in Feb 2026. 17% premium reported; pickup in Phoenix."
+    },
+    {
+      "id": "ok-unclaimed-2027",
+      "name": "Oklahoma safe-deposit box auction",
+      "where": "Dakil Auctioneers",
+      "url": "https://www.dakil.com",
+      "when": "Date not confirmed",
+      "ends": "2027-06-30",
+      "remind_on": "2027-01-10",
+      "note": "Look for the 2027 date."
+    },
+    {
+      "id": "pa-unclaimed-2027",
+      "name": "Pennsylvania unclaimed-property auction",
+      "where": "Pook & Pook",
+      "url": "https://www.pookandpook.com",
+      "when": "March in 2026; 2027 date not announced",
+      "ends": "2027-04-15",
+      "remind_on": "2027-02-10",
+      "note": "Over 4,000 items in March 2026."
+    },
+    {
+      "id": "wa-unclaimed-2027",
+      "name": "Washington unclaimed-property auction",
+      "where": "James G. Murphy Co.",
+      "url": "https://www.murphyauction.com",
+      "when": "May in 2026; 2027 date not announced",
+      "ends": "2027-06-15",
+      "remind_on": "2027-04-10",
+      "note": "Over 3,500 items in May 2026."
+    },
+    {
+      "id": "nv-unclaimed-2027",
+      "name": "Nevada unclaimed-property auction",
+      "where": "Online, JJ Kane in past years",
+      "url": "https://www.jjkane.com",
+      "when": "November in 2025 and 2026",
+      "ends": "2027-11-30",
+      "remind_on": "2027-10-20",
+      "note": "Look for the 2027 dates."
+    }
+  ]
+}

@@ -89,6 +89,17 @@
   <button type="submit">Apply</button>
 </form>
 
+{% if calendar %}
+{% set live_now = calendar|selectattr("live")|list %}
+<details class="calendar">
+  <summary>Sourcing calendar · {% if live_now %}<span class="rs-warn">{{ live_now|length }} to look at now</span> · {% endif %}{{ calendar|length }} coming up</summary>
+  <ul>
+    {% for e in calendar %}
+    <li{% if e.live %} class="live"{% endif %}><strong>{% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener noreferrer">{{ e.name }}</a>{% else %}{{ e.name }}{% endif %}</strong> · {{ e.when }} · {{ e.where }}<br><small class="muted">{{ e.note }}</small></li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
 <div class="section-heading">
   <h2>{{ total_matching }} {% if show in ("queue", "hero") and seen == "hide" %}new {% endif %}item{{ "" if total_matching == 1 else "s" }}</h2>
   {% if show in ("queue", "hero") %}
@@ -126,6 +137,7 @@
       <span class="source">{% if c.status != "INTERESTED" %}<label class="pick" title="Select to pass several at once"><input type="checkbox" name="ids" value="{{ c.id }}" form="bulk" aria-label="select this listing"></label>{% endif %}{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
       <div class="labels">
         {% if c.seen %}<span class="badge">SEEN</span>{% endif %}
+        {% if c.marketplace %}<span class="badge" title="Listed at {{ c.original_price }}; converted to USD. Check for coral or shell before importing.">{{ c.marketplace|upper }} · {{ c.original_price }}</span>{% endif %}
         {% if c.hero %}<span class="badge hero" title="{{ c.hero|join(', ') }}">HERO · {{ c.hero[0]|upper }}</span>{% endif %}
         {% if c.era %}<span class="badge">{{ c.era|upper }}</span>{% endif %}
         {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}
@@ -164,7 +176,7 @@
       <div><dt>{% if c.is_auction %}{{ "Current bid" if c.bid_count else "Starting bid" }}{% if c.bid_count %} · {{ c.bid_count }} bid{{ "" if c.bid_count == 1 else "s" }}{% endif %}{% else %}Price{% endif %}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
       {% if c.bin_price %}<div><dt>Buy It Now</dt><dd>{{ c.bin_price|usd }}</dd></div>{% else %}<div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>{% endif %}
       <div><dt>Landed{% if c.bin_price %} at bid{% endif %} (before tax)</dt><dd>{{ c.landed|usd }}{% if c.bin_price %} <small class="muted">+{{ c.ship|usd }} ship</small>{% endif %}</dd></div>
-      {% if c.walk %}<div class="walk {% if c.price is not none and c.price > c.walk.bid %}over{% endif %}"><dt>{{ "Max bid" if c.is_auction else "Max price" }}</dt><dd><strong>{{ c.walk.bid|usd }}</strong> <small class="muted">before shipping{{ " and premium" if c.is_auction else "" }} · leaves {{ (c.walk.margin * 100)|int }}% at a ${{ c.walk.sale|int }} sale{% if c.pickup_assumed %} · allows for pickup fee and forwarding postage{% endif %}</small></dd></div>{% endif %}
+      {% if c.walk %}<div class="walk {% if c.price is not none and c.price > c.walk.bid %}over{% endif %}"><dt>{{ "Max bid" if c.is_auction else "Max price" }}</dt><dd><strong>{{ c.walk.bid|usd }}</strong> <small class="muted">before shipping{{ " and premium" if c.is_auction else "" }} · leaves {{ (c.walk.margin * 100)|int }}% at a ${{ c.walk.sale|int }} sale{% if c.pickup_assumed %} · allows for pickup fee and forwarding postage{% endif %}{% if c.marketplace %} · allows for import duty{% endif %}</small></dd></div>{% endif %}
       <div><dt>{{ "Ends" if c.is_auction else "Listed end" }}</dt><dd class="small">{{ c.ends_local or "unknown" }}</dd></div>
       {% if c.listed_days is not none %}<div><dt>Listed</dt><dd class="small">{{ "today" if c.listed_days == 0 else c.listed_days ~ " days ago" }}</dd></div>{% endif %}
     </dl>

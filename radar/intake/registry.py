@@ -64,6 +64,31 @@ SOURCES = {
         "Saved-search alerts aggregating other marketplaces: format unverified until first "
         "messages are observed",
     ),
+    "govdeals": (
+        "GovDeals",
+        ["govdeals.com"],
+        "Government and police surplus saved-search alerts: format unverified",
+    ),
+    "k-bid": (
+        "K-BID",
+        ["k-bid.com"],
+        "Daily Lot Alert emails with links to matching lots: format unverified",
+    ),
+    "municibid": (
+        "Municibid",
+        ["municibid.com"],
+        "Municipal surplus saved-search notices: format unverified",
+    ),
+    "ebth": (
+        "EBTH",
+        ["ebth.com"],
+        "Saved-search alerts: format unverified",
+    ),
+    "craigslist": (
+        "Craigslist",
+        ["craigslist.org"],
+        "Saved-search alert emails, per city: format unverified",
+    ),
     "other": (
         "Other authorized estate",
         ["example.invalid"],

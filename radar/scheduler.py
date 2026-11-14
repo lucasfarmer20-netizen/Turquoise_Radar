@@ -281,6 +281,20 @@ async def cycle(sessions, connection, mode, daily_limit):
     except Exception:
         log.exception("marketplace adapters failed; will retry next cycle")
     try:
+        from radar.foreign import run as run_foreign
+
+        foreign_stats = await run_foreign(sessions)
+        if foreign_stats:
+            add_calls(sessions, foreign_stats["calls"])
+    except Exception:
+        log.exception("foreign marketplaces failed; will retry next cycle")
+    try:
+        from radar.feeds import run as run_feeds
+
+        await run_feeds(sessions)
+    except Exception:
+        log.exception("shop feeds failed; will retry next cycle")
+    try:
         from radar.mailbox import poll as poll_mailbox
 
         poll_mailbox(sessions)
@@ -326,6 +340,12 @@ async def cycle(sessions, connection, mode, daily_limit):
         await notify_pending(sessions)
     except Exception:
         log.exception("notification failed; will retry next cycle")
+    try:
+        from radar.sourcing_calendar import remind
+
+        await remind(sessions)
+    except Exception:
+        log.exception("calendar reminder failed; will retry next cycle")
     return run
 
 

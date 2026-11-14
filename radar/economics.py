@@ -60,7 +60,7 @@ def walk_away(resale_low, shipping=None, premium_rate=None):
     )
 
 
-SHIPS_ITSELF = {"ebay", "etsy", "bonanza"}
+SHIPS_ITSELF = {"ebay", "etsy", "bonanza", "shop:"}
 
 
 def pickup_assumed(n):
@@ -81,4 +81,6 @@ def acquisition_terms(n):
     if pickup_assumed(n):
         premium += Decimal(os.environ.get("RADAR_PICKUP_RATE", "0.05"))
         ship = os.environ.get("RADAR_FORWARD_POSTAGE", "12")
+    if n.get("import_rate") not in (None, ""):
+        premium += Decimal(str(n["import_rate"]))  # duty allowance on a purchase from abroad
     return ship, premium

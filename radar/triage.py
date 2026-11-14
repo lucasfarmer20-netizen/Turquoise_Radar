@@ -334,6 +334,14 @@ def listing_context(n):
         "condition": n.get("condition"),
         "buying_options": n.get("buying_options"),
         "found_by_search": n.get("raw_search_phrase"),
+        **(
+            {
+                "sold_from": f"{n['marketplace']} (seller's price {n.get('original_price')}, "
+                "shown here converted to USD; title may be in another language)"
+            }
+            if n.get("marketplace")
+            else {}
+        ),
     }
 
 

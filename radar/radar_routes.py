@@ -28,6 +28,7 @@ from radar.queue import (
 )
 from radar.queue import settings as queue_settings
 from radar.scheduler import cycle_running, read_state, request_scan, trigger_path
+from radar.sourcing_calendar import upcoming as upcoming_events
 from radar.triage import condition_flags, live_verdict, spent_today, thumb_url
 from radar.triage import settings as triage_settings
 
@@ -210,6 +211,8 @@ def card(row, now, triage=None):
             *acquisition_terms(n),
         ),
         pickup_assumed=pickup_assumed(n),
+        marketplace=(n.get("marketplace") or "").replace("EBAY_", "eBay "),
+        original_price=n.get("original_price"),
         owner_resale=n.get("owner_resale_usd"),
         buyable_now=_buyable_now(n, td, price, bin_price, ship),
         offer=offer_target(n, td),
@@ -458,6 +461,7 @@ def radar_routes(app, render):
             sched=sched,
             sched_running=cycle_running(sched, now),
             fast=_fast_view(sched, now),
+            calendar=upcoming_events(now.date()),
             sched_requested=trigger_path().exists(),
             sched_next_relative=_relative(sched_next, now) if sched_next else None,
             sched_alive=bool(sched)
