@@ -34,6 +34,7 @@ def settings():
         purge_days=int(os.environ.get("RADAR_PURGE_DAYS", "14")),
         offer_max_discount=float(os.environ.get("RADAR_OFFER_MAX_DISCOUNT", "0.30")),
         hero_min_score=int(os.environ.get("RADAR_HERO_MIN_SCORE", "60")),
+        auction_horizon_hours=float(os.environ.get("RADAR_AUCTION_HORIZON_HOURS", "48")),
     )
 
 
@@ -178,7 +179,18 @@ def in_queue(item, triage, now, cfg):
             return False
     elif (live.get("score") or 0) < cfg["min_score"]:
         return False
-    end = _end(item.normalized or {})
+    end = _end(n)
+    # A plain auction days from closing is "underpriced" only because bidding has barely
+    # started. It waits out of the queue until it is close enough for the bid to mean
+    # something; an auction with a Buy It Now is shown at once, since that can vanish.
+    opts = n.get("buying_options") or []
+    if (
+        "AUCTION" in opts
+        and not n.get("buy_it_now_price")
+        and end
+        and end > now + timedelta(hours=cfg.get("auction_horizon_hours", 48))
+    ):
+        return False
     return not (end and end < now)
 
 

@@ -631,3 +631,30 @@ def test_interested_listing_that_ended_moves_to_ended(client):
     assert 'id="item-1"' not in client.get("/radar?status=interested").text
     html = client.get("/radar?status=ended").text
     assert 'id="item-1"' in html and "bought / sold" in html
+
+
+def test_far_off_plain_auction_waits_but_bin_auction_shows():
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace as NS
+
+    from radar import queue
+
+    cfg = {**queue.settings(), "min_score": 70}
+    now = datetime.now(UTC)
+    data = {"value_read": "UNDERPRICED", "score": 90, "resale_estimate_usd": [300, 400]}
+    tr = NS(status="OK", relevant=True, data=data, score=90)
+
+    def lot(days, **extra):
+        n = {
+            "item_price": "9.99",
+            "shipping_cost": "5",
+            "source": "eBay",
+            "buying_options": ["AUCTION"],
+            "item_end_time": (now + timedelta(days=days)).isoformat(),
+            **extra,
+        }
+        return NS(inbox_status="NEW", normalized=n, first_seen=now)
+
+    assert queue.in_queue(lot(6), tr, now, cfg) is False  # opening bid, 6 days out
+    assert queue.in_queue(lot(1), tr, now, cfg) is True  # closes tomorrow
+    assert queue.in_queue(lot(6, buy_it_now_price="60"), tr, now, cfg) is True  # BIN can vanish
