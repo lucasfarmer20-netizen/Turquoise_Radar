@@ -84,6 +84,7 @@ class SearchOptions(BaseModel):
     max_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     sort: Literal["newlyListed", "price", "-price", "endingSoonest"] = "newlyListed"
     auto_correct: Literal["omit", "KEYWORD"] = "omit"
+    item_location_country: str | None = "US"
 
     @model_validator(mode="after")
     def range_order(self):
@@ -100,11 +101,20 @@ class SearchOptions(BaseModel):
     def params(self, query, limit, offset=0):
         modes = "FIXED_PRICE|AUCTION" if self.buying_format == "BOTH" else self.buying_format
         filters = [f"buyingOptions:{{{modes}}}"]
+        if self.item_location_country:
+            filters.append(f"itemLocationCountry:{self.item_location_country}")
         if self.min_price is not None or self.max_price is not None:
             low = "" if self.min_price is None else str(self.min_price)
             high = "" if self.max_price is None else str(self.max_price)
             filters += [f"price:[{low}..{high}]", "priceCurrency:USD"]
-        params = dict(q=query, limit=limit, offset=offset, sort=self.sort, filter=",".join(filters))
+        params = dict(
+            q=query,
+            limit=limit,
+            offset=offset,
+            sort=self.sort,
+            filter=",".join(filters),
+            fieldgroups="EXTENDED",  # adds shortDescription, so the screen can read condition
+        )
         if self.auto_correct == "KEYWORD":
             params["auto_correct"] = "KEYWORD"
         return params
@@ -113,10 +123,10 @@ class SearchOptions(BaseModel):
 class Budgets(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = True
-    max_queries: int = Field(default=4, ge=1, le=20)
-    max_results: int = Field(default=12, ge=1, le=200)
+    max_queries: int = Field(default=4, ge=1, le=200)
+    max_results: int = Field(default=12, ge=1, le=5000)
     max_pages_per_query: int = Field(default=2, ge=1, le=5)
-    page_size: int = Field(default=3, ge=1, le=50)
+    page_size: int = Field(default=3, ge=1, le=200)
 
 
 class GroupInput(BaseModel):

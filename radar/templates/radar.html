@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Radar finds{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">SCHEDULED DISCOVERY</div>
+    <h1>Radar finds</h1>
+    {% if show != "hero" %}<p class="muted">Your queue: underpriced finds scoring {{ queue_min_score }}+. Buy-It-Now under your walk-away first, then listings worth an offer, then auctions ending within 6h, then by score. Mark Interested or Pass; everything else is auto-archived and one filter away.</p>{% endif %}
+  </div>
+</div>
+
+<nav class="viewtabs" aria-label="Queues">
+  <a href="/radar" class="{{ 'on' if show != 'hero' else '' }}">Core queue <b>{{ queue_total }}</b></a>
+  <a href="/radar?show=hero" class="{{ 'on' if show == 'hero' else '' }}">Statement / hero <b>{{ hero_total }}</b></a>
+</nav>
+{% if show == "hero" %}<p class="muted small">Statement pieces: large, bold or bright work and named materials (spiny oyster, pink conch, Dry Creek, Sonoran Gold, White Water, Morenci, Royston). Contemporary first. Shown when the piece scores {{ hero_min_score }}+ and the price is at or under fair, or an offer could get it there.</p>{% endif %}
+<div class="stats">
+  <div><span>QUEUE</span><strong>{{ queue_total }}</strong><small class="muted">underpriced, score {{ queue_min_score }}+ · {{ counts.get("NEW", 0) }} new total · {{ new_24h }} found in 24h</small></div>
+  <div><span>INTERESTED</span><strong>{{ counts.get("INTERESTED", 0) }}</strong><small class="muted"><a href="/radar?status=interested">view</a></small></div>
+  <div><span>TOTAL SEEN</span><strong>{{ total }}</strong><small class="muted">{{ counts.get("IRRELEVANT", 0) }} passed · {{ triaged_total }} screened · {{ relevant_total }} relevant{% if screen_waiting %} · {{ screen_waiting }} waiting{% endif %}</small>{% if screen_paused %}<small class="rs0">Screening paused: today's ${{ screen_budget }} budget is spent (${{ screen_spent }}). Resumes at midnight UTC (3 pm Alaska in winter), or raise VISION_DAILY_BUDGET_USD in .env.</small>{% endif %}</div>
+  <div><span>LAST CYCLE</span>
+    {% if last_run %}
+      <strong class="rs3">{{ last_run_relative }}</strong>
+      <small class="muted">{{ last_run.mode }} · {{ last_run.status }} · {{ last_run.new_count }} new · {{ calls_today }} API calls today</small>
+    {% else %}
+      <strong class="rs3">never</strong><small class="muted">run <code>python -m radar.scheduler run --once</code></small>
+    {% endif %}
+    <form method="post" action="/radar/scan" class="rs5">
+      <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+      {% if sched_running %}
+        <button type="submit" disabled>Scanning…</button>
+        <small class="muted">{{ sched.reason }} cycle in progress — refresh in a minute</small>
+      {% elif sched_requested %}
+        <button type="submit" disabled>Scan requested</button>
+        <small class="muted">scheduler picks it up within 5 s</small>
+      {% elif not sched_alive %}
+        <button type="submit" disabled>Scan now</button>
+        <small class="muted">scheduler not running</small>
+      {% else %}
+        <button type="submit">Scan now</button>
+        {% if sched_next_relative %}<small class="muted">next scheduled {{ sched_next_relative }}</small>{% endif %}
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/radar">
+  <label>Screening
+    <select name="show">
+      {% for v, l in [("queue","Queue (underpriced, " ~ queue_min_score ~ "+)"),("hero","Statement / hero"),("relevant","Relevant + unscreened"),("all","Everything"),("irrelevant","Screened out"),("untriaged","Unscreened only")] %}
+      <option value="{{ v }}" {% if show == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Min score
+    <select name="min_score">
+      {% for v in [0, 40, 60, 75, 90] %}
+      <option value="{{ v }}" {% if min_score == v %}selected{% endif %}>{{ "Any" if v == 0 else v ~ "+" }}</option>{% endfor %}
+    </select></label>
+  <label>Status
+    <select name="status">
+      {% for v, l in [("new","New"),("interested","Interested"),("passed","Passed"),("archived","Archived"),("all","All")] %}
+      <option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Type
+    <select name="kind">
+      {% for v, l in [("all","Auctions + BIN"),("auction","Auctions only"),("bin","Buy It Now only")] %}
+      <option value="{{ v }}" {% if kind == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Sort
+    <select name="sort">
+      {% for v, l in [("score","Score"),("newest","Newest found"),("ending","Ending soonest"),("price","Price low→high"),("price_desc","Price high→low"),("listed","Longest listed")] %}
+      <option value="{{ v }}" {% if sort == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <label>Source
+    <select name="source">
+      <option value="">All sources</option>
+      {% for sname in sources %}<option value="{{ sname }}" {% if source == sname %}selected{% endif %}>{{ sname }}</option>{% endfor %}
+    </select></label>
+  <label>Search term
+    <select name="phrase">
+      <option value="">All terms</option>
+      {% for p in phrases %}<option value="{{ p }}" {% if phrase == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select></label>
+  <label>Found within
+    <select name="hours">
+      {% for v, l in [(0,"Any time"),(6,"6 hours"),(24,"24 hours"),(72,"3 days"),(168,"7 days")] %}
+      <option value="{{ v }}" {% if hours == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+    </select></label>
+  <button type="submit">Apply</button>
+</form>
+
+<div class="section-heading">
+  <h2>{{ total_matching }} {% if show in ("queue", "hero") and seen == "hide" %}new {% endif %}item{{ "" if total_matching == 1 else "s" }}</h2>
+  {% if show in ("queue", "hero") %}
+  <div class="seenbar">
+    {% if mark_ids %}<form method="post" action="/radar/mark-seen"><input type="hidden" name="ids" value="{{ mark_ids }}"><input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}"><button type="submit" class="secondary">Mark all as seen</button></form>{% endif %}
+    {% if seen == "hide" and seen_hidden %}<a href="/radar?show={{ show }}&seen=show">{{ seen_hidden }} seen hidden · show</a>
+    {% elif seen == "show" %}<a href="/radar?show={{ show }}">Hide seen</a>{% endif %}
+  </div>
+  {% endif %}
+  <span class="muted small">keys: <kbd>J</kbd>/<kbd>K</kbd> next/prev · <kbd>I</kbd> interested · <kbd>P</kbd> pass then <kbd>1</kbd>–<kbd>6</kbd> · <kbd>O</kbd> open · <kbd>X</kbd> select{% if pass_stats %} · passes this week: {% for r, n in pass_stats %}{{ r }} {{ n }}{{ ", " if not loop.last }}{% endfor %}{% endif %}</span>
+  {% if pages > 1 %}<span class="muted">page {{ page }} of {{ pages }}</span>{% endif %}
+</div>
+
+{% if not cards %}
+<div class="panel empty muted">{% if show == "queue" and total > 0 %}Queue is clear. Lower the min score in .env (RADAR_QUEUE_MIN_SCORE) if it stays empty for a day. {% else %}Nothing here yet. {% endif %}{% if total == 0 %}The scheduler hasn't stored any finds. Run <code>python -m radar.scheduler run --once</code>.{% else %}Try a wider filter.{% endif %}</div>
+{% endif %}
+
+{% if cards %}
+<form id="bulk" method="post" action="/radar/bulk-pass" class="bulkbar" hidden>
+  <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+  <strong><span id="bulk-count">0</span> selected</strong>
+  <select name="reason" aria-label="pass reason">
+    {% for key, label in pass_reasons.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+  </select>
+  <input type="text" name="note" maxlength="300" placeholder="note (optional)" aria-label="pass note">
+  <button type="submit">Pass selected</button>
+  <button type="button" class="secondary" id="bulk-all">Select all on page</button>
+  <button type="button" class="secondary" id="bulk-clear">Clear</button>
+</form>
+{% endif %}
+<div class="listing-grid">
+{% for c in cards %}
+  <article class="listing-card{{ ' is-seen' if c.seen else '' }}" id="item-{{ c.id }}">
+    <div class="card-top">
+      <span class="source">{% if c.status != "INTERESTED" %}<label class="pick" title="Select to pass several at once"><input type="checkbox" name="ids" value="{{ c.id }}" form="bulk" aria-label="select this listing"></label>{% endif %}{{ c.source }} · {{ c.kind }}{% if c.synthetic %} · SYNTHETIC{% endif %}</span>
+      <div class="labels">
+        {% if c.seen %}<span class="badge">SEEN</span>{% endif %}
+        {% if c.hero %}<span class="badge hero" title="{{ c.hero|join(', ') }}">HERO · {{ c.hero[0]|upper }}</span>{% endif %}
+        {% if c.era %}<span class="badge">{{ c.era|upper }}</span>{% endif %}
+        {% if c.buyable_now %}<span class="badge buy">BUY NOW</span>{% endif %}
+        {% if c.offer %}<span class="badge buy" title="Seller accepts offers. This is your walk-away price; open low and stop here.">OFFER ≤ ${{ c.offer }}</span>{% elif c.takes_offers %}<span class="badge" title="Seller accepts offers">OFFERS</span>{% endif %}
+        {% if c.condition_flags %}<span class="badge warn" title="seller's listing mentions: {{ c.condition_flags|join(', ') }}">CONDITION · {{ c.condition_flags[0]|upper }}</span>{% endif %}
+        {% if c.triaged %}<span class="badge {% if c.score >= 75 %}buy{% elif c.relevant %}review{% endif %}" title="{{ c.category }}">{{ c.score }}{% if not c.relevant %} · SCREENED OUT{% endif %}</span>{% endif %}
+        {% if c.status == "INTERESTED" %}<span class="badge buy">INTERESTED</span>{% endif %}
+        {% if c.status == "IRRELEVANT" %}<span class="badge">PASSED</span>{% endif %}
+        {% if c.status == "ARCHIVED" %}<span class="badge">ARCHIVED · {{ (c.archive_reason or "")|upper }}</span>{% endif %}
+        {% if c.is_auction and c.ends_relative and not c.ended %}<span class="badge review">ENDS {{ c.ends_relative|upper }}</span>{% endif %}
+        {% if c.ended %}<span class="badge">RECORDED END PASSED</span>{% endif %}
+      </div>
+    </div>
+    {% if c.image %}
+    <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">
+      <img src="{{ c.image }}" alt="" loading="lazy" class="rs6">
+    </a>
+    {% endif %}
+    <h3><a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.title }}</a></h3>
+    <p class="shipping">
+      {% if c.ship_status == "CONFIRMED_TO_ALASKA" %}Ships to 99669{% elif c.ship_status == "UNKNOWN" %}Alaska shipping unconfirmed{% else %}{{ c.ship_status|replace("_"," ")|lower }}{% endif %}
+      {% if c.condition %} · {{ c.condition }}{% endif %}
+      {% if c.seller %} · {{ c.seller }}{% endif %}
+    </p>
+    {% if c.triaged %}
+    <p class="shipping rs4">
+      <strong>{{ c.category }}</strong>{% if c.piece_type %} · {{ c.piece_type }}{% endif %}
+      {% if c.value_read %} · <span class="{% if c.value_read == 'Underpriced' %}accent{% else %}muted{% endif %}">{{ c.value_read }}</span>{% endif %}
+      {% if c.resale %} · resale ~${{ c.resale[0] }}–{{ c.resale[1] }}{% if c.resale_source == "owner" %} <span class="accent">(yours)</span>{% endif %}{% endif %}<br>
+      {{ c.reason }}
+      {% if c.signals %}<br><span class="rs1">+ {{ c.signals|join(" · ") }}</span>{% endif %}
+      {% if c.concerns %}<br><span class="muted">− {{ c.concerns|join(" · ") }}</span>{% endif %}
+    </p>
+    {% endif %}
+    <dl class="metrics">
+      <div><dt>{% if c.is_auction %}{{ "Current bid" if c.bid_count else "Starting bid" }}{% if c.bid_count %} · {{ c.bid_count }} bid{{ "" if c.bid_count == 1 else "s" }}{% endif %}{% else %}Price{% endif %}</dt><dd class="accent">{{ c.price|usd }}</dd></div>
+      {% if c.bin_price %}<div><dt>Buy It Now</dt><dd>{{ c.bin_price|usd }}</dd></div>{% else %}<div><dt>Shipping</dt><dd>{{ c.ship|usd }}</dd></div>{% endif %}
+      <div><dt>Landed{% if c.bin_price %} at bid{% endif %} (before tax)</dt><dd>{{ c.landed|usd }}{% if c.bin_price %} <small class="muted">+{{ c.ship|usd }} ship</small>{% endif %}</dd></div>
+      {% if c.walk %}<div class="walk {% if c.price is not none and c.price > c.walk.bid %}over{% endif %}"><dt>Walk away above</dt><dd><strong>{{ c.walk.bid|usd }}</strong> <small class="muted">{{ "bid" if c.is_auction else "price" }} · {{ (c.walk.margin * 100)|int }}% on ${{ c.walk.sale|int }}</small></dd></div>{% endif %}
+      <div><dt>{{ "Ends" if c.is_auction else "Listed end" }}</dt><dd class="small">{{ c.ends_local or "unknown" }}</dd></div>
+      {% if c.listed_days is not none %}<div><dt>Listed</dt><dd class="small">{{ "today" if c.listed_days == 0 else c.listed_days ~ " days ago" }}</dd></div>{% endif %}
+    </dl>
+    <div class="query"><span>FOUND BY</span><code>{{ c.phrase }}</code><span>{{ c.first_seen_relative }}</span></div>
+    <div class="links">
+      <span class="muted">comps for <code>{{ c.comp_query }}</code>:</span>
+      {% for label, href in c.comps %}<a href="{{ href }}" target="_blank" rel="noopener noreferrer">{{ label }}</a>{% endfor %}
+      {% if c.lens_url %}<a href="{{ c.lens_url }}" target="_blank" rel="noopener noreferrer">Google Lens</a>{% endif %}
+      {% if c.hallmark_read %}<span>hallmark read: <strong>{{ c.hallmark_read }}</strong></span>{% endif %}
+      {% if c.deep %}<span class="muted" title="all photos + description reviewed">deep-reviewed</span>{% endif %}
+      {% if c.watched_at %}<span class="muted" title="{{ c.watched_at }}">watching · bid refreshed hourly</span>{% endif %}
+      {% if c.pass_reason %}<span class="muted">passed: {{ c.pass_reason }}{% if c.pass_note %} — “{{ c.pass_note }}”{% endif %}</span>{% endif %}
+    </div>
+    <div class="feed-actions actions" data-item="{{ c.id }}">
+      {% if c.status != "INTERESTED" %}
+      <form method="post" action="/radar/{{ c.id }}/decision">
+        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+        <input type="hidden" name="next_id" value="{{ c.next_id }}">
+        <button name="decision" value="interested" data-key="i">Interested</button>
+      </form>
+      {% endif %}
+      {% if c.status != "IRRELEVANT" %}
+      <details class="pass">
+        <summary class="button secondary" data-key="p">Pass…</summary>
+        <form method="post" action="/radar/{{ c.id }}/decision" class="reasons">
+          <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+          <input type="hidden" name="next_id" value="{{ c.next_id }}">
+          <input type="hidden" name="decision" value="pass">
+          {% for key, label in pass_reasons.items() %}
+          <button name="reason" value="{{ key }}" class="secondary" data-key="{{ loop.index }}">{{ loop.index }} · {{ label }}</button>
+          {% endfor %}
+          <input type="text" name="note" maxlength="300" placeholder="note (optional) — e.g. stone cracked in half" aria-label="pass note" class="rs2">
+        </form>
+      </details>
+      {% endif %}
+      {% if c.status != "NEW" %}
+      <form method="post" action="/radar/{{ c.id }}/decision">
+        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}#item-{{ c.id }}">
+        <button class="secondary" name="decision" value="reset" data-key="u">{{ "Restore" if c.status == "ARCHIVED" else "Undo" }}</button>
+      </form>
+      {% endif %}
+      <a class="button secondary" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" data-key="o">Open on {{ c.source }}</a>
+    </div>
+    <details class="adjust">
+      <summary class="muted small">{{ "Your resale set" if c.owner_resale else "Set your resale" }}{% if c.status == "INTERESTED" %} · bought / sold{% endif %}</summary>
+      <form method="post" action="/radar/{{ c.id }}/outcome" class="outcome">
+        <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+        <label>Resale $<input name="resale_low" inputmode="numeric" size="5" value="{{ c.owner_resale[0] if c.owner_resale else '' }}" placeholder="low"></label>
+        <label>–$<input name="resale_high" inputmode="numeric" size="5" value="{{ c.owner_resale[1] if c.owner_resale else '' }}" placeholder="high"></label>
+        {% if c.status == "INTERESTED" %}
+        <label>Bought $<input name="bought_for" inputmode="decimal" size="7" value="{{ c.bought_for or '' }}" placeholder="landed"></label>
+        <label>Sold $<input name="sold_for" inputmode="decimal" size="7" value="{{ c.sold_for or '' }}" placeholder="gross"></label>
+        {% endif %}
+        <button class="secondary" type="submit">Save</button>
+      </form>
+    </details>
+  </article>
+{% endfor %}
+</div>
+
+{% if pages > 1 %}
+<div class="feed-pagination">
+  {% if page > 1 %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&source={{ source }}&page={{ page - 1 }}">← Newer</a>{% endif %}
+  {% if page < pages %}<a class="button secondary" href="/radar?status={{ status }}&kind={{ kind }}&sort={{ sort }}&phrase={{ phrase }}&hours={{ hours }}&show={{ show }}&min_score={{ min_score }}&source={{ source }}&page={{ page + 1 }}">Older →</a>{% endif %}
+</div>
+{% endif %}
+<script src="/static/radar.js" defer></script>
+{% endblock %}

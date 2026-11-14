@@ -307,7 +307,10 @@ def test_oversized_image_stops_without_untracked_retention(setup):
     assert status(root / "pilot.db")["total"] <= 8
 
 
-@pytest.mark.parametrize("endpoint", [None, "", "http://receiver.invalid/pilot-deletion", "https://receiver.invalid/wrong"])
+@pytest.mark.parametrize(
+    "endpoint",
+    [None, "", "http://receiver.invalid/pilot-deletion", "https://receiver.invalid/wrong"],
+)
 def test_receiver_configuration_required_before_enable(monkeypatch, capsys, endpoint):
     if endpoint is None:
         monkeypatch.delenv("PILOT_MATCH_ENDPOINT", raising=False)

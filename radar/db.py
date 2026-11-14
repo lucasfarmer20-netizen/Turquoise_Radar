@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, create_engine
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from radar.schemas import utcnow
@@ -177,10 +177,26 @@ class DiscoveredItem(Base):
     ebay_item_id: Mapped[str] = mapped_column(String)
     inbox_status: Mapped[str] = mapped_column(String, default="NEW")
     normalized: Mapped[dict] = mapped_column(JSON)
-    original_data: Mapped[dict] = mapped_column(JSON)
+    original_data: Mapped[dict] = mapped_column(JSON, deferred=True)
     listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
     first_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TriageResult(Base):
+    __tablename__ = "triage_results"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("discovered_items.id"), unique=True)
+    model: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)  # OK | ERROR | SKIPPED
+    relevant: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
+    data: Mapped[dict] = mapped_column(JSON)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[str] = mapped_column(String, default="0")
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class DiscoveryObservation(Base):

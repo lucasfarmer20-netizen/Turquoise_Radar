@@ -1,0 +1,26 @@
+[Unit]
+Description=Turquoise Radar discovery scheduler + vision triage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=radar
+Group=radar
+WorkingDirectory=/opt/radar
+EnvironmentFile=/opt/radar/.env
+Environment=RADAR_DATABASE_URL=sqlite:////opt/radar/data/radar.db
+ExecStart=/opt/radar/.venv/bin/python -m radar.scheduler run
+Restart=always
+RestartSec=30
+# Keep the web app and SSH responsive while a long screening pass runs.
+Nice=10
+CPUWeight=50
+MemoryHigh=1100M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/radar/data
+
+[Install]
+WantedBy=multi-user.target

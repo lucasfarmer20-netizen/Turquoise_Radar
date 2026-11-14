@@ -26,7 +26,7 @@ from radar.db import (
 )
 from radar.intake.parsers import MAX_BATCH_BYTES, MAX_MESSAGES, MessageType, parse_message
 from radar.intake.registry import SourceDefinition
-from radar.schemas import ListingInput, Money, Shipping, utcnow
+from radar.schemas import ListingInput, Money, Shipping, listing_from_record, utcnow
 from radar.sources import dedup_key, parse_import
 
 COSTS = [
@@ -391,7 +391,7 @@ def promote_candidate(session, item_id):
         raise ValueError("Candidate not found")
     if found.listing_id:
         return session.get(Listing, found.listing_id)
-    item = ListingInput.model_validate(found.normalized)
+    item = listing_from_record(found.normalized)
     key = dedup_key(item)
     row = session.scalar(select(Listing).where(Listing.dedup_key == key))
     if not row:

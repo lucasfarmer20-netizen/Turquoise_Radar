@@ -13,7 +13,7 @@ from radar.db import (
     SavedSourceSearch,
 )
 from radar.intake.service import observation_occurrences
-from radar.schemas import ListingInput
+from radar.schemas import ListingInput, listing_from_record
 from radar.workflow import queue_state
 
 AUCTION_PRIORITY = {
@@ -95,7 +95,7 @@ def inbox_cards(session, prefs):
         api_counts[o.item_id] += 1
     cards = []
     for row in session.scalars(select(DiscoveredItem).order_by(DiscoveredItem.last_seen.desc())):
-        item = ListingInput.model_validate(row.normalized)
+        item = listing_from_record(row.normalized)
         a = analyze(item, prefs)
         listing = session.get(Listing, row.listing_id) if row.listing_id else None
         text = item.raw_title.casefold()

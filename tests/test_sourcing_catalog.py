@@ -78,6 +78,7 @@ def test_staging_creates_only_disabled_group_and_missing_patterns(catalog_sessio
                 "max_price": None,
                 "sort": "newlyListed",
                 "auto_correct": "omit",
+                "item_location_country": "US",
             },
         }
         assert [entry.model_dump() for entry in plan(session, budgets(session))] == prior_plan
