@@ -29,6 +29,7 @@ DEFAULT_QUERIES = [
 ]
 BASE = "https://openapi.etsy.com/v3/application"
 PAUSE_SECONDS = 0.3
+FAST_LANE = True  # searches return newest listings first
 WEIGHT_TO_G = {
     "g": Decimal(1),
     "kg": Decimal(1000),

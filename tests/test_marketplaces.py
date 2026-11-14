@@ -140,3 +140,29 @@ def test_queries_for_uses_override_then_adapter_default(monkeypatch):
     assert marketplaces.queries_for(bonanza, seeds) == ["old pawn", "zuni inlay"]
     monkeypatch.setenv("BONANZA_QUERIES", "all")
     assert marketplaces.queries_for(bonanza, seeds) == seeds
+
+
+def test_fast_mode_runs_only_newest_first_adapters(tmp_path, monkeypatch):
+    from radar import marketplaces
+    from radar.db import database
+
+    engine, sessions = database(f"sqlite:///{tmp_path / 'f.db'}")
+    ran = []
+
+    async def etsy_search(q):
+        ran.append(("etsy", q))
+        return [], 2
+
+    async def bonanza_search(q):
+        ran.append(("bonanza", q))
+        return [], 1
+
+    monkeypatch.setattr(etsy, "configured", lambda: True)
+    monkeypatch.setattr(bonanza, "configured", lambda: True)
+    monkeypatch.setattr(etsy, "search", etsy_search)
+    monkeypatch.setattr(bonanza, "search", bonanza_search)
+    monkeypatch.setattr(etsy, "PAUSE_SECONDS", 0)
+    monkeypatch.setenv("ETSY_QUERIES", "old pawn")
+    report = asyncio.run(marketplaces.run_marketplaces(sessions, fast=True))
+    assert ran == [("etsy", "old pawn")] and list(report) == ["Etsy"]
+    engine.dispose()

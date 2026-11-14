@@ -103,9 +103,11 @@ def adapters():
     return [m for m in (etsy, bonanza) if m.configured()]
 
 
-async def run_marketplaces(sessions, queries=None):
-    """Run every configured adapter over the seed queries. Returns {source: stats}."""
-    active = adapters()
+async def run_marketplaces(sessions, queries=None, fast=False):
+    """Run every configured adapter over the seed queries. Returns {source: stats}. With
+    fast=True only adapters that return newest-first (FAST_LANE = True) run, for the
+    between-cycles check, and routine logging and state are skipped."""
+    active = [m for m in adapters() if not fast or getattr(m, "FAST_LANE", False)]
     if not active:
         return {}
     queries = queries or seed_queries()
@@ -132,6 +134,16 @@ async def run_marketplaces(sessions, queries=None):
             stats["refreshed"] += r
             await asyncio.sleep(mod.PAUSE_SECONDS)
         report[name] = stats
+        if fast:
+            if stats["new"] or stats["errors"]:
+                log.info(
+                    "fast lane %s: %d new, %d errors, %d calls",
+                    name,
+                    stats["new"],
+                    stats["errors"],
+                    stats["calls"],
+                )
+            continue
         log.info(
             "%s: %d queries, %d listings, %d new, %d refreshed, %d errors, %d calls",
             name,
@@ -142,6 +154,8 @@ async def run_marketplaces(sessions, queries=None):
             stats["errors"],
             stats["calls"],
         )
+    if fast:
+        return report
     with sessions.begin() as s:
         row = s.get(Setting, STATE_SETTING_ID)
         data = {"last_run_at": _now(), "report": report}

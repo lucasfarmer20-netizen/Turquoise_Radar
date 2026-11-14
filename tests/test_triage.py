@@ -355,11 +355,21 @@ def test_fast_cycle_screens_only_what_it_found_and_notifies(tmp_path, monkeypatc
         notified.append(True)
         return 0
 
+    from radar import marketplaces
+
+    etsy_runs = []
+
+    async def fake_markets(sessions_, queries=None, fast=False):
+        etsy_runs.append(fast)
+        return {}
+
+    monkeypatch.setattr(marketplaces, "run_marketplaces", fake_markets)
     monkeypatch.setattr(category_sweep, "run", fake_sweep)
     monkeypatch.setattr(triage, "run_triage", fake_triage)
     monkeypatch.setattr(notify, "notify_pending", fake_notify)
     assert asyncio.run(scheduler.fast_cycle(sessions, daily_limit=4000)) == 1
     assert screened == [4] and notified == [True]  # the backlog (ids 1-3) was not touched
+    assert etsy_runs == [True]
     assert scheduler.calls_today(sessions) == 4
     # near the daily call limit the fast lane stands down
     assert asyncio.run(scheduler.fast_cycle(sessions, daily_limit=300)) == 0

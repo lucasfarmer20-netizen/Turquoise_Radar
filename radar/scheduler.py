@@ -358,13 +358,18 @@ async def fast_cycle(sessions, daily_limit):
     with sessions() as s:
         before = s.scalar(select(func.max(DiscoveredItem.id))) or 0
     stats = await run_sweep(sessions, fast=True)
-    if not stats:
-        return 0
-    add_calls(sessions, stats["calls"])
-    if not stats["new"]:
-        return 0
+    if stats:
+        add_calls(sessions, stats["calls"])  # eBay calls only; Etsy has its own allowance
+    try:
+        from radar.marketplaces import run_marketplaces
+
+        await run_marketplaces(sessions, fast=True)
+    except Exception:
+        log.exception("fast lane: marketplace check failed")
     with sessions() as s:
         ids = list(s.scalars(select(DiscoveredItem.id).where(DiscoveredItem.id > before)))
+    if not ids:
+        return 0
     from radar.notify import notify_pending
     from radar.triage import run_triage
     from radar.triage import settings as triage_settings
