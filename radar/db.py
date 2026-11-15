@@ -120,7 +120,26 @@ def database(url=None):
     url = url or os.environ.get("RADAR_DATABASE_URL", "sqlite:///./data/radar.db")
     if url.startswith("sqlite:///") and url != "sqlite:///:memory:":
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(url, connect_args={"check_same_thread": False})
+    engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30})
+    wal = os.environ.get("RADAR_SQLITE_WAL", "") == "1"  # on in the service units
+    if wal and url.startswith("sqlite") and ":memory:" not in url:
+        from sqlalchemy import event
+
+        @event.listens_for(engine, "connect")
+        def _sqlite_concurrency(connection, _record):
+            """The scheduler writes while the web page reads. In SQLite's default mode a write
+            locks readers out ("database is locked"); write-ahead logging lets them read the
+            last committed state instead, and the timeout makes two writers queue, not fail."""
+            cursor = connection.cursor()
+            try:
+                cursor.execute("PRAGMA busy_timeout=30000")
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+            except Exception:  # another process holds the file this instant; next connect retries
+                pass
+            finally:
+                cursor.close()
+
     from radar.migrations import migrate
 
     migrate(engine)

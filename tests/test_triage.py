@@ -443,3 +443,24 @@ def test_cost_report_groups_by_source_and_term(tmp_path):
     assert (r["high"], r["interested"], r["tokens"]) == (1, 1, 4000)
     assert r["cost"] == Decimal("0.0030") and "old pawn" in costs.render(rows)
     engine.dispose()
+
+
+def test_page_can_read_while_the_scheduler_is_writing(tmp_path, monkeypatch):
+    from sqlalchemy import text
+
+    monkeypatch.setenv("RADAR_SQLITE_WAL", "1")
+
+    from radar.db import database
+
+    url = f"sqlite:///{tmp_path / 'wal.db'}"
+    writer_engine, writers = database(url)
+    reader_engine, readers = database(url)
+    with writers() as w:
+        w.execute(text("UPDATE discovery_groups SET id = id"))
+        w.execute(text("INSERT INTO discovery_groups (id, data) VALUES ('x', '{}')"))
+        with readers() as r:  # write transaction still open
+            assert r.execute(text("SELECT count(*) FROM discovery_groups")).scalar() == 0
+            assert r.execute(text("PRAGMA journal_mode")).scalar() == "wal"
+        w.commit()
+    writer_engine.dispose()
+    reader_engine.dispose()

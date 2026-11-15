@@ -10,6 +10,7 @@ Group=radar
 WorkingDirectory=/opt/radar
 EnvironmentFile=/opt/radar/.env
 Environment=RADAR_DATABASE_URL=sqlite:////opt/radar/data/radar.db
+Environment=RADAR_SQLITE_WAL=1
 ExecStart=/opt/radar/.venv/bin/python -m radar.scheduler run
 Restart=always
 RestartSec=30
