@@ -20,7 +20,7 @@ import logging
 import os
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 import httpx
@@ -144,7 +144,13 @@ silversmiths, Taxco masters) sell for multiples. Use what you know of that maker
 the resale range and say so in the reason. Describe only what is visible. Do not assert tribe,
 maker, mine or age as fact beyond what the title or marks state; use "style" language.
 Transcribe a hallmark only if clearly legible. Keep the reason to one sentence a buyer can
-scan, and name the price-vs-value judgment in it."""
+scan, and name the price-vs-value judgment in it.
+
+BREVITY: when a listing is not relevant, or scores under 40, the lists and the optional
+fields will never be read. Return them empty (quality_signals, concerns, statement_notes as
+[], comp_query as "", hallmark_read as null) and give only the category, score and
+one-sentence reason.
+"""
 
 
 class Verdict(BaseModel):
@@ -207,6 +213,7 @@ def settings():
         deep_budget=Decimal(os.environ.get("VISION_DEEP_DAILY_BUDGET_USD", "1.50")),
         deep_enabled=os.environ.get("VISION_DEEP_ENABLED", "true").lower() in ("1", "true", "yes"),
         deep_images=int(os.environ.get("VISION_DEEP_IMAGES", "6")),
+        deep_auction_hours=float(os.environ.get("VISION_DEEP_AUCTION_HOURS", "6")),
     )
 
 
@@ -492,7 +499,10 @@ async def screen_one(anthropic, http, model, item, max_images=1, deep=False):
     data = reconcile_verdict(v.model_dump(), n)
     if flags:
         data["condition_flags"] = flags
-    return dict(status="OK", data=data, usage=response.usage.model_dump())
+    usage = response.usage.model_dump()
+    data["tokens"] = [usage.get("input_tokens") or 0, usage.get("output_tokens") or 0]
+    data["images_sent"] = len(blobs)
+    return dict(status="OK", data=data, usage=usage)
 
 
 async def run_triage(sessions, cfg, limit=None, rescreen=False, item_ids=None):
@@ -654,6 +664,23 @@ async def hydrate_description(sessions, item_id, adapter):
     return True
 
 
+def deep_worthwhile(n, now, cfg):
+    """Whether the expensive second look is worth buying yet. A fixed price (or a Buy It Now)
+    can be acted on at once, so yes. A plain auction only gets it close to its end, when the
+    bid means something; most auctions that enter the queue two days out are bid past the
+    walk-away long before then, and reviewing them early is money spent on nothing."""
+    opts = n.get("buying_options") or []
+    if "AUCTION" not in opts or n.get("buy_it_now_price"):
+        return True
+    try:
+        end = datetime.fromisoformat(str(n.get("item_end_time")).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return True  # no closing time known (auction-house lot): few of these, review them
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=UTC)
+    return end <= now + timedelta(hours=cfg.get("deep_auction_hours", 6))
+
+
 async def run_deep(sessions, cfg, limit=None):
     """Second pass on queue items with every photo and the description, using the deep model.
     Replaces the item's verdict (model recorded), keeps the first-pass read under 'quick_'."""
@@ -677,7 +704,9 @@ async def run_deep(sessions, cfg, limit=None):
         todo = [
             (it.id, tr.id)
             for it, tr in rows
-            if in_queue(it, tr, now, qcfg) and not tr.data.get("deep")
+            if in_queue(it, tr, now, qcfg)
+            and not tr.data.get("deep")
+            and deep_worthwhile(it.normalized or {}, now, cfg)
         ]
         spent = sum(
             (

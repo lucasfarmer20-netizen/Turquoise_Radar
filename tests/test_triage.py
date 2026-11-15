@@ -396,3 +396,50 @@ def test_run_triage_item_ids_limits_the_pass(tmp_path, monkeypatch):
     )
     assert asyncio.run(triage.run_triage(sessions, cfg, item_ids=[2])) == 1 and seen == [2]
     engine.dispose()
+
+
+def test_deep_pass_waits_for_plain_auctions_to_near_their_end():
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+    cfg = {"deep_auction_hours": 6}
+    soon = (now + timedelta(hours=2)).isoformat()
+    later = (now + timedelta(hours=40)).isoformat()
+    auction = {"buying_options": ["AUCTION"]}
+    assert triage.deep_worthwhile({**auction, "item_end_time": soon}, now, cfg) is True
+    assert triage.deep_worthwhile({**auction, "item_end_time": later}, now, cfg) is False
+    assert triage.deep_worthwhile(
+        {**auction, "item_end_time": later, "buy_it_now_price": "60"}, now, cfg
+    )
+    assert triage.deep_worthwhile({"buying_options": ["FIXED_PRICE"]}, now, cfg) is True
+    assert triage.deep_worthwhile(auction, now, cfg) is True  # no end time known
+
+
+def test_cost_report_groups_by_source_and_term(tmp_path):
+    from radar import costs
+
+    engine, sessions = _db(tmp_path)
+    with sessions.begin() as s:
+        for item in s.query(DiscoveredItem):
+            item.normalized = {**item.normalized, "raw_search_phrase": "old pawn"}
+            if item.id == 1:
+                item.inbox_status = "INTERESTED"
+            s.add(
+                TriageResult(
+                    item_id=item.id,
+                    model="claude-haiku-5-5",
+                    status="OK",
+                    relevant=item.id != 3,
+                    score=90 if item.id == 1 else 40,
+                    category="X",
+                    data={"tokens": [4000, 300]},
+                    cost_usd="0.0010",
+                )
+            )
+    rows = costs.report(sessions)
+    assert len(rows) == 1
+    r = rows[0]
+    assert (r["source"], r["term"], r["screened"], r["relevant"]) == ("eBay", "old pawn", 3, 2)
+    assert (r["high"], r["interested"], r["tokens"]) == (1, 1, 4000)
+    assert r["cost"] == Decimal("0.0030") and "old pawn" in costs.render(rows)
+    engine.dispose()
