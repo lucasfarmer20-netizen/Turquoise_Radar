@@ -464,3 +464,10 @@ def test_page_can_read_while_the_scheduler_is_writing(tmp_path, monkeypatch):
         w.commit()
     writer_engine.dispose()
     reader_engine.dispose()
+
+
+def test_image_type_comes_from_the_bytes_not_the_header():
+    assert triage.sniff_media(b"\xff\xd8\xff\xe0rest", "image/png") == "image/jpeg"
+    assert triage.sniff_media(b"\x89PNG\r\n\x1a\nrest", "image/jpeg") == "image/png"
+    assert triage.sniff_media(b"RIFF0000WEBPrest", "image/jpeg") == "image/webp"
+    assert triage.sniff_media(b"unknown", "image/gif") == "image/gif"

@@ -257,13 +257,27 @@ def thumb_url(url):
     return re.sub(r"s-l\d+(\.\w+)$", r"s-l500\1", url)
 
 
+def sniff_media(data, declared):
+    """The image type from the file's first bytes. Some hosts serve a JPEG under a .png name
+    and header (Bonanza thumbnails); the model rejects a mismatch with a 400."""
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return declared
+
+
 async def fetch_image(client, url):
     r = await client.get(thumb_url(url), timeout=20)
     r.raise_for_status()
     media = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
     if media not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
         media = "image/jpeg"
-    return media, r.content
+    return sniff_media(r.content, media), r.content
 
 
 CONDITION_WORDS = (

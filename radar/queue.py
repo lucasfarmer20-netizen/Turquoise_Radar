@@ -11,7 +11,7 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 
 from radar.db import (
     AlertObservation,
@@ -215,30 +215,44 @@ def archive_reason(item, triage, now, cfg):
     return None
 
 
+BATCH = 400
+
+
+def _id_batches(sessions, where):
+    """Ids matching `where`, in lists of BATCH. Ids are a few bytes each; the listings they
+    name are loaded a batch at a time so a large backlog never sits in memory at once."""
+    with sessions() as s:
+        ids = list(s.scalars(select(DiscoveredItem.id).where(where).order_by(DiscoveredItem.id)))
+    for i in range(0, len(ids), BATCH):
+        yield ids[i : i + BATCH]
+
+
 def sweep(sessions, cfg=None, now=None):
     """Archive NEW items that no longer deserve attention. Returns {reason: count}."""
     cfg = cfg or settings()
     now = now or datetime.now(UTC)
     counts = {}
+    for ids in _id_batches(sessions, DiscoveredItem.inbox_status == "NEW"):
+        with sessions.begin() as s:
+            rows = s.execute(
+                select(DiscoveredItem, TriageResult)
+                .outerjoin(TriageResult, TriageResult.item_id == DiscoveredItem.id)
+                .where(DiscoveredItem.id.in_(ids), DiscoveredItem.inbox_status == "NEW")
+            ).all()
+            for item, triage in rows:
+                reason = archive_reason(item, triage, now, cfg)
+                if reason:
+                    item.inbox_status = ARCHIVED
+                    item.normalized = {
+                        **(item.normalized or {}),
+                        "archive_reason": reason,
+                        "archived_at": now.isoformat(),
+                    }
+                    counts[reason] = counts.get(reason, 0) + 1
+    # Interested listings that have ended leave the Interested list but are kept, under
+    # their own status, so a win can still be recorded against them.
+    grace = timedelta(minutes=cfg["ended_grace_minutes"])
     with sessions.begin() as s:
-        rows = s.execute(
-            select(DiscoveredItem, TriageResult)
-            .outerjoin(TriageResult, TriageResult.item_id == DiscoveredItem.id)
-            .where(DiscoveredItem.inbox_status == "NEW")
-        ).all()
-        for item, triage in rows:
-            reason = archive_reason(item, triage, now, cfg)
-            if reason:
-                item.inbox_status = ARCHIVED
-                item.normalized = {
-                    **(item.normalized or {}),
-                    "archive_reason": reason,
-                    "archived_at": now.isoformat(),
-                }
-                counts[reason] = counts.get(reason, 0) + 1
-        # Interested listings that have ended leave the Interested list but are kept, under
-        # their own status, so a win can still be recorded against them.
-        grace = timedelta(minutes=cfg["ended_grace_minutes"])
         for item in s.scalars(
             select(DiscoveredItem).where(DiscoveredItem.inbox_status == "INTERESTED")
         ):
@@ -256,41 +270,55 @@ def purge(sessions, cfg=None, now=None):
     """Delete listings that are over. Never touches INTERESTED items or anything with a
     vision case. Removes: items whose listing ended more than purge_days ago (any status),
     and ARCHIVED/IRRELEVANT items archived or last seen more than purge_days ago.
-    Returns {reason: count}. Set RADAR_PURGE_DAYS=0 to disable."""
+    Returns {reason: count}. Set RADAR_PURGE_DAYS=0 to disable.
+
+    Reads only the handful of fields the decision needs, never whole listing records, and
+    deletes in batches: loading every listing at once is what stalled the scheduler."""
     cfg = cfg or settings()
     if cfg["purge_days"] <= 0:
         return {}
     now = now or datetime.now(UTC)
     cutoff = now - timedelta(days=cfg["purge_days"])
     counts = {}
-    with sessions.begin() as s:
+
+    def field(name):
+        return func.json_extract(DiscoveredItem.normalized, f"$.{name}")
+
+    victims = []
+    with sessions() as s:
         keep = {cid for cid in s.scalars(select(VisionCase.candidate_id)) if cid is not None}
-        victims = []
-        for item in s.scalars(
-            select(DiscoveredItem).where(DiscoveredItem.inbox_status != "INTERESTED")
-        ):
-            if item.id in keep:
-                continue
-            n = item.normalized or {}
-            if n.get("bought_for") not in (None, ""):
-                continue  # purchase history is kept
-            end = _end(n)
+        rows = s.execute(
+            select(
+                DiscoveredItem.id,
+                DiscoveredItem.inbox_status,
+                DiscoveredItem.last_seen,
+                DiscoveredItem.first_seen,
+                field("item_end_time"),
+                field("archived_at"),
+                field("bought_for"),
+            ).where(DiscoveredItem.inbox_status != "INTERESTED")
+        )
+        for item_id, status, last_seen, first_seen, end_time, archived, bought in rows:
+            if item_id in keep or bought not in (None, ""):
+                continue  # vision cases and purchase history are kept
+            end = _end({"item_end_time": end_time})
             reason = None
             if end and end < cutoff:
                 reason = "ended"
-            elif item.inbox_status in (ARCHIVED, "IRRELEVANT"):
-                archived_at = _end({"item_end_time": n.get("archived_at")})
-                stamp = archived_at or _aware(item.last_seen) or _aware(item.first_seen)
+            elif status in (ARCHIVED, "IRRELEVANT"):
+                archived_at = _end({"item_end_time": archived})
+                stamp = archived_at or _aware(last_seen) or _aware(first_seen)
                 if stamp and stamp < cutoff:
                     reason = "archived"
             if reason:
-                victims.append((item, reason))
-        for item, reason in victims:
+                victims.append(item_id)
+                counts[reason] = counts.get(reason, 0) + 1
+    for i in range(0, len(victims), BATCH):
+        chunk = victims[i : i + BATCH]
+        with sessions.begin() as s:
             for model in (TriageResult, DiscoveryObservation, AlertObservation):
-                for row in s.scalars(select(model).where(model.item_id == item.id)):
-                    s.delete(row)
-            s.delete(item)
-            counts[reason] = counts.get(reason, 0) + 1
+                s.execute(delete(model).where(model.item_id.in_(chunk)))
+            s.execute(delete(DiscoveredItem).where(DiscoveredItem.id.in_(chunk)))
     if counts:
         log.info("purged %s", counts)
     return counts
