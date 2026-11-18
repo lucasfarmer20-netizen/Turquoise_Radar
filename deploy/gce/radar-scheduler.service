@@ -11,6 +11,7 @@ WorkingDirectory=/opt/radar
 EnvironmentFile=/opt/radar/.env
 Environment=RADAR_DATABASE_URL=sqlite:////opt/radar/data/radar.db
 Environment=RADAR_SQLITE_WAL=1
+Environment=RADAR_ISOLATE=1
 ExecStart=/opt/radar/.venv/bin/python -m radar.scheduler run
 Restart=always
 RestartSec=30
@@ -18,6 +19,10 @@ RestartSec=30
 Nice=10
 CPUWeight=50
 MemoryHigh=1100M
+# Past this, stop the offending cycle outright (the supervisor starts the next one) rather
+# than let it crawl for hours and fill swap.
+MemoryMax=1400M
+MemorySwapMax=400M
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

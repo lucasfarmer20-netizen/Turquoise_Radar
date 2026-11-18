@@ -593,6 +593,11 @@ async def run_triage(sessions, cfg, limit=None, rescreen=False, item_ids=None):
             async with sem:
                 if stop:
                     return
+                with sessions() as s:
+                    # The fast lane and a full cycle can run side by side; do not pay to
+                    # screen a listing the other one has just screened.
+                    if s.scalar(select(TriageResult.id).where(TriageResult.item_id == item.id)):
+                        return
                 result = await screen_one(anthropic, http, cfg["model"], item)
             cost = cost_usd(cfg["model"], result["usage"])
             d = result["data"]

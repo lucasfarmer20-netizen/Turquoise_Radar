@@ -69,7 +69,7 @@ def write_state(**fields):
         current = read_state()
         current.update(fields)
         current["updated_at"] = datetime.now(UTC).isoformat()
-        tmp = state_path().with_suffix(".tmp")
+        tmp = state_path().with_suffix(f".{os.getpid()}.tmp")  # two processes may write
         tmp.write_text(json.dumps(current), encoding="utf-8")
         tmp.replace(state_path())
     except OSError as e:  # state is advisory; never fail a cycle over it
@@ -335,9 +335,7 @@ async def cycle(sessions, connection, mode, daily_limit):
     except Exception:
         log.exception("auction watch / reconcile failed")
     try:
-        from radar.notify import notify_pending
-
-        await notify_pending(sessions)
+        await notify_once(sessions)
     except Exception:
         log.exception("notification failed; will retry next cycle")
     try:
@@ -367,6 +365,23 @@ def _latest_run(sessions, after=0):
 FAST_RESERVE_CALLS = 400
 
 
+async def notify_once(sessions):
+    """Send pending alerts, one process at a time. The fast lane and a full cycle run side by
+    side; without the lock both could send the same find."""
+    import fcntl
+
+    from radar.notify import notify_pending
+
+    lock = state_path().with_name("notify.lock")
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock, "w") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return 0  # the other process is sending now and will include these
+        return await notify_pending(sessions)
+
+
 async def fast_cycle(sessions, daily_limit):
     """Between full cycles: fetch the newest listings in the jewelry category, screen only
     those, and notify at once. A mispriced Buy It Now sells in minutes; the hourly cycle is
@@ -388,14 +403,13 @@ async def fast_cycle(sessions, daily_limit):
         log.exception("fast lane: marketplace check failed")
     with sessions() as s:
         ids = list(s.scalars(select(DiscoveredItem.id).where(DiscoveredItem.id > before)))
-    from radar.notify import notify_pending
     from radar.triage import run_triage
     from radar.triage import settings as triage_settings
 
     if ids:
         await run_triage(sessions, triage_settings(), item_ids=ids)
     # Always check: an auction already known may just have entered its last hour.
-    await notify_pending(sessions)
+    await notify_once(sessions)
     return len(ids)
 
 
@@ -473,6 +487,77 @@ def cycle_running(state, now=None):
     except (TypeError, ValueError):
         return False
     return ((now or datetime.now(UTC)) - seen).total_seconds() <= STALE_AFTER_SECONDS
+
+
+FULL_LIMIT_SECONDS = 3 * 3600
+FAST_LIMIT_SECONDS = 15 * 60
+
+
+def supervise(cfg, env=None, spawn=None, sleep=time.sleep, rounds=None):
+    """Run every full cycle and every fast check as its own short-lived process.
+
+    Two reasons. Memory: a process that lived for days grew until the system throttled it and
+    every request timed out; a child gives all its memory back when it exits. Speed: the fast
+    lane no longer waits for a full cycle to finish, so a 50-minute cycle costs it nothing.
+    This loop itself only starts, watches and reaps children."""
+    import subprocess
+
+    stop = {"flag": False}
+
+    def _stop(*_):
+        stop["flag"] = True
+
+    if rounds is None:
+        signal.signal(signal.SIGINT, _stop)
+        signal.signal(signal.SIGTERM, _stop)
+    base = [sys.executable, "-m", "radar.scheduler"]
+    tail = ["--env", str(env)] if env else []
+    spawn = spawn or (lambda args: subprocess.Popen(base + args + tail, cwd=ROOT))
+    interval = cfg["hours"] * 3600
+    fast_every = cfg.get("fast_minutes", 0) * 60
+    full = fast = None
+    full_started = fast_started = 0.0
+    next_at = datetime.now(UTC)  # first cycle at once
+    next_fast = time.monotonic() + min(fast_every, 60)
+    while not stop["flag"] and (rounds is None or rounds > 0):
+        if rounds is not None:
+            rounds -= 1
+        clock = time.monotonic()
+        if full is not None and full.poll() is not None:
+            if full.returncode:
+                log.warning("full cycle exited with code %s", full.returncode)
+            full = None
+            next_at = next_boundary(datetime.now(UTC), interval)
+            write_state(
+                running=False,
+                finished_at=datetime.now(UTC).isoformat(),
+                next_at=next_at.isoformat(),
+                interval_hours=cfg["hours"],
+            )
+            log.info("next cycle at %s", next_at.astimezone().strftime("%H:%M %Z"))
+        if fast is not None and fast.poll() is not None:
+            fast = None
+        if full is not None and clock - full_started > FULL_LIMIT_SECONDS:
+            log.warning("full cycle ran past %d s; stopping it", FULL_LIMIT_SECONDS)
+            full.kill()
+        if fast is not None and clock - fast_started > FAST_LIMIT_SECONDS:
+            log.warning("fast check ran past %d s; stopping it", FAST_LIMIT_SECONDS)
+            fast.kill()
+            record_fast(0, False)
+        requested = trigger_path().exists()
+        if full is None and (requested or datetime.now(UTC) >= next_at):
+            if requested:
+                log.info("scan requested from the web app; running now")
+                trigger_path().unlink(missing_ok=True)
+            full, full_started = spawn(["run", "--once"]), clock
+        if fast_every and fast is None and clock >= next_fast:
+            fast, fast_started = spawn(["fast"]), clock
+            next_fast = clock + fast_every
+        sleep(2)
+    for child in (full, fast):
+        if child is not None and child.poll() is None:
+            child.terminate()
+    write_state(running=False)
 
 
 def run_forever(sessions, connection, cfg, once=False):
@@ -606,7 +691,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["seed", "run", "status", "prune-foreign"])
+    parser.add_argument("command", choices=["seed", "run", "fast", "status", "prune-foreign"])
     parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
     parser.add_argument("--env", help="path to .env (default: repo root .env)")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -630,6 +715,14 @@ def main(argv=None):
             )
         elif args.command == "status":
             status(sessions, cfg)
+        elif args.command == "fast":
+            found, ok = 0, True
+            try:
+                found = asyncio.run(fast_cycle(sessions, cfg["daily_limit"]))
+            except Exception:
+                ok = False
+                log.exception("fast lane failed; will retry")
+            record_fast(found, ok)
         elif args.command == "prune-foreign":
             print(f"marked {prune_foreign(sessions)} non-US items as passed")
         else:
@@ -649,7 +742,11 @@ def main(argv=None):
                 cfg["hours"],
                 cfg["daily_limit"],
             )
-            run_forever(sessions, connection, cfg, once=args.once)
+            if os.environ.get("RADAR_ISOLATE") == "1" and not args.once:
+                engine.dispose()  # the children open their own connections
+                supervise(cfg, env=args.env)
+            else:
+                run_forever(sessions, connection, cfg, once=args.once)
     finally:
         engine.dispose()
     return 0

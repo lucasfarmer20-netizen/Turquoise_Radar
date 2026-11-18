@@ -1,6 +1,7 @@
 """Triage unit tests with a fake model and fake image server; no network."""
 
 import asyncio
+import json
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -471,3 +472,86 @@ def test_image_type_comes_from_the_bytes_not_the_header():
     assert triage.sniff_media(b"\x89PNG\r\n\x1a\nrest", "image/jpeg") == "image/png"
     assert triage.sniff_media(b"RIFF0000WEBPrest", "image/jpeg") == "image/webp"
     assert triage.sniff_media(b"unknown", "image/gif") == "image/gif"
+
+
+class _Child:
+    def __init__(self, polls_until_done):
+        self.left, self.returncode, self.killed = polls_until_done, None, False
+
+    def poll(self):
+        if self.left > 0:
+            self.left -= 1
+            return None
+        self.returncode = 0
+        return 0
+
+    def kill(self):
+        self.killed, self.left = True, 0
+
+    terminate = kill
+
+
+def test_supervisor_runs_fast_checks_while_a_full_cycle_is_still_running(tmp_path, monkeypatch):
+    from radar import scheduler
+
+    monkeypatch.setenv("RADAR_STATE_DIR", str(tmp_path))
+    monkeypatch.setattr(scheduler, "state_path", lambda: tmp_path / "state.json")
+    monkeypatch.setattr(scheduler, "trigger_path", lambda: tmp_path / "trigger")
+    clock = {"t": 0.0}
+    monkeypatch.setattr(scheduler.time, "monotonic", lambda: clock["t"])
+    started = []
+
+    def spawn(args):
+        started.append((args[0], clock["t"]))
+        return _Child(10_000 if args[0] == "run" else 1)
+
+    def sleep(_):
+        clock["t"] += 60
+
+    scheduler.supervise(dict(hours=1, fast_minutes=5), spawn=spawn, sleep=sleep, rounds=31)
+    kinds = [k for k, _ in started]
+    assert kinds.count("run") == 1  # one full cycle, never a second on top of it
+    assert kinds.count("fast") >= 5  # the fast lane kept going for the half hour it ran
+    assert json.loads((tmp_path / "state.json").read_text())["running"] is False
+
+
+def test_supervisor_stops_a_fast_check_that_hangs(tmp_path, monkeypatch):
+    from radar import scheduler
+
+    monkeypatch.setattr(scheduler, "state_path", lambda: tmp_path / "state.json")
+    monkeypatch.setattr(scheduler, "trigger_path", lambda: tmp_path / "trigger")
+    clock = {"t": 0.0}
+    monkeypatch.setattr(scheduler.time, "monotonic", lambda: clock["t"])
+    children = []
+
+    def spawn(args):
+        children.append((args[0], _Child(10_000)))
+        return children[-1][1]
+
+    def sleep(_):
+        clock["t"] += 120
+
+    scheduler.supervise(dict(hours=1, fast_minutes=5), spawn=spawn, sleep=sleep, rounds=12)
+    fasts = [c for kind, c in children if kind == "fast"]
+    assert fasts[0].killed and len(fasts) >= 2
+    assert scheduler.fast_summary(scheduler.read_state())["ok"] is False
+
+
+def test_only_one_process_sends_alerts_at_a_time(tmp_path, monkeypatch):
+    import fcntl
+
+    from radar import notify, scheduler
+
+    monkeypatch.setattr(scheduler, "state_path", lambda: tmp_path / "state.json")
+    calls = []
+
+    async def fake(sessions):
+        calls.append(1)
+        return 3
+
+    monkeypatch.setattr(notify, "notify_pending", fake)
+    assert asyncio.run(scheduler.notify_once(None)) == 3
+    with open(tmp_path / "notify.lock", "w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        assert asyncio.run(scheduler.notify_once(None)) == 0
+    assert len(calls) == 1
