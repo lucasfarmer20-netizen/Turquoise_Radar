@@ -394,6 +394,12 @@ def parse_message(raw: bytes, source_id: str, source: SourceDefinition, received
         return parse_auction_email(
             message, platform, source, html_parts, texts, attachments, received_override
         )
+    if source_id == "proxibid" or any(d.endswith("proxibid.com") for d in source.domains):
+        from radar.intake.proxibid_email import parse_proxibid_email
+
+        proxibid = parse_proxibid_email(message, source, html_parts, attachments, received_override)
+        if proxibid is not None:
+            return proxibid
     if source_id in {"shopgoodwill", "hibid"}:
         from radar.intake.search_email import parse_search_email
 

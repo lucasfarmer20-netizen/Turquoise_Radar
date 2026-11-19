@@ -1,0 +1,83 @@
+{
+  "_comment": "Owner-supplied search terms, 2026-11-09. Verbatim strings are what the owner would type; 'variants' are deliberate misspellings/under-descriptions a careless seller might use. Every query runs against every enabled source adapter. Do not 'correct' the misspelled ones. Auctions are sorted endingSoonest; with an hourly cycle each term's page covers several hours of endings, so every auction is captured with 1-6h notice. Seeding disables the code's built-in DEFAULT_GROUPS so this file is the single source of truth; the best of those terms live in 'Under-description bait'.",
+  "groups": [
+    {
+      "name": "Native American / Southwest",
+      "queries": [
+        "Native american jewelry",
+        "Nature American Jewelry",
+        "Native America Jewelry",
+        "Native American Jewlry",
+        "Navajo Jewelry",
+        "Navaho Jewelry",
+        "Old Pawn",
+        "navajo cuff",
+        "zuni inlay",
+        "concho belt",
+        "native american copper cuff",
+        "Fred Harvey era"
+      ]
+    },
+    {
+      "name": "Turquoise",
+      "queries": [
+        "Turqoise Jewelry",
+        "old blue stone ring",
+        "Old blue stone bracelet",
+        "turquoise cuff sterling",
+        "squash blossom necklace",
+        "turquoise sterling lot"
+      ]
+    },
+    {
+      "name": "Sterling / vintage silver (under-described)",
+      "queries": [
+        "Vintage silver jewelry",
+        "Vintage silver-tone jewelry",
+        "Sterling Silver Ring Lot",
+        "southwestern sterling lot",
+        "estate sterling jewelry lot"
+      ]
+    },
+    {
+      "name": "Mexican silver",
+      "queries": [
+        "taxco"
+      ]
+    },
+    {
+      "name": "Under-description bait",
+      "queries": [
+        "grandma's silver jewelry",
+        "silver jewelry jar",
+        "mystery silver jewelry",
+        "heavy silver bracelet",
+        "old stamped jewelry",
+        "Navjo",
+        "Zunni"
+      ]
+    },
+    {
+      "name": "Statement / hero",
+      "queries": [
+        "spiny oyster necklace",
+        "pink conch sterling",
+        "Royston turquoise cuff",
+        "Morenci turquoise sterling",
+        "Dry Creek turquoise",
+        "Sonoran Gold turquoise",
+        "White Water turquoise",
+        "statement turquoise necklace",
+        "large turquoise cluster cuff"
+      ]
+    }
+  ],
+  "buying_options": [
+    "FIXED_PRICE",
+    "AUCTION"
+  ],
+  "sorts": {
+    "FIXED_PRICE": "newlyListed",
+    "AUCTION": "endingSoonest"
+  }
+}

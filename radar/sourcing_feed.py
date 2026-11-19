@@ -18,7 +18,7 @@ from radar.db import (
 from radar.ebay_deletion.processing import REMOVED, is_ebay
 from radar.intake.service import observation_occurrences
 from radar.research_evidence import research_projection
-from radar.schemas import ListingInput, Shipping, utcnow
+from radar.schemas import Shipping, listing_from_record, utcnow
 from radar.workflow import queue_state
 
 
@@ -221,13 +221,13 @@ def _build_feed(session, prefs):
         groups.setdefault(key, (listing, []))[1].append(row)
     cards = []
     for key, (listing, linked) in groups.items():
-        item = ListingInput.model_validate(listing.data if listing else linked[0].normalized)
+        item = listing_from_record(listing.data if listing else linked[0].normalized)
         analysis = analyze(item, prefs)
         research = research_projection(item, analysis)
         modes = _item_datasets(item)
         history, observed = [], []
         for row in linked:
-            modes.update(_item_datasets(ListingInput.model_validate(row.normalized)))
+            modes.update(_item_datasets(listing_from_record(row.normalized)))
             modes.update(datasets[row.id])
             history.extend(queries[row.id])
             observed.extend([_utc(row.last_seen), *times[row.id]])

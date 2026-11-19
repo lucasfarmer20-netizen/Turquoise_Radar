@@ -249,10 +249,14 @@ def test_browse_candidate_uses_discovery_promotion_and_preserves_provider_envelo
     assert f'href="/vision/for/candidate/{row.id}"' not in response.text
     assert f'href="/discovery/items/{row.id}"' not in response.text
     assert client.post(action, follow_redirects=False).status_code == 409
-    assert client.post(
-        f"/feed/review/candidate/{row.id}", data={"decision": "GO"},
-        headers={"Accept": "application/json"}
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/feed/review/candidate/{row.id}",
+            data={"decision": "GO"},
+            headers={"Accept": "application/json"},
+        ).status_code
+        == 200
+    )
     with client.app.state.sessions() as session:
         linked = session.get(DiscoveredItem, row.id)
         promoted = session.get(Listing, linked.listing_id)

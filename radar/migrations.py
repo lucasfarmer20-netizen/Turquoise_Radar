@@ -149,7 +149,16 @@ VERSION_6 = [
     "CREATE INDEX ix_maker_runs_case ON maker_runs(case_id)",
     "CREATE INDEX ix_maker_decisions_case ON maker_decisions(case_id)",
 ]
-CURRENT_VERSION = 6
+VERSION_7 = [
+    """CREATE TABLE triage_results (id INTEGER PRIMARY KEY,
+        item_id INTEGER NOT NULL UNIQUE REFERENCES discovered_items(id),
+        model VARCHAR NOT NULL, status VARCHAR NOT NULL, relevant BOOLEAN,
+        score INTEGER, category VARCHAR, data JSON NOT NULL,
+        input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+        cost_usd VARCHAR NOT NULL DEFAULT '0', created_at DATETIME NOT NULL)""",
+    "CREATE INDEX ix_triage_score ON triage_results(relevant, score)",
+]
+CURRENT_VERSION = 7
 
 
 def migrate(engine):
@@ -188,6 +197,9 @@ def migrate(engine):
                     conn.exec_driver_sql(statement)
             if version < 6:
                 for statement in VERSION_6:
+                    conn.exec_driver_sql(statement)
+            if version < 7:
+                for statement in VERSION_7:
                     conn.exec_driver_sql(statement)
             conn.exec_driver_sql(f"PRAGMA user_version={CURRENT_VERSION}")
             conn.commit()

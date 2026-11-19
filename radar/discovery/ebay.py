@@ -293,6 +293,20 @@ class EbayAdapter(SourceAdapter):
             result.errors.append(f"{e.code}: {e}")
         return result
 
+    async def get_item(self, item_id):
+        """Browse getItem for one listing (current bid, bid count, end date, ship-to)."""
+        token = await self.access_token()
+        data = await self._request(
+            "GET",
+            f"/buy/browse/v1/item/{item_id}",
+            headers={
+                "Authorization": "Bearer " + token,
+                "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+                "X-EBAY-C-ENDUSERCTX": "contextualLocation=country%3DUS%2Czip%3D99669",
+            },
+        )
+        return self.public_data(data)
+
     async def retrieve(self, exact_query):
         result = await self.search(exact_query, SearchOptions(), limit=12)
         return [
@@ -397,6 +411,10 @@ def normalize(raw, mode, query, original_query, corrected=None, pattern_id=None)
         options = raw.get("buyingOptions", [])
         price = raw.get("currentBidPrice") if "AUCTION" in options else raw.get("price")
         price = price or {}
+        bin_price = None
+        if "AUCTION" in options and "FIXED_PRICE" in options:
+            bin_price = (raw.get("price") or {}).get("value")
+        bid_count = raw.get("bidCount") if "AUCTION" in options else None
         shipping = raw.get("shippingOptions") or []
         shipping_price = shipping[0].get("shippingCost", {}) if shipping else {}
         shipping_value = (
@@ -422,6 +440,8 @@ def normalize(raw, mode, query, original_query, corrected=None, pattern_id=None)
             currency=price.get("currency", "XXX"),
             seller_id=seller.get("username"),
             buying_options=options,
+            buy_it_now_price=bin_price,
+            bid_count=bid_count if isinstance(bid_count, int) and bid_count >= 0 else None,
             condition=raw.get("condition"),
             category=category,
             image_urls=[image["imageUrl"]] if image.get("imageUrl") else [],

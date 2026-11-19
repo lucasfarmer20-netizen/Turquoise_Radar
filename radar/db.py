@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, create_engine
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from radar.schemas import utcnow
@@ -120,7 +120,26 @@ def database(url=None):
     url = url or os.environ.get("RADAR_DATABASE_URL", "sqlite:///./data/radar.db")
     if url.startswith("sqlite:///") and url != "sqlite:///:memory:":
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(url, connect_args={"check_same_thread": False})
+    engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30})
+    wal = os.environ.get("RADAR_SQLITE_WAL", "") == "1"  # on in the service units
+    if wal and url.startswith("sqlite") and ":memory:" not in url:
+        from sqlalchemy import event
+
+        @event.listens_for(engine, "connect")
+        def _sqlite_concurrency(connection, _record):
+            """The scheduler writes while the web page reads. In SQLite's default mode a write
+            locks readers out ("database is locked"); write-ahead logging lets them read the
+            last committed state instead, and the timeout makes two writers queue, not fail."""
+            cursor = connection.cursor()
+            try:
+                cursor.execute("PRAGMA busy_timeout=30000")
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+            except Exception:  # another process holds the file this instant; next connect retries
+                pass
+            finally:
+                cursor.close()
+
     from radar.migrations import migrate
 
     migrate(engine)
@@ -177,10 +196,26 @@ class DiscoveredItem(Base):
     ebay_item_id: Mapped[str] = mapped_column(String)
     inbox_status: Mapped[str] = mapped_column(String, default="NEW")
     normalized: Mapped[dict] = mapped_column(JSON)
-    original_data: Mapped[dict] = mapped_column(JSON)
+    original_data: Mapped[dict] = mapped_column(JSON, deferred=True)
     listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"))
     first_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TriageResult(Base):
+    __tablename__ = "triage_results"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("discovered_items.id"), unique=True)
+    model: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)  # OK | ERROR | SKIPPED
+    relevant: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
+    data: Mapped[dict] = mapped_column(JSON)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[str] = mapped_column(String, default="0")
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class DiscoveryObservation(Base):

@@ -336,6 +336,8 @@ class ListingInput(BaseModel):
     query_attribution_verified: bool | None = None
     combined_shipping_evidence: str | None = None
     buying_options: list[str] = Field(default_factory=list)
+    buy_it_now_price: Money | None = None  # set when an auction also offers Buy It Now
+    bid_count: int | None = Field(default=None, ge=0)
     item_end_time: datetime | None = None
     shipping_evidence: str | None = None
     discovery_mode: Literal["fixture", "sandbox", "production"] | None = None
@@ -432,3 +434,12 @@ class FeedbackInput(BaseModel):
 
 def utcnow():
     return datetime.now(UTC)
+
+
+def listing_from_record(data):
+    """A ListingInput from a stored listing record. Stored records also carry annotations the
+    radar and the owner add later (seen, pass note, resale override, notification stamps);
+    those are not listing fields and are left out here rather than rejected."""
+    return ListingInput.model_validate(
+        {k: v for k, v in (data or {}).items() if k in ListingInput.model_fields}
+    )

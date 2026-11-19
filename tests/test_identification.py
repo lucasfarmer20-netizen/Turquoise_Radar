@@ -388,7 +388,15 @@ def test_missing_directory_never_initializes_replacement(owner_client, tmp_path)
 def test_migration_preserves_all_v5_tables(tmp_path):
     from sqlalchemy import create_engine
 
-    from radar.migrations import VERSION_1, VERSION_2, VERSION_3, VERSION_4, VERSION_5, migrate
+    from radar.migrations import (
+        CURRENT_VERSION,
+        VERSION_1,
+        VERSION_2,
+        VERSION_3,
+        VERSION_4,
+        VERSION_5,
+        migrate,
+    )
 
     p = tmp_path / "old.db"
     with sqlite3.connect(p) as c:
@@ -410,11 +418,11 @@ def test_migration_preserves_all_v5_tables(tmp_path):
     migrate(engine)
     engine.dispose()
     with sqlite3.connect(p) as c:
-        assert c.execute("pragma user_version").fetchone()[0] == 6
+        assert c.execute("pragma user_version").fetchone()[0] == CURRENT_VERSION
         assert all(c.execute("select * from " + t).fetchall() == rows for t, rows in before.items())
         assert c.execute("pragma integrity_check").fetchone()[0] == "ok"
         assert not c.execute("pragma foreign_key_check").fetchall()
-    assert (tmp_path / "old.db.pre-v6.bak").exists()
+    assert (tmp_path / f"old.db.pre-v{CURRENT_VERSION}.bak").exists()
 
 
 def test_negated_symbols_and_unknown_source_identity_do_not_invent_a_maker():

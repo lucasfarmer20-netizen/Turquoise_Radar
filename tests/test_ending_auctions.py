@@ -27,7 +27,8 @@ def test_ending_soon_requires_explicit_auction():
         "limit": 3,
         "offset": 0,
         "sort": "endingSoonest",
-        "filter": "buyingOptions:{AUCTION}",
+        "filter": "buyingOptions:{AUCTION},itemLocationCountry:US",
+        "fieldgroups": "EXTENDED",
     }
 
 
@@ -45,7 +46,7 @@ def test_real_adapter_wire_is_bounded_and_fields_remain_factual():
         if request.url.path.endswith("/token"):
             return httpx.Response(200, json={"access_token": "SYNTHETIC-token", "expires_in": 3600})
         assert request.url.params["sort"] == "endingSoonest"
-        assert request.url.params["filter"] == "buyingOptions:{AUCTION}"
+        assert request.url.params["filter"] == "buyingOptions:{AUCTION},itemLocationCountry:US"
         assert request.url.params["limit"] == "3"
         assert "99669" in request.headers["X-EBAY-C-ENDUSERCTX"]
         return httpx.Response(200, json={"itemSummaries": [raw], "total": 1})
@@ -96,9 +97,12 @@ def test_fixture_sorts_known_end_times_and_honors_page_cap(tmp_path):
 def test_buyer_analysis_keeps_existing_evidence_rules(item, prefs):
     # Source identity does not create a blanket ban or manufacture financial evidence.
     original = analyze(item, prefs)
-    buyer = analyze(item.model_copy(update={
-        "source": "eBay", "synthetic": False, "discovery_mode": "production"
-    }), prefs)
+    buyer = analyze(
+        item.model_copy(
+            update={"source": "eBay", "synthetic": False, "discovery_mode": "production"}
+        ),
+        prefs,
+    )
     assert buyer.model_dump() == original.model_dump()
 
 
