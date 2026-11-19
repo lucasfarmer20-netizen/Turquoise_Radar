@@ -148,11 +148,14 @@ def _find_line(t, i, cfg, slack):
     if walk:
         word = "max bid" if kind == "bid" else "max price"
         limit = f"*{word} {_usd(walk['bid'])}* · " if slack else f"{word} {_usd(walk['bid'])} · "
+    # An offer candidate is in the alert on the piece's quality; its stored score is marked
+    # down for the asking price, which the offer is meant to fix. Show the quality score.
+    score = (d.get("model_score") or t.score) if offer else t.score
     if slack:
-        head = f"*{t.score}* · {tag}<{ebay}|{title}>"
+        head = f"*{score}* · {tag}<{ebay}|{title}>"
         tail = f"<{card}|card>"
     else:
-        head = f"[{t.score}] {tag}{title}"
+        head = f"[{score}] {tag}{title}"
         tail = ebay
     return (
         f"{head}\n"
@@ -179,7 +182,10 @@ def build_message(finds, ending, now, cfg, slack):
         n = len(finds)
         plural = "s" if n != 1 else ""
         ge = "\u2265" if slack else ">="
-        head = f"{n} new find{plural} (score {ge} {cfg['min_score']}, underpriced)"
+        head = (
+            f"{n} new find{plural} (score {ge} {cfg['min_score']}; "
+            "under your max, or within reach by offer)"
+        )
         parts.append(f"*{head}*" if slack else head)
         cap = cfg.get("max_items", 10)
         parts += [_find_line(t, i, cfg, slack) for t, i in finds[:cap]]
