@@ -8,11 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from radar.jewelry.config import HAIKU_QUICK_MAX_TOKENS
 from radar.jewelry.validation import reference_error, rule_error
 
-PROMPT_VERSION = "jewelry-3"
-SCHEMA_VERSION = "3"
+PROMPT_VERSION = "jewelry-4"
+SCHEMA_VERSION = "4"
 OWNER = "local-owner"
 Role = Literal["FRONT", "BACK_HALLMARK", "STONE", "SIDE_DETAIL"]
 Stage = Literal["QUICK", "DEEP"]
+# Apparent colour of a sub-item's metal as photographed. This is never a
+# material, purity, karat or plating claim; a GOLD_TONE sub-item may be brass,
+# gold-filled, plated or gilded, and tone alone must not change any financial,
+# material or attribution evidence.
+Tone = Literal["GOLD_TONE", "SILVER_TONE", "OTHER_TONE", "UNKNOWN"]
 Kind = Literal[
     "RING",
     "CUFF",
@@ -172,6 +177,9 @@ class SubItem(Strict):
     location_hint: str = Field(min_length=1)
     finding_keys: list[str] = Field(min_length=1, max_length=8)
     uncertainty: str = Field(min_length=1)
+    # Defaulted so findings cached under schema 3 stay valid and are never
+    # silently reinterpreted as carrying a tone observation.
+    tone: Tone = "UNKNOWN"
 
     @field_validator("label", "location_hint", "uncertainty")
     @classmethod

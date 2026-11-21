@@ -25,6 +25,7 @@ from radar.jewelry.images import ORIGINAL_PROCESSING_VERSION, private_path, read
 from radar.jewelry.schemas import OWNER, PROMPT_VERSION, SCHEMA_VERSION, Correction, VisionResult
 from radar.jewelry.scoring import visual_score
 from radar.schemas import utcnow
+from radar.tray import tray_signal
 from radar.vision import AnthropicVisionProvider, FixtureVisionProvider, VisionImage
 
 
@@ -409,6 +410,9 @@ async def analyze(
                 **run.data,
                 "result": result.model_dump(mode="json"),
                 "score": visual_score(result),
+                # Deterministic describe-vs-depict gap over the same listing text
+                # already permitted into provider context. Never a valuation.
+                "tray": tray_signal(context, result),
                 "usage": response.usage,
                 "request_id": response.request_id,
                 "reported_model": response.reported_model,

@@ -332,7 +332,7 @@ def test_prompt_names_valid_unknown_classification_and_version_changes():
     from radar.jewelry.schemas import PROMPT_VERSION, SCHEMA_VERSION
 
     assert "classification UNKNOWN" in SYSTEM_PROMPT and "INCONCLUSIVE" not in SYSTEM_PROMPT
-    assert PROMPT_VERSION == "jewelry-3" and SCHEMA_VERSION == "3"
+    assert PROMPT_VERSION == "jewelry-4" and SCHEMA_VERSION == "4"
 
 
 def test_diagnostic_unknown_types_context_messages_and_paths_cannot_leak():

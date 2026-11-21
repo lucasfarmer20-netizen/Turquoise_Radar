@@ -34,7 +34,11 @@ Generic purity/material/coating marks (925, STERLING, 14K, GF, EPNS) alone canno
 support a maker research name.
 Never change ownership, listing facts, purchase costs, shipping evidence or valuations.
 For mixed lots, describe distinguishable research sub-items with location and photo ID;
-do not invent independent marketplace listings. If the piece type cannot be determined,
+do not invent independent marketplace listings. Give each sub-item an apparent metal
+tone of GOLD_TONE, SILVER_TONE, OTHER_TONE or UNKNOWN. Tone is the colour you can see
+and nothing more: it is never a claim about material, purity, karat, plating or value,
+a gold-coloured piece may be brass, gilt, plated or filled, and an unclear or mixed
+piece stays UNKNOWN. If the piece type cannot be determined,
 use classification UNKNOWN and explain the inconclusive evidence in the summary.
 Return the strict requested schema. Material and cultural attribution stay UNVERIFIED;
 independent owner evidence is NOT_ASSESSED. Never put unsupported claims in prose.

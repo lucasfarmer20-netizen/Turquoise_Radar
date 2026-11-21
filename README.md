@@ -110,6 +110,24 @@ and start the app with `RADAR_DATABASE_URL=sqlite:///./data/vision-demo.db`. Nev
 seed demos into owner inventory. No cloud republication is needed for fixture use;
 the existing frozen installation command installs the new locked dependencies.
 
+## Tray lots: the describe-vs-depict gap
+
+Mixed estate trays clear cheap because specialists bid their specialty and ignore
+the rest, and because houses audit the claims they make rather than the ones they
+omit. `radar/tray.py` scores how much of a depicted lot the listing never names,
+so undercatalogued trays sort to the top of the review queue.
+
+Both sides are deterministic: distinguishable `sub_items` on one side, a literal
+scan of the listing title and description for item nouns on the other. No total
+piece count is estimated — the vision prompt forbids it and that holds here.
+Sub-items also carry an apparent `tone`, which records photographed colour only
+and is never a material, purity or karat claim; an undescribed gold-toned item in
+an otherwise silver tray carries the heaviest weight because it is the clearest
+case of value the catalogue never priced.
+
+This produces a research priority, never a valuation or a bid. Read
+[tray lots](docs/TRAY-LOTS.md) for the scoring table and limitations.
+
 ## Local hallmark reference similarity (JRI-003)
 
 Compare a privately supplied hallmark photograph against eligible local mark

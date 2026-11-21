@@ -287,8 +287,8 @@ def test_complete_long_report_sdk_persistence_rendering_and_privacy(client, capl
     with client.app.state.sessions() as s:
         row = s.scalar(select(VisionRun))
         assert row.status == "SUCCESS" and row.data["result"] == expected
-        assert row.data["schema_version"] == SCHEMA_VERSION == "3"
-        assert row.data["prompt_version"] == "jewelry-3"
+        assert row.data["schema_version"] == SCHEMA_VERSION == "4"
+        assert row.data["prompt_version"] == "jewelry-4"
         assert s.scalar(select(VisionFinding)).data == expected["findings"][0]
         assert s.scalar(select(VisionSubItem)).data == expected["sub_items"][0]
         assert s.scalar(select(Listing)).data == original_listing
